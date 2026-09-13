@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "find-work",
-  "version": "0.2.2",
-  "description": "Select independent ready issues and generate a bounded execution queue.",
+  "name": "execute-work",
+  "version": "0.2.3",
+  "description": "Implement a fixed issue list sequentially and submit independent change requests without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -10,5 +10,9 @@
   "homepage": "https://github.com/philfanzhou/ForgeSteward#readme",
   "repository": "https://github.com/philfanzhou/ForgeSteward",
   "license": "MIT",
-  "keywords": ["agent-skills", "issues", "repository-maintenance"]
+  "keywords": [
+    "agent-skills",
+    "issues",
+    "repository-maintenance"
+  ]
 }

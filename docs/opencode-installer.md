@@ -2,7 +2,7 @@
 
 ## 范围与选择
 
-实现 Issue #1。原 Issue 中的三个技能按当前仓库的四个插件理解，`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量。四个插件、版本及核心指令均不修改。本适配是仓库级工具，不是第五个 Skill。
+本适配最初实现 Issue #1，当时仓库有四个插件。`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量；当前源码包含五个插件。本适配是仓库级工具，不是独立 Skill。改名迁移见 [prepare-work 与 execute-work](prepare-execute-migration.md)，不需要修改安装器算法。
 
 采用 Python 3.9+ 标准库脚本，避免额外包发布、运行时依赖和三份核心源码。用户取得仓库后，一条命令即可安装指定技能或全部技能；首次取得源码的 Git clone 是明确的准备步骤，不宣称已经提供无需 checkout 的远端一键安装服务。
 
@@ -43,10 +43,10 @@
 
 `python3 -m unittest discover -s tests -v` 覆盖单个/全部选择、目录名/frontmatter、资源完整性、幂等、版本/同版本内容变化、手动编辑/增删文件/空目录、未托管冲突、收据损坏、路径穿越和符号链接、用户级路径、源文件删除后卸载、锁、暂存失败及提交中途失败回滚。
 
-设置 `FORGESTEWARD_OPENCODE` 为 OpenCode 可执行文件后，同一套测试会在临时项目及隔离 XDG 配置中调用 `opencode debug skill --pure`，检查实际发现的四个名称和完整路径，并在卸载后确认清单为空；不调用模型或修改真实用户配置。未设置且 PATH 无 OpenCode 时明确跳过该项。
+设置 `FORGESTEWARD_OPENCODE` 为 OpenCode 可执行文件后，同一套测试会在临时项目及隔离 XDG 配置中调用 `opencode debug skill --pure`，检查实际发现的全部当前名称和完整路径，并在卸载后确认清单为空；不调用模型或修改真实用户配置。未设置且 PATH 无 OpenCode 时明确跳过该项。
 
 GitHub Actions 在 macOS、Linux、Windows 上运行标准库测试，并在 Linux 使用固定的 OpenCode `1.18.30` 运行真实发现测试。Windows 运行脚本使用 `py -3` 或已配置的 Python 3.9+；符号链接测试在无创建权限时报告跳过，尚无 Windows 原生 OpenCode 运行时验证。
 
 残留回归新增覆盖正常/重复卸载、缺失收据、手工和历史名称候选、不依赖源码、具名卸载不影响保留项、损坏收据的整批保护及报告、悬空链接、用户/项目作用域隔离、扫描失败以及真实 CLI 退出码。真实 OpenCode 测试另验证缺失收据后卸载返回残留状态，技能依然被发现，不能把命令结束冒充技能已消失。测试只使用临时目录，不删除用户实际安装。
 
-README 已把三个 Agent 的安装与调用放在项目释义之前，并记录源码固定、更新、卸载、迁移、作用域和错误恢复。此次不修改 Claude/Codex 的分发机制，也不改变技能的业务流程与授权边界。
+README 已把三个 Agent 的安装与调用放在项目释义之前，并记录源码固定、更新、卸载、迁移、作用域和错误恢复。安装器不修改 Claude/Codex 的分发机制，也不自行改写技能的业务流程与授权边界。

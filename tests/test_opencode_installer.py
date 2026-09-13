@@ -45,10 +45,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(code, expected, output.getvalue())
         return output.getvalue()
 
-    def installed(self, name="find-work"):
+    def installed(self, name="prepare-work"):
         return self.root / (installer.PREFIX + name)
 
-    def source_skill(self, name="find-work"):
+    def source_skill(self, name="prepare-work"):
         return self.source / "plugins" / name / "skills" / (installer.PREFIX + name)
 
     def contents(self, directory):
@@ -75,25 +75,25 @@ class InstallerTests(unittest.TestCase):
                 self.assertIn("uninstall", result.stdout)
 
     def test_single_install_and_full_name(self):
-        self.run_cli("install", "forge-steward-find-work")
-        self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-find-work"])
+        self.run_cli("install", "forge-steward-prepare-work")
+        self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-prepare-work"])
         self.assertEqual((self.installed() / "SKILL.md").read_bytes(), (self.source_skill() / "SKILL.md").read_bytes())
         receipt = json.loads((self.installed() / installer.RECEIPT).read_text(encoding="utf-8"))
         self.assertEqual(receipt["files"], installer.snapshot(self.source_skill()))
 
     def test_install_all_has_matching_frontmatter_and_resources(self):
         self.run_cli("install", "--all")
-        self.assertEqual(len(list(self.root.iterdir())), 4)
+        self.assertEqual(len(list(self.root.iterdir())), 5)
         for path in self.root.iterdir():
             self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
         self.assertTrue((self.installed("check-workflow") / "references/agent-entrypoints.md").is_file())
         self.assert_no_transactions()
 
     def test_repeat_install_is_byte_and_mtime_identical(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         before = self.contents(self.root)
         mtime = (self.installed() / installer.RECEIPT).stat().st_mtime_ns
-        self.assertIn("Already installed", self.run_cli("install", "find-work"))
+        self.assertIn("Already installed", self.run_cli("install", "prepare-work"))
         self.assertEqual(before, self.contents(self.root))
         self.assertEqual(mtime, (self.installed() / installer.RECEIPT).stat().st_mtime_ns)
 
@@ -108,16 +108,16 @@ class InstallerTests(unittest.TestCase):
         self.assert_no_transactions()
 
     def test_added_and_deleted_files_and_empty_dirs_are_protected(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         extra = self.installed() / "notes.txt"
         extra.write_text("keep", encoding="utf-8")
-        self.run_cli("uninstall", "find-work", expected=1)
+        self.run_cli("uninstall", "prepare-work", expected=1)
         extra.unlink()
         extra.mkdir()
-        self.run_cli("uninstall", "find-work", expected=1)
+        self.run_cli("uninstall", "prepare-work", expected=1)
         extra.rmdir()
         (self.installed() / "SKILL.md").unlink()
-        self.run_cli("update", "find-work", expected=1)
+        self.run_cli("update", "prepare-work", expected=1)
 
     def test_unmanaged_collision_prevents_partial_batch(self):
         self.installed("review-and-merge").mkdir(parents=True)
@@ -129,37 +129,79 @@ class InstallerTests(unittest.TestCase):
     def test_explicit_update_replaces_content_and_removes_obsolete_files(self):
         obsolete = self.source_skill() / "obsolete.txt"
         obsolete.write_text("old", encoding="utf-8")
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         obsolete.unlink()
         new = self.source_skill() / "new.txt"
         new.write_text("new", encoding="utf-8")
-        manifest_path = self.source / "plugins/find-work/plugin.json"
+        manifest_path = self.source / "plugins/prepare-work/plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         old_version = manifest["version"]
-        manifest["version"] = "0.3.0"
+        manifest["version"] = "0.2.4"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-        self.run_cli("install", "find-work", expected=1)
-        self.assertIn(old_version + " -> 0.3.0", self.run_cli("update", "find-work"))
+        self.run_cli("install", "prepare-work", expected=1)
+        self.assertIn(old_version + " -> 0.2.4", self.run_cli("update", "prepare-work"))
         self.assertFalse((self.installed() / "obsolete.txt").exists())
         self.assertEqual((self.installed() / "new.txt").read_text(encoding="utf-8"), "new")
-        self.assertIn("installed 0.3.0", self.run_cli("status", "find-work"))
+        self.assertIn("installed 0.2.4", self.run_cli("status", "prepare-work"))
 
     def test_update_missing_requires_install(self):
-        self.assertIn("use install first", self.run_cli("update", "find-work", expected=1))
+        self.assertIn("use install first", self.run_cli("update", "prepare-work", expected=1))
+
+    def install_retired_find_work(self):
+        # 模拟旧 catalog；安装收据由真实安装器生成，不手工伪造归属。
+        plugin = self.source / "plugins/find-work"
+        shutil.copytree(self.source / "plugins/prepare-work", plugin)
+        skill = plugin / "skills/forge-steward-prepare-work"
+        skill.rename(plugin / "skills/forge-steward-find-work")
+        document = plugin / "skills/forge-steward-find-work/SKILL.md"
+        document.write_text(document.read_text(encoding="utf-8").replace(
+            "name: forge-steward-prepare-work", "name: forge-steward-find-work"), encoding="utf-8")
+        manifest = plugin / "plugin.json"
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        data.update(name="find-work", version="0.2.1")
+        manifest.write_text(json.dumps(data), encoding="utf-8")
+        self.run_cli("install", "find-work")
+        shutil.rmtree(plugin)
+
+    def test_retired_name_migrates_without_alias_or_source(self):
+        self.install_retired_find_work()
+        before = self.contents(self.root)
+        self.run_cli("install", "find-work", expected=1)
+        self.run_cli("update", "--all", expected=1)
+        self.assertEqual(before, self.contents(self.root))
+        self.run_cli("uninstall", "find-work")
+        self.assertFalse(self.installed("find-work").exists())
+        self.run_cli("install", "prepare-work", "execute-work")
+        self.assertCountEqual([p.name for p in self.root.iterdir()],
+                              ["forge-steward-prepare-work", "forge-steward-execute-work"])
+        for name in ("prepare-work", "execute-work"):
+            installed = self.contents(self.installed(name))
+            installed.pop(installer.RECEIPT)
+            self.assertEqual(installed, self.contents(self.source_skill(name)))
+
+    def test_retired_modified_skill_is_preserved_during_migration(self):
+        self.install_retired_find_work()
+        document = self.installed("find-work") / "SKILL.md"
+        document.write_text("local customization", encoding="utf-8")
+        before = self.contents(self.root)
+        self.run_cli("uninstall", "find-work", expected=1)
+        self.assertEqual(before, self.contents(self.root))
+        self.run_cli("install", "prepare-work", "execute-work")
+        self.assertEqual(document.read_text(encoding="utf-8"), "local customization")
 
     def test_uninstall_keeps_unrelated_skills_and_no_receipts(self):
         self.run_cli("install", "--all")
         unrelated = self.root / "other-skill"
         unrelated.mkdir()
         (unrelated / "notes.txt").write_text("keep", encoding="utf-8")
-        self.run_cli("uninstall", "find-work")
+        self.run_cli("uninstall", "prepare-work")
         self.assertFalse(self.installed().exists())
         self.run_cli("uninstall", "--all")
         self.assertEqual(self.contents(self.root), {"other-skill/notes.txt": b"keep"})
         self.assert_no_transactions()
 
     def test_uninstall_does_not_need_original_source(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         shutil.rmtree(self.source / "plugins")
         self.run_cli("uninstall", "--all")
         self.assertFalse(self.installed().exists())
@@ -168,7 +210,7 @@ class InstallerTests(unittest.TestCase):
         output = self.run_cli("uninstall", "--all")
         self.assertIn("No residual candidates", output)
         self.assertIn("Other projects", output)
-        self.run_cli("uninstall", "find-work")
+        self.run_cli("uninstall", "prepare-work")
         self.assertFalse(self.root.parent.exists())
 
     def test_normal_uninstall_reports_no_residues(self):
@@ -211,7 +253,7 @@ class InstallerTests(unittest.TestCase):
         self.run_cli("install", "--all")
         legacy = self.root / "review-and-merge"
         legacy.mkdir()
-        output = self.run_cli("uninstall", "find-work")
+        output = self.run_cli("uninstall", "prepare-work")
         self.assertIn("No residual candidates", output)
         self.assertNotIn(str(legacy), output)
         self.assertTrue(self.installed("fix-feedback").is_dir())
@@ -244,7 +286,7 @@ class InstallerTests(unittest.TestCase):
     def test_user_residue_scan_does_not_cross_scopes(self):
         config = self.base / "custom-config"
         with mock.patch.dict(os.environ, {"OPENCODE_CONFIG_DIR": str(config)}):
-            self.run_cli("install", "find-work", user=True)
+            self.run_cli("install", "prepare-work", user=True)
             manual = config / "skills/find-work"
             manual.mkdir()
             output = self.run_cli("uninstall", "--all", user=True, expected=2)
@@ -293,7 +335,7 @@ class InstallerTests(unittest.TestCase):
         with mock.patch.object(installer.os, "replace", side_effect=fail_once):
             output = self.run_cli("uninstall", "--all", expected=1)
         self.assertEqual(before, self.contents(self.root))
-        self.assertEqual(output.count("managed installation remains"), 4)
+        self.assertEqual(output.count("managed installation remains"), 5)
         self.assert_no_transactions()
 
     def test_subprocess_residue_exit_code(self):
@@ -311,16 +353,16 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.root.parent.exists())
 
     def test_receipt_corruption_is_preserved(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         receipt = self.installed() / installer.RECEIPT
         receipt.write_text("not json", encoding="utf-8")
-        self.run_cli("uninstall", "find-work", expected=1)
+        self.run_cli("uninstall", "prepare-work", expected=1)
         self.assertEqual(receipt.read_text(encoding="utf-8"), "not json")
 
     def test_path_traversal_and_unknown_selection(self):
         for name in ("../outside", "/absolute", "missing", "--all"):
             if name == "--all":
-                self.run_cli("install", "find-work", name, expected=1)
+                self.run_cli("install", "prepare-work", name, expected=1)
             else:
                 self.run_cli("install", name, expected=1)
         self.assertFalse(self.root.exists())
@@ -328,16 +370,16 @@ class InstallerTests(unittest.TestCase):
     def test_user_scope_respects_xdg(self):
         config = self.base / "custom-config"
         with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(config)}):
-            self.run_cli("install", "find-work", user=True)
-            self.assertTrue((config / "opencode/skills/forge-steward-find-work/SKILL.md").is_file())
+            self.run_cli("install", "prepare-work", user=True)
+            self.assertTrue((config / "opencode/skills/forge-steward-prepare-work/SKILL.md").is_file())
             self.run_cli("uninstall", "--all", user=True)
         self.assertFalse(self.root.exists())
 
     def test_user_scope_respects_opencode_config_dir(self):
         config = self.base / "opencode-custom"
         with mock.patch.dict(os.environ, {"OPENCODE_CONFIG_DIR": str(config)}):
-            self.run_cli("install", "find-work", user=True)
-            self.assertTrue((config / "skills/forge-steward-find-work/SKILL.md").is_file())
+            self.run_cli("install", "prepare-work", user=True)
+            self.assertTrue((config / "skills/forge-steward-prepare-work/SKILL.md").is_file())
             self.run_cli("uninstall", "--all", user=True)
 
     def test_real_opencode_discovery(self):
@@ -375,18 +417,18 @@ class InstallerTests(unittest.TestCase):
                 user_env["OPENCODE_CONFIG_DIR"] = str(custom)
                 env["OPENCODE_CONFIG_DIR"] = str(custom)
             with mock.patch.dict(os.environ, user_env):
-                self.run_cli("install", "find-work", user=True)
+                self.run_cli("install", "prepare-work", user=True)
                 items = discovered()
-                self.assertEqual(set(items), {"forge-steward-find-work"})
-                expected = (custom if custom else Path(env["XDG_CONFIG_HOME"]) / "opencode") / "skills/forge-steward-find-work/SKILL.md"
-                self.assertEqual(Path(items["forge-steward-find-work"]["location"]).resolve(), expected)
+                self.assertEqual(set(items), {"forge-steward-prepare-work"})
+                expected = (custom if custom else Path(env["XDG_CONFIG_HOME"]) / "opencode") / "skills/forge-steward-prepare-work/SKILL.md"
+                self.assertEqual(Path(items["forge-steward-prepare-work"]["location"]).resolve(), expected)
                 self.run_cli("uninstall", "--all", user=True)
                 self.assertEqual(discovered(), {})
         # 命令失败/有残留与真实发现一致：不能把缺失收据的副本当成已卸载。
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         (self.installed() / installer.RECEIPT).unlink()
         self.assertIn("Residual:", self.run_cli("uninstall", "--all", expected=2))
-        self.assertEqual(set(discovered()), {"forge-steward-find-work"})
+        self.assertEqual(set(discovered()), {"forge-steward-prepare-work"})
 
     def make_link(self, link, target, directory=False):
         try:
@@ -398,7 +440,7 @@ class InstallerTests(unittest.TestCase):
         outside = self.base / "outside"
         outside.mkdir()
         self.make_link(self.project / ".opencode", outside, True)
-        self.run_cli("install", "find-work", expected=1)
+        self.run_cli("install", "prepare-work", expected=1)
         self.assertEqual(list(outside.iterdir()), [])
 
     @unittest.skipUnless(os.name == "nt", "Windows junction test")
@@ -407,28 +449,28 @@ class InstallerTests(unittest.TestCase):
         outside.mkdir()
         subprocess.run(["cmd", "/c", "mklink", "/J", str(self.project / ".opencode"), str(outside)],
                        check=True, capture_output=True)
-        self.run_cli("install", "find-work", expected=1)
+        self.run_cli("install", "prepare-work", expected=1)
         self.assertEqual(list(outside.iterdir()), [])
 
     def test_symlink_inside_install_is_protected(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         outside = self.base / "outside.txt"
         outside.write_text("keep", encoding="utf-8")
         self.make_link(self.installed() / "link", outside)
-        self.run_cli("uninstall", "find-work", expected=1)
+        self.run_cli("uninstall", "prepare-work", expected=1)
         self.assertEqual(outside.read_text(encoding="utf-8"), "keep")
 
     def test_symlink_source_is_rejected(self):
         outside = self.base / "outside.txt"
         outside.write_text("secret", encoding="utf-8")
         self.make_link(self.source_skill() / "link", outside)
-        self.run_cli("install", "find-work", expected=1)
+        self.run_cli("install", "prepare-work", expected=1)
         self.assertFalse(self.root.exists())
 
     def test_name_mismatch_is_rejected(self):
         skill = self.source_skill() / "SKILL.md"
-        skill.write_text(skill.read_text(encoding="utf-8").replace("name: forge-steward-find-work", "name: different"), encoding="utf-8")
-        self.run_cli("install", "find-work", expected=1)
+        skill.write_text(skill.read_text(encoding="utf-8").replace("name: forge-steward-prepare-work", "name: different"), encoding="utf-8")
+        self.run_cli("install", "prepare-work", expected=1)
         self.assertFalse(self.root.exists())
 
     def test_lock_preserves_other_installers_work(self):
@@ -448,17 +490,17 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.root.parent / installer.LOCK).exists())
 
     def test_invalid_receipt_schema_reports_error(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         (self.installed() / installer.RECEIPT).write_text("[]", encoding="utf-8")
-        self.assertIn("Invalid installation receipt", self.run_cli("uninstall", "find-work", expected=1))
+        self.assertIn("Invalid installation receipt", self.run_cli("uninstall", "prepare-work", expected=1))
 
     def test_status_reports_same_version_content_change(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         (self.source_skill() / "new.txt").write_text("new source", encoding="utf-8")
-        self.assertIn("checkout differs", self.run_cli("status", "find-work"))
+        self.assertIn("checkout differs", self.run_cli("status", "prepare-work"))
 
     def test_copy_failure_changes_no_existing_install(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         before = self.contents(self.root)
         with mock.patch.object(installer.shutil, "copytree", side_effect=OSError("disk full")):
             self.run_cli("install", "check-workflow", expected=1)
@@ -486,7 +528,7 @@ class InstallerTests(unittest.TestCase):
         self.assert_no_transactions()
 
     def test_interrupt_rolls_back(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         before = self.contents(self.root)
         (self.source_skill() / "new.txt").write_text("new", encoding="utf-8")
         replace = os.replace
@@ -501,12 +543,12 @@ class InstallerTests(unittest.TestCase):
 
         with mock.patch.object(installer.os, "replace", side_effect=interrupt_once):
             with self.assertRaises(KeyboardInterrupt):
-                self.run_cli("update", "find-work")
+                self.run_cli("update", "prepare-work")
         self.assertEqual(before, self.contents(self.root))
         self.assert_no_transactions()
 
     def test_failed_rollback_keeps_recovery_backup(self):
-        self.run_cli("install", "find-work")
+        self.run_cli("install", "prepare-work")
         before = self.contents(self.installed())
         (self.source_skill() / "new.txt").write_text("new", encoding="utf-8")
         replace = os.replace
@@ -520,10 +562,10 @@ class InstallerTests(unittest.TestCase):
             return replace(source, destination)
 
         with mock.patch.object(installer.os, "replace", side_effect=fail_commit_and_restore):
-            self.assertIn("Rollback incomplete", self.run_cli("update", "find-work", expected=1))
+            self.assertIn("Rollback incomplete", self.run_cli("update", "prepare-work", expected=1))
         transaction = next(self.root.parent.glob(".forge-steward-txn-*"))
-        self.assertEqual(before, self.contents(transaction / "old-forge-steward-find-work"))
-        self.assertIn("Recover the interrupted", self.run_cli("install", "find-work", expected=1))
+        self.assertEqual(before, self.contents(transaction / "old-forge-steward-prepare-work"))
+        self.assertIn("Recover the interrupted", self.run_cli("install", "prepare-work", expected=1))
 
 
 if __name__ == "__main__":
