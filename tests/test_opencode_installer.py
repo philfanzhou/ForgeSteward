@@ -59,7 +59,11 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(list(self.root.parent.glob(".forge-steward-*")))
 
     def test_list_and_subprocess_help(self):
-        self.assertEqual(self.run_cli("list").count("0.2.0"), 4)
+        expected = []
+        for path in sorted((self.source / "plugins").glob("*/plugin.json")):
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            expected.append(installer.PREFIX + manifest["name"] + " " + manifest["version"])
+        self.assertEqual(self.run_cli("list").splitlines(), expected)
         for encoding in ("utf-8", "cp1252"):
             with self.subTest(encoding=encoding):
                 environment = dict(os.environ, PYTHONIOENCODING=encoding)
@@ -131,10 +135,11 @@ class InstallerTests(unittest.TestCase):
         new.write_text("new", encoding="utf-8")
         manifest_path = self.source / "plugins/find-work/plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        old_version = manifest["version"]
         manifest["version"] = "0.3.0"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         self.run_cli("install", "find-work", expected=1)
-        self.assertIn("0.2.0 -> 0.3.0", self.run_cli("update", "find-work"))
+        self.assertIn(old_version + " -> 0.3.0", self.run_cli("update", "find-work"))
         self.assertFalse((self.installed() / "obsolete.txt").exists())
         self.assertEqual((self.installed() / "new.txt").read_text(encoding="utf-8"), "new")
         self.assertIn("installed 0.3.0", self.run_cli("status", "find-work"))
