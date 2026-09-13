@@ -1,5 +1,7 @@
 # 固定版本安装、升级与回退
 
+README 已提供三种 Agent 的[升级快捷步骤](../README.md#upgrade-and-keep-only-the-selected-version)和[完整卸载步骤](../README.md#uninstall-and-verify)。本页补充固定版本、作用域及回退边界；升级 Agent 程序本身不等于升级固定 Tag 的技能。
+
 ## 先选择版本
 
 从 [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择已经发布的 Tag，并阅读对应表和迁移说明。下例使用首版 `v0.2.0`；在 Tag/Release 发布完成前不可将示例视作可用远端版本。
@@ -57,15 +59,17 @@ claude plugin list
 
 ### 切换或回退
 
-先记录该市场下全部插件与安装作用域，备份用户修改，按卸载文档处理 `user`、各项目的 `project`/`local` 安装。**移除市场会连带卸载该市场插件，不能当作只切换一个技能的无副作用操作。** 确认这一范围后：
+先记录该市场下全部插件与安装作用域、市场声明所在作用域和受影响项目，备份用户修改，按卸载文档处理 `user`、各项目的 `project`/`local` 安装。升级时若需保留插件持久数据，对插件卸载使用 `--keep-data`，并另外备份重要数据。**移除市场会连带卸载该市场插件，不能当作只切换一个技能的无副作用操作。** 市场声明与插件安装作用域是两个维度；当前 CLI 的 marketplace remove 省略 `--scope` 会移除所有作用域的声明。
+
+以下仅适用于市场与插件都只在 `user` 作用域安装的情形，且已完成插件卸载：
 
 ```bash
-claude plugin marketplace remove forge-steward
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0
+claude plugin marketplace remove forge-steward --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0 --scope user
 claude plugin install find-work@forge-steward --scope user
 ```
 
-重新安装记录中的其他插件，在相应项目恢复原作用域；检查市场 ref、安装版本和新会话调用。保持 Tag 不变时刷新市场仍跟随该 ref，不会切回 main。显式包版本相同会使更新被跳过，不能把“刷新成功”当成已切换内容的证据。包内内容未变的相同版本不需要重装。
+混合作用域需要在各原项目目录按记录显式选择 `--scope project` 或 `--scope local` 处理对应声明；不要假定从一个项目运行 user 命令能清理其他项目。协调共享配置变更，管理员控制的配置交由其管理者处理。重新安装记录中的其他插件，在相应项目恢复原作用域；检查市场 ref、安装版本和新会话调用。保持 Tag 不变时刷新市场仍跟随该 ref，不会切回 main。显式包版本相同会使更新被跳过，不能把“刷新成功”当成已切换内容的证据。包内内容未变的相同版本不需要重装。
 
 如果需要精确 commit 而非 Tag，可先克隆独立、干净的完整仓库，checkout Release SHA，然后通过 `claude plugin marketplace add /absolute/path/to/ForgeSteward` 添加本地市场；先处理同名旧市场。保留整个 checkout，不仅下载 marketplace.json，因为其插件路径是相对仓库的。不要在使用期间修改这个 checkout。
 
@@ -122,3 +126,7 @@ OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本�
 ## 完成标准
 
 源 ref/SHA 与预期一致、选定插件版本符合 Release 对应表、实际安装内容与来源一致，并在新会话显示正确调用名。保留原版本和恢复记录；失败时报告实际已完成的卸载/安装，不把缓存刷新或命令退出当成完整切换。切换技能不自动回滚已修改的项目规则、代码、Issue、PR、评论或凭据。
+
+“只保留新版”首先要求实际发现来源中不再有旧版副本：逐个核对环境、作用域和手工路径，不能以选择器只显示一个名字证明没有重复。磁盘清理另行核验：Codex 卸载命令声明清理对应本地缓存；Claude Code 旧版缓存有后台清理宽限期；OpenCode update 替换选中的受管目录，但不删除其他作用域、退役名称和手工副本。不要把这三种行为统一宣传为立即零残留。
+
+需要立即清理磁盘时，停止相关会话，列明确切旧路径，核对 ForgeSteward 归属及所有配置/作用域的引用；受管安装用对应卸载命令，确认无人引用的缓存或手工副本先移出全部发现路径备份，复核后再删除。不得按宽泛通配符删除共享目录。旧源码 clone 与安装副本分开处理；OpenCode 安装器及本地路径市场仍依赖的 checkout 必须保留。详见 README 的[仅保留目标版本核验清单](../README.md#verify-that-only-the-intended-version-remains)。

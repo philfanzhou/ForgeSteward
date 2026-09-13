@@ -8,7 +8,7 @@ Choose your agent below. The four plugins install independently: `check-workflow
 
 The examples pin the `v0.2.0` repository snapshot. See its [release version matrix](docs/releases/v0.2.0.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
 
-For removal, see [Uninstall and verify](#uninstall-and-verify), including scopes, caches, and manual-copy leftovers.
+Already installed? See [Upgrade and keep only the selected version](#upgrade-and-keep-only-the-selected-version). To remove everything, see [Uninstall and verify](#uninstall-and-verify). Both cover Codex, Claude Code, and OpenCode; upgrading the agent application itself does not upgrade a pinned ForgeSteward release.
 
 ### Codex
 
@@ -87,6 +87,109 @@ Load the forge-steward-find-work skill and find actionable issues in this reposi
 ```
 
 With OpenCode installed, `opencode debug skill` lists the discovered names and locations. See [installation maintenance and troubleshooting](#opencode-installation-maintenance) for updates, uninstalling, version selection, and conflicts.
+
+## Upgrade and keep only the selected version
+
+Choose the newest **published, non-prerelease** tag you want from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), then read its plugin version matrix and migration notes. The commands below use the published `v0.2.0` as a runnable example: **replace it with your chosen published tag before upgrading**. Reusing `v0.2.0` reinstalls that snapshot; it does not install unpublished fixes from a PR or `main`. A repository tag selects the whole marketplace snapshot, while each plugin has its own package version. `find-work@forge-steward` is a plugin/marketplace ID, not a version selector.
+
+Before removal, confirm the target release exists and is compatible, record your current ref, installed subset and scopes, and back up local modifications and any plugin data you need **outside all agent discovery/cache directories**. Stop active skill-driven work. Run each step only after the previous step succeeds; if reinstallation fails, restore the recorded release using the same procedure. Do not delete backups until the new installation is verified.
+
+| Agent | How the selected release replaces the old one | What may still remain |
+| --- | --- | --- |
+| Codex | Uninstall installed ForgeSteward plugins, replace the marketplace ref, reinstall the same subset. | Other environments, manual skill copies, or untracked caches need separate inspection. |
+| Claude Code | Uninstall in the recorded scopes, replace the marketplace ref, reinstall in those scopes. | Old version caches can await background cleanup; other scopes and manual copies are separate. |
+| OpenCode | Select the source tag, then `update` the installed skills in each intended scope. | Other scopes, retired names and manually copied skills are not removed by `update`. |
+
+### Upgrade Codex
+
+In the terminal for the Codex environment you actually use, inspect the current installation:
+
+```bash
+codex plugin marketplace list
+codex plugin list --json
+```
+
+The following example assumes all four plugins are installed. For a partial install, omit both the removal and reinstallation lines for plugins you do not use. Remove **all installed plugins from this marketplace** before replacing its ref, not just `find-work`:
+
+```bash
+codex plugin remove check-workflow@forge-steward
+codex plugin remove find-work@forge-steward
+codex plugin remove review-and-merge@forge-steward
+codex plugin remove fix-feedback@forge-steward
+codex plugin marketplace remove forge-steward
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
+codex plugin add check-workflow@forge-steward
+codex plugin add find-work@forge-steward
+codex plugin add review-and-merge@forge-steward
+codex plugin add fix-feedback@forge-steward
+codex plugin marketplace list
+codex plugin list --json
+```
+
+Check the selected source/ref, installed state and local package versions against the Release matrix, then verify the skills in a new session. If the CLI is managing the same Codex environment used by the desktop app, no separate desktop reinstall is needed; start a new task and reopen the app if its picker remains stale. A different host, account or configuration environment must be checked separately. Administrator/project-controlled sources must be changed through their owning policy, not bypassed. See [Codex removal](#codex-removal) and the [official plugin guide](https://learn.chatgpt.com/docs/plugins#remove-a-plugin). CLI syntax was checked with `0.154.0`; use `--help` if your CLI differs.
+
+### Upgrade Claude Code
+
+Run `claude plugin list` and `claude plugin marketplace list` first. The terminal example below assumes the marketplace and all four plugins are installed **only at user scope**. For a partial install, omit the corresponding uninstall/install lines. `--keep-data` preserves persistent data during reinstallation; it does not retain the old version as an active installation.
+
+```bash
+claude plugin uninstall check-workflow@forge-steward --scope user --keep-data
+claude plugin uninstall find-work@forge-steward --scope user --keep-data
+claude plugin uninstall review-and-merge@forge-steward --scope user --keep-data
+claude plugin uninstall fix-feedback@forge-steward --scope user --keep-data
+claude plugin marketplace remove forge-steward --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0 --scope user
+claude plugin install check-workflow@forge-steward --scope user
+claude plugin install find-work@forge-steward --scope user
+claude plugin install review-and-merge@forge-steward --scope user
+claude plugin install fix-feedback@forge-steward --scope user
+claude plugin marketplace list
+claude plugin list
+```
+
+For `project`/`local` or mixed-scope installs, first record all affected projects and declarations, uninstall in each original scope, and follow the [scope-aware switching guide](docs/versioned-installation.md#切换或回退). Marketplace scope and plugin installation scope are separate. Removing a marketplace can uninstall its plugins; omitting `--scope` removes marketplace declarations from every scope in current CLI behavior. Restore only the intended declarations and plugin scopes, coordinating any shared project changes with the team. Do not apply the user-only recipe to a shared or administrator-managed setup.
+
+Confirm source/ref and installed versions, then restart Claude Code. Refreshing a marketplace pinned to an old tag does not select a newer tag. Old caches may remain pending background cleanup; neither a successful upgrade nor `plugin prune` guarantees immediate deletion of old version directories (`prune` concerns unused dependencies). See [Claude Code removal](#claude-code-removal) and the official [cache lifecycle](https://code.claude.com/docs/en/plugins-reference#plugin-caching-and-file-resolution). CLI syntax was checked with `2.1.269`.
+
+### Upgrade OpenCode
+
+Use the checkout created during installation. First inspect it and fetch tags:
+
+```bash
+git -C "$HOME/code/ForgeSteward" status --short
+git -C "$HOME/code/ForgeSteward" fetch origin --tags
+```
+
+Continue only with a clean checkout and no branch work you need to preserve; otherwise use a separate clean clone. Replace `v0.2.0` with your chosen release, then compare the resulting SHA with that Release before updating any installed copy:
+
+```bash
+git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.0
+git -C "$HOME/code/ForgeSteward" rev-parse HEAD
+```
+
+From the repository you want to maintain, update the installed subset (here, only `find-work`):
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status find-work --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status find-work --project .
+opencode debug skill
+```
+
+Repeat for your other installed skills, or use `update --all` only if every skill in the selected checkout is already installed. Newly selected skills need `install`, not `update`. For user-level copies, use `--user` with the same `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME` as before; update or uninstall old copies in other projects/scopes separately. On Windows, use `py -3` instead of `python3` and your actual Windows checkout path; Git commands are unchanged apart from that path.
+
+`update` replaces each selected managed directory, including obsolete files inside it; it does not create side-by-side version directories. It does not fetch source, remove retired skill names, or clean other discovery paths. Uninstall retired managed names explicitly; move confirmed manual/legacy copies outside discovery paths only after preserving edits. Modified or corrupt installations require inspection, not forced deletion. Verify versions/content with `status`, check the actual paths reported by `opencode debug skill`, and restart OpenCode. See [OpenCode installation maintenance](#opencode-installation-maintenance) for receipts and recovery.
+
+### Verify that only the intended version remains
+
+There are two separate goals: **only the selected version is available in new sessions**, and **no obsolete files remain on disk**. A successful install alone proves neither.
+
+1. Verify each intended environment/scope against the selected Release matrix. Inspect local installed manifests/content, not just the marketplace catalog. Unchanged plugin packages may legitimately keep their previous version across repository releases.
+2. Check for duplicates or stale copies in other scopes and manual discovery paths, including old unprefixed names. A picker showing one name may hide another copy; inspect its source path and configuration. Keep one intended discovery source per skill per environment unless you deliberately manage multiple scopes.
+3. For disk cleanup, close relevant sessions, identify exact ForgeSteward-owned obsolete paths, and confirm no scope/configuration still references them. Use the agent's uninstall command for registered installations; move confirmed unused manual/cache copies to a backup outside all discovery paths before deleting them after verification. Do not delete a whole `.codex`, `.claude`, `.agents`, `.opencode`, or shared cache directory. Claude Code may retain orphaned version caches until its background sweep; no cross-agent one-command immediate cache purge is promised.
+4. Verify again in a new session. Keep the source checkout needed by OpenCode and any local-path marketplace; old downloaded clones are separate from installed skills and can be removed only after checking local work and references. Skill removal does not revert project rules, code, issues or PRs.
+
+To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and verify](#uninstall-and-verify) for each agent and **do not run the reinstall steps**. Rollback uses the same switching procedure with the previous published tag; it does not undo work already performed by a skill.
 
 ## Skills
 
