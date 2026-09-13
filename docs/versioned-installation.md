@@ -4,9 +4,9 @@ README 已提供三种 Agent 的[升级快捷步骤](../README.md#upgrade-and-ke
 
 ## 先选择版本
 
-从 [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择已经发布的 Tag，并阅读对应表和迁移说明。下例使用首版 `v0.2.0`；在 Tag/Release 发布完成前不可将示例视作可用远端版本。
+从 [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择已经发布的 Tag，并阅读对应表和迁移说明。下例使用 `v0.2.1`；在 Tag/Release 发布完成前不可将示例视作可用远端版本。
 
-`v0.2.0` 是仓库快照，插件 `0.2.0` 是各自包版本；`find-work@forge-steward` 中的 `@` 后面是市场名称，不支持将它直接替换成包版本号。本仓库两个市场都从快照内的相对路径加载插件，因此选择 Tag 固定整份市场，而不是独立解析每个插件的历史版本。仍可只安装一个技能；若需要不同快照的插件混搭，需要另外设计分发来源，不能靠修改缓存实现。
+`v0.2.1` 是仓库快照，插件 `0.2.1` 是各自包版本；`find-work@forge-steward` 中的 `@` 后面是市场名称，不支持将它直接替换成包版本号。本仓库两个市场都从快照内的相对路径加载插件，因此选择 Tag 固定整份市场，而不是独立解析每个插件的历史版本。仍可只安装一个技能；若需要不同快照的插件混搭，需要另外设计分发来源，不能靠修改缓存实现。
 
 固定 Tag 后不应自动跟随 main。Tag 按项目规范不可移动；若需要更强的可复现性，应记录 Release 正文给出的完整 commit SHA，并与实际 Git checkout 核对。首次发布以前不存在 `v0.1.x` Tag，不能凭插件曾用过的版本号推定远端存在同名 Tag。
 
@@ -17,13 +17,13 @@ README 已提供三种 Agent 的[升级快捷步骤](../README.md#upgrade-and-ke
 在终端执行，要求 CLI 支持 `plugin marketplace add --ref`（已核对 `0.154.0` 帮助）：
 
 ```bash
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
 codex plugin add find-work@forge-steward
 codex plugin marketplace list
 codex plugin list --json
 ```
 
-需要其他技能时，将 `find-work` 换为 `check-workflow`、`review-and-merge`、`fix-feedback` 分别安装。新会话使用 `$forge-steward-find-work`。市场的 ref 支持 Git 分支、Tag 或提交；精确 SHA 可替换 `v0.2.0`，应使用 Release 的完整 SHA。依据：[Codex 市场配置](https://learn.chatgpt.com/docs/config-file/config-reference)、本机 `codex plugin marketplace add --help`。
+需要其他技能时，将 `find-work` 换为 `check-workflow`、`review-and-merge`、`fix-feedback` 分别安装。新会话使用 `$forge-steward-find-work`。市场的 ref 支持 Git 分支、Tag 或提交；精确 SHA 可替换 `v0.2.1`，应使用 Release 的完整 SHA。依据：[Codex 市场配置](https://learn.chatgpt.com/docs/config-file/config-reference)、本机 `codex plugin marketplace add --help`。
 
 ### 切换已经配置的市场
 
@@ -34,7 +34,7 @@ codex plugin list --json
 ```bash
 # 先完成上面的插件卸载与备份，再执行：
 codex plugin marketplace remove forge-steward
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
 codex plugin add find-work@forge-steward
 ```
 
@@ -49,13 +49,13 @@ codex plugin add find-work@forge-steward
 在终端执行（已核对 Claude Code `2.1.269` 命令帮助和官方文档）：
 
 ```bash
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1
 claude plugin install find-work@forge-steward --scope user
 claude plugin marketplace list
 claude plugin list
 ```
 
-也可以在 Claude 会话中使用 `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.0` 和 `/plugin install find-work@forge-steward`。新会话调用 `/find-work:forge-steward-find-work`。GitHub 来源的 `@ref` 支持分支/Tag；Git URL 使用 `#ref`。市场 ref 与插件来源的 SHA 字段是不同层级，不将插件来源 JSON 的 `sha` 当成 marketplace add 的参数。依据：[市场 ref 与版本规则](https://code.claude.com/docs/en/plugin-marketplaces)。
+也可以在 Claude 会话中使用 `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.1` 和 `/plugin install find-work@forge-steward`。新会话调用 `/find-work:forge-steward-find-work`。GitHub 来源的 `@ref` 支持分支/Tag；Git URL 使用 `#ref`。市场 ref 与插件来源的 SHA 字段是不同层级，不将插件来源 JSON 的 `sha` 当成 marketplace add 的参数。依据：[市场 ref 与版本规则](https://code.claude.com/docs/en/plugin-marketplaces)。
 
 ### 切换或回退
 
@@ -65,7 +65,7 @@ claude plugin list
 
 ```bash
 claude plugin marketplace remove forge-steward --scope user
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0 --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1 --scope user
 claude plugin install find-work@forge-steward --scope user
 ```
 
@@ -81,19 +81,19 @@ claude plugin install find-work@forge-steward --scope user
 
 ```bash
 mkdir -p "$HOME/code"
-git clone --branch v0.2.0 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.0"
-git -C "$HOME/code/ForgeSteward-v0.2.0" rev-parse HEAD
+git clone --branch v0.2.1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.1"
+git -C "$HOME/code/ForgeSteward-v0.2.1" rev-parse HEAD
 ```
 
 核对 HEAD 与 Release SHA 一致，再从要维护的目标项目目录执行：
 
 ```bash
-python3 "$HOME/code/ForgeSteward-v0.2.0/scripts/opencode.py" install find-work --project .
-python3 "$HOME/code/ForgeSteward-v0.2.0/scripts/opencode.py" status find-work --project .
+python3 "$HOME/code/ForgeSteward-v0.2.1/scripts/opencode.py" install find-work --project .
+python3 "$HOME/code/ForgeSteward-v0.2.1/scripts/opencode.py" status find-work --project .
 opencode debug skill
 ```
 
-全部安装使用 `--all`，用户级使用 `--user`；用户级应保留安装时的 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`。Windows 使用 Git 同样选择快照，通过 `py -3 "C:\path\ForgeSteward-v0.2.0\scripts\opencode.py" install find-work --project .` 运行安装器，替换为实际路径。
+全部安装使用 `--all`，用户级使用 `--user`；用户级应保留安装时的 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`。Windows 使用 Git 同样选择快照，通过 `py -3 "C:\path\ForgeSteward-v0.2.1\scripts\opencode.py" install find-work --project .` 运行安装器，替换为实际路径。
 
 ### 切换现有源码 checkout 与安装副本
 
@@ -104,10 +104,10 @@ git -C "$HOME/code/ForgeSteward" status --short
 git -C "$HOME/code/ForgeSteward" fetch origin --tags
 ```
 
-确认工作区干净且无需要保留的分支工作后，再执行以下命令；否则新建独立 checkout。将 `v0.2.0` 替换为所选已发布 Tag 或完整 SHA：
+确认工作区干净且无需要保留的分支工作后，再执行以下命令；否则新建独立 checkout。将 `v0.2.1` 替换为所选已发布 Tag 或完整 SHA：
 
 ```bash
-git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.0
+git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.1
 git -C "$HOME/code/ForgeSteward" rev-parse HEAD
 # 在目标项目目录执行；只选择实际已安装的技能：
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project .
@@ -122,6 +122,10 @@ opencode debug skill
 - 回退到首版之前的提交不保证存在同一安装器或调用接口，须先读那份快照文档；不要把未来脚本当作所有历史版本都支持的契约。
 
 OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本安装器的选定范围，实际发现还可能受用户级、兼容路径、祖先路径及重复副本影响。依据：[OpenCode 技能发现](https://opencode.ai/docs/skills/)。
+
+## 从 v0.2.0 升级
+
+目标为 `v0.2.1` 时，四个插件包均从 `0.2.0` 升至 `0.2.1`，主要改变 Codex 插件/技能的显示元数据。安装 ID、技能调用名、默认 prompt、SKILL.md 及安装器行为不变。旧 Tag 不会自动获得修复；按上文切换市场 ref 或源码并显式更新。若需回退，用相同流程选择仍保留的 `v0.2.0`，核对其[历史对应表](releases/v0.2.0.md)。完整变更见 [v0.2.1 对应表](releases/v0.2.1.md)。
 
 ## 完成标准
 
