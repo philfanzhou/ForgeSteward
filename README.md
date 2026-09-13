@@ -6,6 +6,8 @@ ForgeSteward is a collection of cross-agent skills for maintaining software repo
 
 Choose your agent below. The four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
 
+For removal, see [Uninstall and verify](#uninstall-and-verify), including scopes, caches, and manual-copy leftovers.
+
 ### Codex
 
 Run these commands in your terminal (requires a Codex CLI with `plugin` support):
@@ -145,7 +147,7 @@ python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall find-work --project .
 ```
 
-Replace `find-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers.
+Replace `find-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers. It also reports matching unmanaged or legacy-name candidates in that target; exit code `2` means leftovers need inspection, not that they were deleted. See [Uninstall and verify](#uninstall-and-verify) for the complete boundary.
 
 The installer uses the current local checkout and does not fetch or execute remote installation commands. To update from the repository, first update your source checkout with `git -C "$HOME/code/ForgeSteward" pull --ff-only`, then run `update`. For a reproducible version, select a reviewed commit or tag with `git -C "$HOME/code/ForgeSteward" checkout --detach <commit-or-tag>` before installing or updating. An explicit `update` follows that checkout, including an intentional downgrade. Use a separate clean checkout if your source has local work.
 
@@ -158,6 +160,85 @@ Selected targets are checked and staged before changing installed skills. Ordina
 If OpenCode does not discover the skills, confirm the printed target and run `status`, then `opencode debug skill` from the target project. Check OpenCode's skill permissions, custom configuration, and any duplicate manual installs. The installer never changes agent permissions or configuration files.
 
 Development checks: `python3 -m unittest discover -s tests -v`. Set `FORGESTEWARD_OPENCODE` to an OpenCode executable to include actual discovery and removal checks in isolated temporary configuration directories; otherwise that test is explicitly skipped. See the Chinese [installer design and verification notes](docs/opencode-installer.md).
+
+## Uninstall and verify
+
+Uninstall in the same agent environment and scope used for installation. Stop active skill-driven work first, then start a fresh session after removal: an existing conversation can still contain previously loaded instructions. Disabling a plugin is not uninstalling it. Do not delete an entire agent configuration or cache directory to remove these four skills.
+
+### Codex removal
+
+Run in your terminal, selecting only the plugins you installed:
+
+```bash
+codex plugin remove check-workflow@forge-steward
+codex plugin remove find-work@forge-steward
+codex plugin remove review-and-merge@forge-steward
+codex plugin remove fix-feedback@forge-steward
+codex plugin list --json
+```
+
+The `remove` command removes the plugin and its local cache (command syntax checked with Codex CLI `0.154.0`). If you no longer want this marketplace, remove its source after uninstalling the plugins:
+
+```bash
+codex plugin marketplace remove forge-steward
+codex plugin marketplace list
+```
+
+Alternatively, use the plugin browser's **Uninstall plugin** action. Check installed state rather than merely seeing a plugin in the available catalog. Start a new session and confirm the `forge-steward-` skills are absent. Repeat for other Codex environments where you installed them. Administrator-managed installations require the administrator's action. See [official plugin removal guidance](https://learn.chatgpt.com/docs/plugins#remove-a-plugin); use `codex plugin remove --help` to check the CLI version in your environment.
+
+### Claude Code removal
+
+For user-scope installations, run in your terminal:
+
+```bash
+claude plugin uninstall check-workflow@forge-steward --scope user
+claude plugin uninstall find-work@forge-steward --scope user
+claude plugin uninstall review-and-merge@forge-steward --scope user
+claude plugin uninstall fix-feedback@forge-steward --scope user
+claude plugin list
+```
+
+If installed at `project` or `local` scope, run the corresponding commands with that scope from each affected project. When no longer needed, remove the marketplace declaration and check the result:
+
+```bash
+claude plugin marketplace remove forge-steward
+claude plugin marketplace list
+```
+
+Check all applicable scopes and a new session's skill list. CLI syntax was checked with Claude Code `2.1.269`. The final-scope uninstall deletes plugin persistent data by default; `--keep-data` explicitly retains it. Old plugin versions can remain in the cache pending background cleanup, so successful uninstall is not an immediate zero-disk-residue guarantee. If immediate disk cleanup is needed, close relevant sessions and inspect only ForgeSteward-owned cache entries before removing confirmed unused copies; never delete a shared cache wholesale. See the official [uninstall reference](https://code.claude.com/docs/en/plugins-reference#plugin-uninstall) and [cache lifecycle](https://code.claude.com/docs/en/plugins-reference#plugin-caching-and-file-resolution).
+
+### OpenCode removal
+
+From each target project, remove all installer-managed skills (or replace `--all` with one short or full skill name):
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall --all --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status --all --project .
+opencode debug skill
+```
+
+For user-level installations, separately run:
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall --all --user
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status --all --user
+```
+
+Use the same `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME` values as when installing. On Windows, replace `python3` with `py -3` and use your checkout's Windows path, as in the installation example above. Keep the installer checkout until removal is verified.
+
+The uninstall report is deliberately bounded:
+
+- It checks only immediate entries in the printed target, not every project, user directory, ancestor, compatibility path, or custom search path. `--all` reports `forge-steward-*` entries and the four historical names `check-workflow`, `find-work`, `review-and-merge`, `fix-feedback`. Named uninstall checks only the selected names and their known historical counterparts; intentionally retained plugins do not make that operation fail.
+- Managed, unchanged installations are removed with resources and receipts. Modified or corrupt selected installations still block the entire planned batch. Missing-receipt/manual copies are not automatically adopted or deleted; `--all` can remove valid managed installations while reporting such leftovers. Historical names are only **candidates**, because another author's skill can have the same name.
+- Exit `0` means no matching candidates remain **within that limited scan**. Exit `1` means the operation or scan failed. Exit `2` means removal finished but matching candidates remain (argument-parser usage errors also use `2`; distinguish them by the message). A failed uninstall also reports residues when the target can still be inspected. Empty skill/config containers are allowed; no crash-recovery guarantee is added.
+
+Inspect each reported path, preserve user edits, and move only confirmed copies outside all skill search paths or delete them with explicit ownership confirmation. Do not reinstall a removed skill just to clear a warning. Re-run uninstall to verify its limited report, then `opencode debug skill` to verify actual discovery. `status --all` checks current checkout names, not every legacy or retired name.
+
+OpenCode also discovers project/user `.agents/skills` and `.claude/skills` copies. Check those separately, along with ancestor and custom paths and any old unprefixed installations; the installer does not remove them. A scope being clean does not prove the skill is unavailable elsewhere. See [OpenCode discovery paths](https://opencode.ai/docs/skills/).
+
+### What removal does not undo
+
+Uninstall removes availability, not work already performed. Changes made by `check-workflow` to project rules or agent entry documents, code commits, issues, PRs, comments, and conversation history remain project/user assets. Reverting those requires a separate reviewed change; do not delete `AGENTS.md` or `CLAUDE.md` wholesale. Independently configured credentials, integrations and automation are not revoked by skill removal either. A downloaded ForgeSteward source checkout is separate from installed copies; retain it if you develop the project, or remove it only after checking for local work and completing uninstall verification.
 
 ## The name
 
