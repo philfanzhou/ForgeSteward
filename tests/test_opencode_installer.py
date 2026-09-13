@@ -160,9 +160,146 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.installed().exists())
 
     def test_missing_uninstall_is_idempotent_and_read_only(self):
-        self.run_cli("uninstall", "--all")
+        output = self.run_cli("uninstall", "--all")
+        self.assertIn("No residual candidates", output)
+        self.assertIn("Other projects", output)
         self.run_cli("uninstall", "find-work")
         self.assertFalse(self.root.parent.exists())
+
+    def test_normal_uninstall_reports_no_residues(self):
+        self.run_cli("install", "--all")
+        output = self.run_cli("uninstall", "--all")
+        self.assertEqual(list(self.root.iterdir()), [])
+        self.assertIn("No residual candidates", output)
+        self.assert_no_transactions()
+
+    def test_missing_receipt_is_reported_without_deleting_manual_content(self):
+        self.run_cli("install", "--all")
+        (self.installed() / installer.RECEIPT).unlink()
+        before = self.contents(self.installed())
+        output = self.run_cli("uninstall", "--all", expected=2)
+        self.assertIn("Unmanaged directory", output)
+        self.assertIn(str(self.installed()), output)
+        self.assertIn("NOT deleted", output)
+        self.assertEqual(before, self.contents(self.installed()))
+        self.assertEqual([p.name for p in self.root.iterdir()], [self.installed().name])
+        self.assert_no_transactions()
+        # 幂等重跑仍然报告残留，不因“无托管项”变成成功。
+        self.run_cli("uninstall", "--all", expected=2)
+
+    def test_unmanaged_and_legacy_names_are_only_candidates(self):
+        self.root.mkdir(parents=True)
+        for name in ("forge-steward-custom", *installer.LEGACY_NAMES, "other-skill"):
+            directory = self.root / name
+            directory.mkdir()
+            (directory / "notes.txt").write_text("user content", encoding="utf-8")
+        before = self.contents(self.root)
+        shutil.rmtree(self.source / "plugins")
+        output = self.run_cli("uninstall", "--all", expected=2)
+        for name in ("forge-steward-custom", *installer.LEGACY_NAMES):
+            self.assertIn(str(self.root / name), output)
+        self.assertIn("ownership unverified", output)
+        self.assertNotIn("other-skill", output)
+        self.assertEqual(before, self.contents(self.root))
+
+    def test_named_uninstall_leaves_intentionally_installed_skills(self):
+        self.run_cli("install", "--all")
+        legacy = self.root / "review-and-merge"
+        legacy.mkdir()
+        output = self.run_cli("uninstall", "find-work")
+        self.assertIn("No residual candidates", output)
+        self.assertNotIn(str(legacy), output)
+        self.assertTrue(self.installed("fix-feedback").is_dir())
+        legacy = self.root / "find-work"
+        legacy.mkdir()
+        output = self.run_cli("uninstall", "forge-steward-find-work", expected=2)
+        self.assertIn(str(legacy), output)
+
+    def test_failed_uninstall_also_reports_all_residues_and_preserves_batch(self):
+        self.run_cli("install", "--all")
+        (self.installed() / installer.RECEIPT).write_text("broken", encoding="utf-8")
+        legacy = self.root / "find-work"
+        legacy.mkdir()
+        before = self.contents(self.root)
+        output = self.run_cli("uninstall", "--all", expected=1)
+        self.assertIn("Residual: " + str(self.installed()), output)
+        self.assertIn("Residual: " + str(legacy), output)
+        self.assertIn("managed installation remains", output)
+        self.assertEqual(before, self.contents(self.root))
+        self.assert_no_transactions()
+
+    def test_dangling_link_residue_is_not_followed(self):
+        self.root.mkdir(parents=True)
+        link = self.installed()
+        self.make_link(link, self.base / "missing", True)
+        output = self.run_cli("uninstall", "--all", expected=2)
+        self.assertIn("link/reparse point; not followed", output)
+        self.assertTrue(link.is_symlink())
+
+    def test_user_residue_scan_does_not_cross_scopes(self):
+        config = self.base / "custom-config"
+        with mock.patch.dict(os.environ, {"OPENCODE_CONFIG_DIR": str(config)}):
+            self.run_cli("install", "find-work", user=True)
+            manual = config / "skills/find-work"
+            manual.mkdir()
+            output = self.run_cli("uninstall", "--all", user=True, expected=2)
+            self.assertIn(str(manual), output)
+            self.assertTrue(manual.is_dir())
+            output = self.run_cli("uninstall", "--all")
+            self.assertIn("were NOT checked", output)
+            self.assertNotIn(str(manual), output)
+        self.assertFalse(self.root.parent.exists())
+
+    def test_residue_scan_failure_is_not_reported_as_clean(self):
+        self.root.mkdir(parents=True)
+        with mock.patch.object(installer, "report_uninstall_residues", side_effect=PermissionError("scan denied")):
+            output = self.run_cli("uninstall", "--all", expected=1)
+        self.assertIn("scan denied", output)
+        self.assertNotIn("No residual candidates", output)
+
+    def test_unreadable_residue_returns_scan_failure(self):
+        self.installed().mkdir(parents=True)
+        with mock.patch.object(installer, "read_install", side_effect=PermissionError("entry denied")):
+            output = self.run_cli("uninstall", "--all", expected=1)
+        self.assertIn("scan failed: entry denied", output)
+        self.assertTrue(self.installed().is_dir())
+
+    def test_same_named_file_is_preserved_and_reported(self):
+        self.root.mkdir(parents=True)
+        path = self.installed()
+        path.write_text("not a skill", encoding="utf-8")
+        output = self.run_cli("uninstall", "--all", expected=2)
+        self.assertIn(str(path), output)
+        self.assertEqual(path.read_text(encoding="utf-8"), "not a skill")
+
+    def test_uninstall_rename_failure_rolls_back_and_reports(self):
+        self.run_cli("install", "--all")
+        before = self.contents(self.root)
+        replace = os.replace
+        calls = 0
+
+        def fail_once(source, destination):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("uninstall rename failure")
+            return replace(source, destination)
+
+        with mock.patch.object(installer.os, "replace", side_effect=fail_once):
+            output = self.run_cli("uninstall", "--all", expected=1)
+        self.assertEqual(before, self.contents(self.root))
+        self.assertEqual(output.count("managed installation remains"), 4)
+        self.assert_no_transactions()
+
+    def test_subprocess_residue_exit_code(self):
+        self.installed().mkdir(parents=True)
+        result = subprocess.run(
+            [sys.executable, str(REPO / "scripts/opencode.py"), "uninstall", "--all",
+             "--project", str(self.project)], capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("Residual:", result.stdout)
+        self.assertTrue(self.installed().is_dir())
 
     def test_status_does_not_create_directories(self):
         self.assertIn("not installed", self.run_cli("status", "--all"))
@@ -240,6 +377,11 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(Path(items["forge-steward-find-work"]["location"]).resolve(), expected)
                 self.run_cli("uninstall", "--all", user=True)
                 self.assertEqual(discovered(), {})
+        # 命令失败/有残留与真实发现一致：不能把缺失收据的副本当成已卸载。
+        self.run_cli("install", "find-work")
+        (self.installed() / installer.RECEIPT).unlink()
+        self.assertIn("Residual:", self.run_cli("uninstall", "--all", expected=2))
+        self.assertEqual(set(discovered()), {"forge-steward-find-work"})
 
     def make_link(self, link, target, directory=False):
         try:

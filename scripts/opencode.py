@@ -19,6 +19,8 @@ REPO = Path(__file__).resolve().parents[1]
 PREFIX = "forge-steward-"
 RECEIPT = ".forge-steward-install.json"
 LOCK = ".forge-steward.lock"
+# 历史调用名不是归属凭据；仅用于报告可能遗留的手工副本。
+LEGACY_NAMES = {"check-workflow", "find-work", "review-and-merge", "fix-feedback"}
 
 
 class InstallError(Exception):
@@ -245,6 +247,44 @@ def transact(root, changes, revision):
             print("{}: {} {} -> {}".format("Updated" if current else "Installed", name, current["version"] if current else "absent", wanted["version"]))
 
 
+def report_uninstall_residues(root, names, all_skills):
+    """只读核对本次选择的名称；不跨作用域、不跟随链接、不推定归属。"""
+    print("Residual scan (selected names, target directory only): " + str(root))
+    reject_links(root)
+    candidates = sorted(root.iterdir()) if root.exists() else []
+    selected = set(names)
+    legacy = LEGACY_NAMES if all_skills else {
+        name[len(PREFIX):] for name in names if name[len(PREFIX):] in LEGACY_NAMES
+    }
+    remaining = False
+    scan_failed = False
+    for path in candidates:
+        if not (path.name in legacy or path.name in selected
+                or (all_skills and path.name.startswith(PREFIX))):
+            continue
+        remaining = True
+        if is_link(path):
+            reason = "link/reparse point; not followed"
+        elif path.name in legacy:
+            reason = "possible legacy name; ownership unverified"
+        else:
+            try:
+                current = read_install(path)
+                reason = "managed installation remains" if current else "entry changed during scan"
+            except OSError as error:
+                scan_failed = True
+                reason = "scan failed: " + str(error)
+            except (InstallError, ValueError) as error:
+                reason = str(error)
+        print("Residual: {} ({})".format(path, reason))
+    if remaining:
+        print("Residual candidates were NOT deleted. Inspect ownership and back up/move confirmed copies outside skill search paths; do not delete unrelated files.")
+    else:
+        print("No residual candidates for the selected names in this target.")
+    print("Other projects, user scopes, compatibility/custom paths and old sessions were NOT checked. Verify with opencode debug skill in a new session.")
+    return 1 if scan_failed else (2 if remaining else 0)
+
+
 def parser():
     cli = argparse.ArgumentParser(description="Manage OpenCode skills from this checkout using Python's standard library.")
     commands = cli.add_subparsers(dest="command", required=True)
@@ -256,6 +296,8 @@ def parser():
         scope = sub.add_mutually_exclusive_group(required=True)
         scope.add_argument("--project", metavar="PATH", help="Use PATH/.opencode/skills")
         scope.add_argument("--user", action="store_true", help="Use OPENCODE_CONFIG_DIR/skills, XDG_CONFIG_HOME/opencode/skills, or ~/.config/opencode/skills")
+        if command == "uninstall":
+            sub.epilog = "After uninstall, report selected-name residues in the target only. Exit: 0 none found, 1 operation/scan failure, 2 residues (also argparse usage errors)."
     return cli
 
 
@@ -273,7 +315,9 @@ def main(argv=None, repo=REPO):
         root = target_root(args)
         print("Target: " + str(root))
         if args.all and args.command == "uninstall":
-            names = sorted(p.name for p in root.glob(PREFIX + "*") if (p / RECEIPT).exists())
+            # iterdir 不像 glob 那样隐藏目录访问错误；扫描失败不得报卸载成功。
+            names = sorted(p.name for p in root.iterdir()
+                           if p.name.startswith(PREFIX) and (p / RECEIPT).exists()) if root.exists() else []
         else:
             names = sorted(available) if args.all else sorted({skill_name(n) for n in args.skills})
         for name in names:
@@ -297,9 +341,21 @@ def main(argv=None, repo=REPO):
                     failed = True
                     print(str(error))
             return int(failed)
-        if args.command == "uninstall" and not root.exists():
-            print("No managed installations.")
-            return 0
+        if args.command == "uninstall":
+            failed = False
+            try:
+                if root.exists():
+                    with locked(root):
+                        changes = plan_changes(args.command, names, root, available)
+                        transact(root, changes, {})
+                else:
+                    print("No managed installations.")
+            except (InstallError, OSError, ValueError) as error:
+                failed = True
+                print("Error: " + str(error), file=sys.stderr)
+            # 即使预检或事务失败也展示仍在目标内的内容；错误退出码优先。
+            residue_code = report_uninstall_residues(root, names, args.all)
+            return 1 if failed else residue_code
         with locked(root):
             changes = plan_changes(args.command, names, root, available)
             transact(root, changes, source_revision(repo) if args.command != "uninstall" else {})
