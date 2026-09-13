@@ -1,0 +1,40 @@
+name: Test OpenCode installer
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - run: python -m unittest discover -s tests -v
+
+  discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install a pinned OpenCode in the runner temporary directory
+        run: npm install --prefix "$RUNNER_TEMP/opencode-runtime" --registry=https://registry.npmjs.org --no-audit --no-fund opencode-ai@1.18.30
+      - name: Verify actual discovery and removal
+        env:
+          FORGESTEWARD_OPENCODE: ${{ runner.temp }}/opencode-runtime/node_modules/.bin/opencode
+        run: python -m unittest discover -s tests -v
