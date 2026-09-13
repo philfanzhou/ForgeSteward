@@ -1,6 +1,6 @@
 {
   "name": "fix-feedback",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Resolve required feedback and verified gaps on open change requests without merging.",
   "author": {
     "name": "philfanzhou",
@@ -12,7 +12,7 @@
   "keywords": ["agent-skills", "review-feedback", "repository-maintenance"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Fix Feedback",
+    "displayName": "Fix Feedback - ForgeSteward",
     "shortDescription": "Fix required review feedback and verified gaps.",
     "longDescription": "Repair only required unresolved review feedback, deterministic in-scope CI failures, and confirmed acceptance gaps, then push each original branch without merging.",
     "developerName": "philfanzhou",

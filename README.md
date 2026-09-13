@@ -109,6 +109,8 @@ Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a 
 
 ## Calling the skills
 
+Starting with plugin version `0.2.1`, Codex plugin and skill display names use `<Task> - ForgeSteward`, for example `Find Work - ForgeSteward`. These human-facing labels are separate from the installation IDs and skill invocation names below. This display-name fix is pending the next repository release; the pinned `v0.2.0` installation examples still install the previous labels. Updating requires selecting a release containing the fix, not reinstalling the unchanged `v0.2.0` snapshot; see the [version switching guide](docs/versioned-installation.md).
+
 All skill names use the `forge-steward-` prefix. Plugin names and the `forge-steward` marketplace remain unchanged: each plugin is still independently installed and versioned. For example, the plugin identifier is `find-work@forge-steward`, and its skill name is `forge-steward-find-work`.
 
 Open an agent session in the repository you want to maintain, select a skill, and append your request. In Codex CLI and the IDE extension, type `$` to select a skill or use `/skills`. Claude Code adds the plugin namespace to the skill name:
