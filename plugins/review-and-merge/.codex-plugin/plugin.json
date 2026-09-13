@@ -1,0 +1,23 @@
+{
+  "name": "review-and-merge",
+  "version": "0.1.0",
+  "description": "Review a frozen change-request queue and merge only fully eligible changes.",
+  "author": {
+    "name": "philfanzhou",
+    "url": "https://github.com/philfanzhou"
+  },
+  "homepage": "https://github.com/philfanzhou/ForgeSteward#readme",
+  "repository": "https://github.com/philfanzhou/ForgeSteward",
+  "license": "MIT",
+  "keywords": ["agent-skills", "code-review", "repository-maintenance"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Review and Merge",
+    "shortDescription": "Review and safely merge eligible changes.",
+    "longDescription": "Freeze the open change-request queue, verify scope and acceptance evidence, merge eligible changes, and reconcile linked tasks without expanding the audit.",
+    "developerName": "philfanzhou",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Review the current open change requests and merge only those that fully satisfy their acceptance gates."
+  }
+}

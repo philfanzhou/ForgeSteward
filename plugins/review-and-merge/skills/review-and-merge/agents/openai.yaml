@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review and Merge"
+  short_description: "Review and safely merge eligible changes"
+  default_prompt: "Use $review-and-merge to review the current open change requests and merge eligible ones."

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "review-and-merge",
+  "version": "0.1.0",
+  "description": "Review a frozen change-request queue and merge only fully eligible changes.",
+  "author": {
+    "name": "philfanzhou",
+    "url": "https://github.com/philfanzhou"
+  },
+  "homepage": "https://github.com/philfanzhou/ForgeSteward#readme",
+  "repository": "https://github.com/philfanzhou/ForgeSteward",
+  "license": "MIT",
+  "keywords": ["agent-skills", "code-review", "repository-maintenance"]
+}

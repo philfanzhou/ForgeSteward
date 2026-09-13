@@ -1,0 +1,44 @@
+{
+  "name": "forge-steward",
+  "interface": {
+    "displayName": "ForgeSteward"
+  },
+  "plugins": [
+    {
+      "name": "find-work",
+      "source": {
+        "source": "local",
+        "path": "./plugins/find-work"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "review-and-merge",
+      "source": {
+        "source": "local",
+        "path": "./plugins/review-and-merge"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "fix-feedback",
+      "source": {
+        "source": "local",
+        "path": "./plugins/fix-feedback"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -10,17 +10,19 @@ ForgeSteward is a collection of cross-agent skills for maintaining software repo
 
 Together, **ForgeSteward** means a trusted steward for the software forge: an agent-assisted toolkit that helps maintainers move repository work forward while respecting review gates, project policy, and human judgment.
 
-## Planned skills
+## Skills
 
 | Skill | Purpose |
 | --- | --- |
-| `find-work` | Find open issues that are sufficiently clear and unblocked to begin work. |
-| `review-and-merge` | Review an open change request, verify required quality and policy gates, and merge only when the configured conditions are satisfied. |
-| `fix-feedback` | Identify actionable review feedback, update the code, run relevant checks, and report what was addressed. |
+| [`find-work`](plugins/find-work/skills/find-work/SKILL.md) | Find open issues that are sufficiently clear and unblocked to begin work, then generate a bounded execution prompt without implementing it. |
+| [`review-and-merge`](plugins/review-and-merge/skills/review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
+| [`fix-feedback`](plugins/fix-feedback/skills/fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
 
 Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
 
 The skill names and core workflows use provider-neutral terminology. Platform adapters map a **change request** to a GitHub pull request, a GitLab merge request, or the equivalent concept on another forge, and map **review feedback** to that platform's comments, discussions, or review threads.
+
+Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a Codex compatibility manifest package it for Codex; a Claude manifest and repository marketplace package the same file for Claude Code. OpenCode can consume that unchanged skill directory from one of its Agent Skills locations, such as `.agents/skills/<name>`. OpenCode does not consume the Claude or Codex marketplace indexes.
 
 ## Agent instructions
 

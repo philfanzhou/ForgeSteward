@@ -1,0 +1,25 @@
+{
+  "name": "forge-steward",
+  "description": "Cross-agent skills for selecting repository work, reviewing changes, and resolving feedback.",
+  "owner": {
+    "name": "philfanzhou",
+    "url": "https://github.com/philfanzhou"
+  },
+  "plugins": [
+    {
+      "name": "find-work",
+      "source": "./plugins/find-work",
+      "description": "Select independent ready issues and generate a bounded execution queue."
+    },
+    {
+      "name": "review-and-merge",
+      "source": "./plugins/review-and-merge",
+      "description": "Review a frozen change-request queue and merge only fully eligible changes."
+    },
+    {
+      "name": "fix-feedback",
+      "source": "./plugins/fix-feedback",
+      "description": "Resolve required feedback and verified gaps on open change requests without merging."
+    }
+  ]
+}
