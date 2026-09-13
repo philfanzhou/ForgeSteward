@@ -6,7 +6,7 @@ ForgeSteward is a collection of cross-agent skills for maintaining software repo
 
 Choose your agent below. The four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
 
-The examples pin the `v0.2.0` repository snapshot. See its [release version matrix](docs/releases/v0.2.0.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
+The examples pin the `v0.2.1` repository snapshot. See its [release version matrix](docs/releases/v0.2.1.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
 
 Already installed? See [Upgrade and keep only the selected version](#upgrade-and-keep-only-the-selected-version). To remove everything, see [Uninstall and verify](#uninstall-and-verify). Both cover Codex, Claude Code, and OpenCode; upgrading the agent application itself does not upgrade a pinned ForgeSteward release.
 
@@ -15,7 +15,7 @@ Already installed? See [Upgrade and keep only the selected version](#upgrade-and
 Run these commands in your terminal (requires a Codex CLI with `plugin` support):
 
 ```bash
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
 codex plugin add check-workflow@forge-steward
 codex plugin add find-work@forge-steward
 codex plugin add review-and-merge@forge-steward
@@ -34,7 +34,7 @@ $forge-steward-find-work Find up to 10 actionable issues and generate an executi
 Run these commands one at a time in the Claude Code conversation:
 
 ```text
-/plugin marketplace add philfanzhou/ForgeSteward@v0.2.0
+/plugin marketplace add philfanzhou/ForgeSteward@v0.2.1
 /plugin install check-workflow@forge-steward
 /plugin install find-work@forge-steward
 /plugin install review-and-merge@forge-steward
@@ -55,7 +55,7 @@ On macOS or Linux, obtain the source once (skip this if you already have this ch
 
 ```bash
 mkdir -p "$HOME/code"
-git clone --branch v0.2.0 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward"
+git clone --branch v0.2.1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward"
 ```
 
 From the repository you want to maintain, install all four skills with one command:
@@ -90,7 +90,7 @@ With OpenCode installed, `opencode debug skill` lists the discovered names and l
 
 ## Upgrade and keep only the selected version
 
-Choose the newest **published, non-prerelease** tag you want from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), then read its plugin version matrix and migration notes. The commands below use the published `v0.2.0` as a runnable example: **replace it with your chosen published tag before upgrading**. Reusing `v0.2.0` reinstalls that snapshot; it does not install unpublished fixes from a PR or `main`. A repository tag selects the whole marketplace snapshot, while each plugin has its own package version. `find-work@forge-steward` is a plugin/marketplace ID, not a version selector.
+Choose the newest **published, non-prerelease** tag you want from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), then read its plugin version matrix and migration notes. The commands below target `v0.2.1`; confirm that its Tag and Release are published before running them: **replace it with your chosen published tag before upgrading**. Reusing `v0.2.1` reinstalls that snapshot; it does not install unpublished fixes from a PR or `main`. A repository tag selects the whole marketplace snapshot, while each plugin has its own package version. `find-work@forge-steward` is a plugin/marketplace ID, not a version selector.
 
 Before removal, confirm the target release exists and is compatible, record your current ref, installed subset and scopes, and back up local modifications and any plugin data you need **outside all agent discovery/cache directories**. Stop active skill-driven work. Run each step only after the previous step succeeds; if reinstallation fails, restore the recorded release using the same procedure. Do not delete backups until the new installation is verified.
 
@@ -117,7 +117,7 @@ codex plugin remove find-work@forge-steward
 codex plugin remove review-and-merge@forge-steward
 codex plugin remove fix-feedback@forge-steward
 codex plugin marketplace remove forge-steward
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
 codex plugin add check-workflow@forge-steward
 codex plugin add find-work@forge-steward
 codex plugin add review-and-merge@forge-steward
@@ -138,7 +138,7 @@ claude plugin uninstall find-work@forge-steward --scope user --keep-data
 claude plugin uninstall review-and-merge@forge-steward --scope user --keep-data
 claude plugin uninstall fix-feedback@forge-steward --scope user --keep-data
 claude plugin marketplace remove forge-steward --scope user
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.0 --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1 --scope user
 claude plugin install check-workflow@forge-steward --scope user
 claude plugin install find-work@forge-steward --scope user
 claude plugin install review-and-merge@forge-steward --scope user
@@ -160,10 +160,10 @@ git -C "$HOME/code/ForgeSteward" status --short
 git -C "$HOME/code/ForgeSteward" fetch origin --tags
 ```
 
-Continue only with a clean checkout and no branch work you need to preserve; otherwise use a separate clean clone. Replace `v0.2.0` with your chosen release, then compare the resulting SHA with that Release before updating any installed copy:
+Continue only with a clean checkout and no branch work you need to preserve; otherwise use a separate clean clone. Replace `v0.2.1` with your chosen release, then compare the resulting SHA with that Release before updating any installed copy:
 
 ```bash
-git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.0
+git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.1
 git -C "$HOME/code/ForgeSteward" rev-parse HEAD
 ```
 
@@ -212,7 +212,7 @@ Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a 
 
 ## Calling the skills
 
-Starting with plugin version `0.2.1`, Codex plugin and skill display names use `<Task> - ForgeSteward`, for example `Find Work - ForgeSteward`. These human-facing labels are separate from the installation IDs and skill invocation names below. This display-name fix is pending the next repository release; the pinned `v0.2.0` installation examples still install the previous labels. Updating requires selecting a release containing the fix, not reinstalling the unchanged `v0.2.0` snapshot; see the [version switching guide](docs/versioned-installation.md).
+Starting with plugin version `0.2.1`, Codex plugin and skill display names use `<Task> - ForgeSteward`, for example `Find Work - ForgeSteward`. These human-facing labels are separate from the installation IDs and skill invocation names below. The `v0.2.1` snapshot contains this display-name fix. Existing `v0.2.0` installations retain the previous labels until you switch to the new snapshot; see the [version switching guide](docs/versioned-installation.md).
 
 All skill names use the `forge-steward-` prefix. Plugin names and the `forge-steward` marketplace remain unchanged: each plugin is still independently installed and versioned. For example, the plugin identifier is `find-work@forge-steward`, and its skill name is `forge-steward-find-work`.
 

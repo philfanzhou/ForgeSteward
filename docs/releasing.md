@@ -43,4 +43,5 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 
 ## 发布记录
 
+- [v0.2.1 对应表与说明](releases/v0.2.1.md)
 - [v0.2.0 对应表与说明](releases/v0.2.0.md)
