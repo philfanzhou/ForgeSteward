@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeSteward Review and Merge"
+  short_description: "Review and safely merge eligible changes"
+  default_prompt: "Use $forge-steward-review-and-merge to review the current open change requests and merge eligible ones."

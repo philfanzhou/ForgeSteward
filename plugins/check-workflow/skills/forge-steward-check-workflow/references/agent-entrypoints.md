@@ -25,7 +25,7 @@
 
 ## 技能分发与规则接入的区别
 
-ForgeSteward 提供同一份标准 `SKILL.md` 和包内相对引用；Codex/Claude 插件清单属于发布适配。OpenCode 可以使用其支持的本地技能目录（例如 `.agents/skills/check-workflow/`），需要包含整个技能目录及 `references/`，不能只复制 SKILL.md。项目文档增补不会自动完成技能安装，也不要求另外三个 Skill 已安装。现有安装流程保持独立，不在接入文档时顺手改造。
+ForgeSteward 提供同一份标准 `SKILL.md` 和包内相对引用；Codex/Claude 插件清单属于发布适配。OpenCode 可以使用其支持的本地技能目录（例如 `.agents/skills/forge-steward-check-workflow/`），需要包含整个技能目录及 `references/`，不能只复制 SKILL.md。项目文档增补不会自动完成技能安装，也不要求另外三个 Skill 已安装。现有安装流程保持独立，不在接入文档时顺手改造。
 
 ## 官方依据
 

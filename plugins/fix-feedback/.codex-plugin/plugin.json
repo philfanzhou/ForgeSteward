@@ -1,6 +1,6 @@
 {
   "name": "fix-feedback",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Resolve required feedback and verified gaps on open change requests without merging.",
   "author": {
     "name": "philfanzhou",
@@ -18,6 +18,6 @@
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Fix the required feedback and verified gaps on the current repairable change-request queue."
+    "defaultPrompt": "Use $forge-steward-fix-feedback to repair the current change requests that have required unresolved feedback."
   }
 }

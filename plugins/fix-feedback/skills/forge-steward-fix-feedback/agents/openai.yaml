@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeSteward Fix Feedback"
+  short_description: "Resolve required review feedback and CI gaps"
+  default_prompt: "Use $forge-steward-fix-feedback to repair the current change requests that have required unresolved feedback."

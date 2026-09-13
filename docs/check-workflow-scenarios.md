@@ -32,4 +32,4 @@
 - 人工核对以上场景，以及新增正文是否会改变已有规则的实际含义；检查 diff 只包含新插件、其登记和必要项目说明。
 - 本次不安装 Codex、Claude Code 或 OpenCode，不启动额外 Agent；文档与包结构检查不算运行时加载或行为兼容性证明。
 
-Agent 入口细节和已核对的官方资料见包内 [入口适配](../plugins/check-workflow/skills/check-workflow/references/agent-entrypoints.md)。该文件随技能分发，不依赖本验收文档才能运行。
+Agent 入口细节和已核对的官方资料见包内 [入口适配](../plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md)。该文件随技能分发，不依赖本验收文档才能运行。以上为 `0.1.0` 的历史验收记录；`0.2.0` 将技能调用名改为 `forge-steward-check-workflow`，插件名仍为 `check-workflow`，工作流行为不变。

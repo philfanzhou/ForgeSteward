@@ -1,6 +1,6 @@
 {
   "name": "fix-feedback",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Resolve required feedback and verified gaps on open change requests without merging.",
   "author": {
     "name": "philfanzhou",
