@@ -5,6 +5,18 @@
   },
   "plugins": [
     {
+      "name": "check-workflow",
+      "source": {
+        "source": "local",
+        "path": "./plugins/check-workflow"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "find-work",
       "source": {
         "source": "local",

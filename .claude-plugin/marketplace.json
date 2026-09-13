@@ -7,6 +7,11 @@
   },
   "plugins": [
     {
+      "name": "check-workflow",
+      "source": "./plugins/check-workflow",
+      "description": "Add missing workflow constraints while preserving existing project rules."
+    },
+    {
       "name": "find-work",
       "source": "./plugins/find-work",
       "description": "Select independent ready issues and generate a bounded execution queue."

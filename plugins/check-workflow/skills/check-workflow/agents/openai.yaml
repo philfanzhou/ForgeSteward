@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check Workflow"
+  short_description: "Add missing workflow rules without replacing policy"
+  default_prompt: "Use $check-workflow to onboard this repository by adding missing workflow constraints while preserving its existing rules."

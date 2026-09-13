@@ -15,9 +15,9 @@
 
 ## 项目定位
 
-ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维护 Skill，用于发现可开工的 Issue、审查并在满足条件时合并 Change Request，以及根据 Review Feedback 修复代码。
+ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维护 Skill，用于增补接入工作流所需的项目约束、发现可开工的 Issue、审查并在满足条件时合并 Change Request，以及根据 Review Feedback 修复代码。
 
-三个 Skill 应保持独立安装和独立版本管理。Skill 名称和核心流程不得绑定 GitHub、GitLab、Gitea 等特定平台。只有真正跨 Agent、跨托管平台通用的行为才应共享；平台特有的 API、术语、清单、目录和调用方式应放在各自适配层中。
+各 Skill 应保持独立安装和独立版本管理。Skill 名称和核心流程不得绑定 GitHub、GitLab、Gitea 等特定平台。只有真正跨 Agent、跨托管平台通用的行为才应共享；平台特有的 API、术语、清单、目录和调用方式应放在各自适配层中。
 
 核心设计统一使用以下平台无关术语：
 
