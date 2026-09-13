@@ -6,6 +6,8 @@ ForgeSteward is a collection of cross-agent skills for maintaining software repo
 
 Choose your agent below. The four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
 
+The examples pin the `v0.2.0` repository snapshot. See its [release version matrix](docs/releases/v0.2.0.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
+
 For removal, see [Uninstall and verify](#uninstall-and-verify), including scopes, caches, and manual-copy leftovers.
 
 ### Codex
@@ -13,7 +15,7 @@ For removal, see [Uninstall and verify](#uninstall-and-verify), including scopes
 Run these commands in your terminal (requires a Codex CLI with `plugin` support):
 
 ```bash
-codex plugin marketplace add philfanzhou/ForgeSteward
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.0
 codex plugin add check-workflow@forge-steward
 codex plugin add find-work@forge-steward
 codex plugin add review-and-merge@forge-steward
@@ -32,7 +34,7 @@ $forge-steward-find-work Find up to 10 actionable issues and generate an executi
 Run these commands one at a time in the Claude Code conversation:
 
 ```text
-/plugin marketplace add philfanzhou/ForgeSteward
+/plugin marketplace add philfanzhou/ForgeSteward@v0.2.0
 /plugin install check-workflow@forge-steward
 /plugin install find-work@forge-steward
 /plugin install review-and-merge@forge-steward
@@ -53,7 +55,7 @@ On macOS or Linux, obtain the source once (skip this if you already have this ch
 
 ```bash
 mkdir -p "$HOME/code"
-git clone https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward"
+git clone --branch v0.2.0 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward"
 ```
 
 From the repository you want to maintain, install all four skills with one command:
@@ -149,7 +151,7 @@ python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall find-work --proj
 
 Replace `find-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers. It also reports matching unmanaged or legacy-name candidates in that target; exit code `2` means leftovers need inspection, not that they were deleted. See [Uninstall and verify](#uninstall-and-verify) for the complete boundary.
 
-The installer uses the current local checkout and does not fetch or execute remote installation commands. To update from the repository, first update your source checkout with `git -C "$HOME/code/ForgeSteward" pull --ff-only`, then run `update`. For a reproducible version, select a reviewed commit or tag with `git -C "$HOME/code/ForgeSteward" checkout --detach <commit-or-tag>` before installing or updating. An explicit `update` follows that checkout, including an intentional downgrade. Use a separate clean checkout if your source has local work.
+The installer uses the current local checkout and does not fetch or execute remote installation commands. Tagged installs use a detached checkout: fetch tags, select the next reviewed tag or commit, then run `update` as described in the [switching guide](docs/versioned-installation.md). Do not run `git pull` on a detached checkout. Only a clean development checkout tracking `main` should use `git -C "$HOME/code/ForgeSteward" pull --ff-only` before updating. An explicit `update` follows the selected checkout, including an intentional downgrade. Use a separate clean checkout if your source has local work.
 
 Each installed skill contains `.forge-steward-install.json`, recording its plugin version, source commit (when Git is available), source dirty state, and content hashes. Repeating an identical install makes no changes. A changed source/version requires `update`; even when the version string is unchanged, content changes are detected.
 
