@@ -1,5 +1,5 @@
 ---
-name: find-work
+name: forge-steward-find-work
 description: Analyze a repository's open issues, exclude work already covered by open change requests, select up to 10 independent ready items, and generate a fixed sequential execution prompt without implementing them. Use for ready-work discovery, issue queue preparation, or advancing a blocked older mainline task.
 ---
 

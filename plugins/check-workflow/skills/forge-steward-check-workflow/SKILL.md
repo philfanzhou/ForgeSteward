@@ -1,5 +1,5 @@
 ---
-name: check-workflow
+name: forge-steward-check-workflow
 description: Onboard a repository to the issue, review, and feedback workflow by checking its existing policies and adding only missing, non-conflicting workflow constraints and coding-agent entry references. Use for first-time workflow adoption or policy compatibility checks, not code audits or ordinary task execution. Check-only requests never edit files.
 ---
 

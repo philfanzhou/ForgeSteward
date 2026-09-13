@@ -1,5 +1,5 @@
 ---
-name: fix-feedback
+name: forge-steward-fix-feedback
 description: Freeze the current repairable change-request queue, resolve only required review feedback, deterministic in-scope CI failures, and confirmed acceptance gaps, then commit and push each original branch without merging. Use for repairing PRs or MRs that need changes, not for items merely awaiting re-review.
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Add missing workflow constraints while preserving existing project rules.",
   "author": {
     "name": "philfanzhou",
@@ -22,6 +22,6 @@
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Onboard this repository with Check Workflow: add missing workflow constraints while preserving its existing project rules."
+    "defaultPrompt": "Use $forge-steward-check-workflow to onboard this repository by adding missing workflow constraints while preserving its existing rules."
   }
 }

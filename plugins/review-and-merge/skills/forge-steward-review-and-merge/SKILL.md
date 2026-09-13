@@ -1,5 +1,5 @@
 ---
-name: review-and-merge
+name: forge-steward-review-and-merge
 description: Freeze and review the current open change requests, merge only those that satisfy their scope, acceptance criteria, checks, and repository policy, then reconcile linked tasks and clean up safely. Use when asked to review an open PR or MR queue and merge eligible changes, not for review-only requests that forbid merging.
 ---
 

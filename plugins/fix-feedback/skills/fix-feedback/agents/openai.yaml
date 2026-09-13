@@ -1,4 +1,0 @@
-interface:
-  display_name: "Fix Feedback"
-  short_description: "Resolve required review feedback and CI gaps"
-  default_prompt: "Use $fix-feedback to repair the current change requests that have required unresolved feedback."

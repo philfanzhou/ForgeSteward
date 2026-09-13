@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Add missing workflow constraints while preserving existing project rules.",
   "author": {
     "name": "philfanzhou",
