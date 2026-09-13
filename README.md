@@ -2,9 +2,11 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-## Install and use
+The current development target is **0.2.3 (unreleased)**, with five independent plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, and `fix-feedback`. `prepare-work` replaces `find-work`: it completes actionable preparation and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. See [the migration and development-install guide](docs/prepare-execute-migration.md) before switching from the published four-plugin snapshot.
 
-Choose your agent below. The four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
+## Install and use — published v0.2.1
+
+The following examples install the historical v0.2.1 snapshot; they do not include prepare-work or execute-work. Its four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
 
 The examples pin the `v0.2.1` repository snapshot. See its [release version matrix](docs/releases/v0.2.1.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
 
@@ -196,13 +198,14 @@ To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and veri
 | Skill | Purpose |
 | --- | --- |
 | [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Check and fill missing workflow constraints and agent entry references, then submit a PR or MR without merging. |
-| [`forge-steward-find-work`](plugins/find-work/skills/forge-steward-find-work/SKILL.md) | Find open issues that are sufficiently clear and unblocked to begin work, then generate a bounded execution prompt without implementing it. |
+| [`forge-steward-prepare-work`](plugins/prepare-work/skills/forge-steward-prepare-work/SKILL.md) | Resolve actionable preparation blockers, persist scope and evidence in issues, and return only a single-line ready issue list. |
+| [`forge-steward-execute-work`](plugins/execute-work/skills/forge-steward-execute-work/SKILL.md) | Implement the complete supplied issue list sequentially and submit independent change requests without merging. |
 | [`forge-steward-review-and-merge`](plugins/review-and-merge/skills/forge-steward-review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
 | [`forge-steward-fix-feedback`](plugins/fix-feedback/skills/forge-steward-fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
 
-Each skill remains independently installable, while all plugins are versioned together. The root [VERSION](VERSION) defines the current source's target version; all plugin manifests must match it, and the release tag must be `v` followed by that version. This policy starts with the pending `0.2.2` release and does not rewrite historical releases. A target version in source does not mean it has been published. See the [release policy](docs/releasing.md). Skills share a common core where behavior is genuinely portable across supported agents.
+Each skill remains independently installable, while all plugins are versioned together. The root [VERSION](VERSION) defines the current source's target version; all plugin manifests must match it, and the release tag must be `v` followed by that version. The unified policy was introduced in the `0.2.2` development baseline and does not rewrite historical releases. Automatic version changes increment only the last component unless the user explicitly specifies otherwise; incompatible changes still require migration notes. A target version in source does not mean it has been published. See the [release policy](docs/releasing.md). Skills share a common core where behavior is genuinely portable across supported agents.
 
-Starting with **check-workflow package `0.2.2`**, explicitly selecting the skill without extra text requests the complete workflow: check, fill missing constraints and necessary agent entry references, validate, commit, push, and open a PR or MR. It should not stop at a report or local diff when delivery is permitted. This change is pending a repository release; the pinned `v0.2.1` examples above still install the earlier behavior.
+In the current **unreleased `0.2.3` target**, carrying forward the check-workflow change from the `0.2.2` development baseline, explicitly selecting the skill without extra text requests the complete workflow: check, fill missing constraints and necessary agent entry references, validate, commit, push, and open a PR or MR. It should not stop at a report or local diff when delivery is permitted. This change is pending a repository release; the pinned `v0.2.1` examples above still install the earlier behavior.
 
 It preserves existing project rules, language, scope, and instruction sources; conflicting requirements are reported without being overwritten. Explicit check-only requests remain read-only, and local-only/no-publish requests stop at that boundary. Implicit skill selection does not authorize publishing beyond the actual request. Repository permissions and approval gates still apply. If nothing is missing, it makes no changes and opens no empty PR; if an equivalent task PR already exists, it avoids duplication. It only fills workflow documents and necessary agent references, not business code, tests, CI or permissions. It never merges changes or installs other skills.
 
@@ -216,22 +219,31 @@ Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a 
 
 Starting with plugin version `0.2.1`, Codex plugin and skill display names use `<Task> - ForgeSteward`, for example `Find Work - ForgeSteward`. These human-facing labels are separate from the installation IDs and skill invocation names below. The `v0.2.1` snapshot contains this display-name fix. Existing `v0.2.0` installations retain the previous labels until you switch to the new snapshot; see the [version switching guide](docs/versioned-installation.md).
 
-All skill names use the `forge-steward-` prefix. Plugin names and the `forge-steward` marketplace remain unchanged: each plugin is still independently installed, but all plugins share one version. For example, the plugin identifier is `find-work@forge-steward`, and its skill name is `forge-steward-find-work`.
+All skill names use the `forge-steward-` prefix and the marketplace remains `forge-steward`. The current target retires the `find-work` plugin ID in favor of `prepare-work` and adds `execute-work`; no old-name alias is provided. Each plugin remains independently installable, with a shared version. The table below describes current source, not the v0.2.1 installation examples.
 
 Open an agent session in the repository you want to maintain, select a skill, and append your request. In Codex CLI and the IDE extension, type `$` to select a skill or use `/skills`. Claude Code adds the plugin namespace to the skill name:
 
 | Plugin | Codex skill mention | Claude Code plugin command |
 | --- | --- | --- |
 | `check-workflow` | `$forge-steward-check-workflow` | `/check-workflow:forge-steward-check-workflow` |
-| `find-work` | `$forge-steward-find-work` | `/find-work:forge-steward-find-work` |
+| `prepare-work` | `$forge-steward-prepare-work` | `/prepare-work:forge-steward-prepare-work` |
+| `execute-work` | `$forge-steward-execute-work` | `/execute-work:forge-steward-execute-work` |
 | `review-and-merge` | `$forge-steward-review-and-merge` | `/review-and-merge:forge-steward-review-and-merge` |
 | `fix-feedback` | `$forge-steward-fix-feedback` | `/fix-feedback:forge-steward-fix-feedback` |
 
-If the selector displays a qualified plugin skill name, select that entry. For example:
+If the selector displays a qualified plugin skill name, select that entry. Prepare work first:
 
 ```text
-$forge-steward-find-work Find up to 10 actionable issues and generate an execution prompt.
+$forge-steward-prepare-work
 ```
+
+Preparation persists its plan, audit and investigation evidence in the original issues. Its final response is only one line, for example `#123, #145, #167`, or `[]` when no issue meets the gates. Cross-repository tracking uses unambiguous qualified identifiers or full issue URLs on the same line. Copy that list to the independently usable execution skill:
+
+```text
+$forge-steward-execute-work #123, #145, #167
+```
+
+Execution processes the complete list, continues independent items when one is blocked, and submits separate PRs or MRs without merging. It reads the issues and owning repository policies itself; it needs neither an execution prompt nor the previous conversation. Preparation includes actionable technical investigation and experiments, but no production implementation. Genuine external blockers are recorded during preparation rather than hidden by a ready label.
 
 OpenCode loads these names through its native `skill` tool; use the natural-language example in the installation section. The Claude command syntax is not a shared cross-agent interface.
 
@@ -239,7 +251,7 @@ For review and merge, include authorization in your request, for example: "Revie
 
 See the official [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills), [Claude Code skill namespaces](https://code.claude.com/docs/en/skills), and [OpenCode skill loading](https://opencode.ai/docs/skills/) documentation for the host-specific interfaces.
 
-### Migrating from 0.1.x
+### Historical migration from 0.1.x to 0.2.0
 
 Each plugin moves to `0.2.0` for this invocation-name change. Update the installed plugins through your agent's plugin manager, then start a new session and select the prefixed skills. Update saved prompts and shortcuts: the old unprefixed skill names are no longer provided as aliases. Plugin installation identifiers remain unchanged.
 
@@ -247,16 +259,16 @@ For manually installed skills, replace each old skill directory with the corresp
 
 ## OpenCode installation maintenance
 
-Run these commands from the target project. Use `--user` in place of `--project .` for a user-level install:
+The commands below use a current-source checkout with `prepare-work`; pinned v0.2.1 still uses `find-work`. Follow the [rename migration](docs/prepare-execute-migration.md) before changing names. Run these commands from the target project. Use `--user` in place of `--project .` for a user-level install:
 
 ```bash
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" list
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status --all --project .
-python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project .
-python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall find-work --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update prepare-work --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall prepare-work --project .
 ```
 
-Replace `find-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers. It also reports matching unmanaged or legacy-name candidates in that target; exit code `2` means leftovers need inspection, not that they were deleted. See [Uninstall and verify](#uninstall-and-verify) for the complete boundary.
+Replace `prepare-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers. It also reports matching unmanaged or legacy-name candidates in that target; exit code `2` means leftovers need inspection, not that they were deleted. See [Uninstall and verify](#uninstall-and-verify) for the complete boundary.
 
 The installer uses the current local checkout and does not fetch or execute remote installation commands. Tagged installs use a detached checkout: fetch tags, select the next reviewed tag or commit, then run `update` as described in the [switching guide](docs/versioned-installation.md). Do not run `git pull` on a detached checkout. Only a clean development checkout tracking `main` should use `git -C "$HOME/code/ForgeSteward" pull --ff-only` before updating. An explicit `update` follows the selected checkout, including an intentional downgrade. Use a separate clean checkout if your source has local work.
 
@@ -272,7 +284,9 @@ Development checks: `python3 -m unittest discover -s tests -v`. Set `FORGESTEWAR
 
 ## Uninstall and verify
 
-Uninstall in the same agent environment and scope used for installation. Stop active skill-driven work first, then start a fresh session after removal: an existing conversation can still contain previously loaded instructions. Disabling a plugin is not uninstalling it. Do not delete an entire agent configuration or cache directory to remove these four skills.
+Uninstall in the same agent environment and scope used for installation. Stop active skill-driven work first, then start a fresh session after removal: an existing conversation can still contain previously loaded instructions. Disabling a plugin is not uninstalling it. Do not delete an entire agent configuration or cache directory to remove ForgeSteward skills.
+
+The named Codex and Claude commands below show the published v0.2.1 IDs. For current-source installations, remove `prepare-work@forge-steward` and `execute-work@forge-steward` as applicable; also remove `find-work@forge-steward` if retained from an older release. Use the actual installed subset and scope. OpenCode `uninstall --all` also handles retired managed IDs.
 
 ### Codex removal
 

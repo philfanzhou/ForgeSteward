@@ -15,7 +15,7 @@
 
 ## 项目定位
 
-ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维护 Skill，用于增补接入工作流所需的项目约束、发现可开工的 Issue、审查并在满足条件时合并 Change Request，以及根据 Review Feedback 修复代码。
+ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维护 Skill，用于增补接入工作流所需的项目约束、将 Issue 准备到可实施状态、按 Issue 清单实现并提交 Change Request、审查并在满足条件时合并 Change Request，以及根据 Review Feedback 修复代码。
 
 各 Skill 应保持独立安装，但必须统一版本管理。Skill 名称和核心流程不得绑定 GitHub、GitLab、Gitea 等特定平台。只有真正跨 Agent、跨托管平台通用的行为才应共享；平台特有的 API、术语、清单、目录和调用方式应放在各自适配层中。
 
@@ -30,6 +30,7 @@ ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维
 - 根目录 `VERSION` 是当前源码目标版本的唯一事实来源，不含 `v` 前缀；它不代表该版本已经发布。
 - 所有插件（包括未来新增插件）的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 中的版本必须与 `VERSION` 完全一致，不允许按插件独立升版。
 - 每次发布统一升版，未修改功能的插件也同步版本；仅文档或安装器变更的发布同样遵守此规则。不要求每个开发提交都升版，未发布的同一目标版本可以继续完善。
+- Agent 或自动化修改版本时，只能将 `X.Y.Z` 的最后一位 `Z` 加一，保持 `X.Y` 不变；即使新增 Skill、改名或存在不兼容变化，也不得自行提升 minor 或 major。只有用户明确指定目标版本或指定调整其他位时才按其要求执行。不兼容变化仍须记录迁移说明。候选版后缀及发布渠道的新增或变更也须由用户明确指定，不借后缀绕过此限制。
 - 发布 Tag 必须为 `v` 加 `VERSION`，Release 对应表中的全部插件版本必须与其一致。发布前按 `docs/releasing.md` 核对；CI 必须校验所有插件清单与 `VERSION` 一致。
 - 已发布 Tag 和历史版本对应表保持不变，不因采用新规则改写历史；修复必须使用新版本。修改版本规则不等于授权合并、发布或升级用户安装。
 

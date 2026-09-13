@@ -17,10 +17,22 @@
       "category": "Productivity"
     },
     {
-      "name": "find-work",
+      "name": "prepare-work",
       "source": {
         "source": "local",
-        "path": "./plugins/find-work"
+        "path": "./plugins/prepare-work"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "execute-work",
+      "source": {
+        "source": "local",
+        "path": "./plugins/execute-work"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -1,6 +1,6 @@
 {
   "name": "forge-steward",
-  "description": "Cross-agent skills for selecting repository work, reviewing changes, and resolving feedback.",
+  "description": "Cross-agent skills for preparing and implementing repository work, reviewing changes, and resolving feedback.",
   "owner": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -12,9 +12,14 @@
       "description": "Add missing workflow constraints while preserving existing project rules."
     },
     {
-      "name": "find-work",
-      "source": "./plugins/find-work",
-      "description": "Select independent ready issues and generate a bounded execution queue."
+      "name": "prepare-work",
+      "source": "./plugins/prepare-work",
+      "description": "Prepare issues for implementation through investigation and issue updates; return only a single-line issue list."
+    },
+    {
+      "name": "execute-work",
+      "source": "./plugins/execute-work",
+      "description": "Implement a fixed issue list sequentially and submit independent change requests without merging."
     },
     {
       "name": "review-and-merge",

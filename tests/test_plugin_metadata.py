@@ -9,7 +9,8 @@ import unittest
 REPO = Path(__file__).resolve().parents[1]
 TITLES = {
     "check-workflow": "Check Workflow",
-    "find-work": "Find Work",
+    "prepare-work": "Prepare Work",
+    "execute-work": "Execute Work",
     "review-and-merge": "Review and Merge",
     "fix-feedback": "Fix Feedback",
 }
@@ -67,13 +68,19 @@ class PluginMetadataTests(unittest.TestCase):
                 self.assertIn("name: " + skill_name + "\n", frontmatter)
                 self.assertIn("$" + skill_name, manifests[1]["interface"]["defaultPrompt"])
 
-    def test_marketplaces_keep_existing_install_ids(self):
+    def test_marketplaces_match_current_install_ids(self):
         for path in (".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json"):
             with self.subTest(marketplace=path):
                 marketplace = json.loads((REPO / path).read_text(encoding="utf-8"))
                 self.assertEqual(marketplace["name"], "forge-steward")
                 names = [plugin["name"] for plugin in marketplace["plugins"]]
                 self.assertCountEqual(names, TITLES)
+                self.assertCountEqual([p.name for p in (REPO / "plugins").iterdir() if p.is_dir()], TITLES)
+                for plugin in marketplace["plugins"]:
+                    source = plugin["source"]
+                    relative = source["path"] if isinstance(source, dict) else source
+                    self.assertEqual((REPO / relative).resolve(), REPO / "plugins" / plugin["name"])
+                    self.assertTrue((REPO / relative / "plugin.json").is_file())
 
 
 if __name__ == "__main__":

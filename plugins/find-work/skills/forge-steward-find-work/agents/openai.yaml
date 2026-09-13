@@ -1,4 +1,0 @@
-interface:
-  display_name: "Find Work - ForgeSteward"
-  short_description: "Find actionable, independent repository work"
-  default_prompt: "Use $forge-steward-find-work to select actionable issues and generate the execution prompt."

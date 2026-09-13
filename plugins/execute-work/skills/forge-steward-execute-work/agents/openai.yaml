@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execute Work - ForgeSteward"
+  short_description: "Implement an issue list and submit independent PRs."
+  default_prompt: "Use $forge-steward-execute-work to implement the supplied issue list and submit independent change requests without merging."
