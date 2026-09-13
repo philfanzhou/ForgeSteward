@@ -20,6 +20,12 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
 
+## Agent instructions
+
+Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex and OpenCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Platform adapters must not duplicate shared guidance.
+
+Project design documents other than README files are written in Simplified Chinese. GitHub issue and pull-request titles are written in English, while their bodies and comments are written in Simplified Chinese.
+
 ## Principles
 
 - Prefer evidence from the current repository over assumptions.
