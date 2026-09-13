@@ -128,6 +128,26 @@ class ZCodePackagingTests(unittest.TestCase):
                 with patch("sys.argv", ["sync_marketplace.py", "--check"]):
                     self.assertEqual(SYNC.main(), 0)
 
+    def test_cli_supports_non_utf8_redirected_output(self):
+        import sys
+        with tempfile.TemporaryDirectory(prefix="forgesteward-zcode-") as directory:
+            root = Path(directory)
+            self.fixture(root)
+            script = root / "scripts/sync_marketplace.py"
+            script.parent.mkdir()
+            shutil.copyfile(REPO / "scripts/sync_marketplace.py", script)
+            path = root / SYNC.MARKETPLACE
+            catalog = json.loads(path.read_text(encoding="utf-8"))
+            catalog["plugins"][0].pop("version")
+            path.write_text(json.dumps(catalog), encoding="utf-8")
+            environment = dict(os.environ, PYTHONIOENCODING="cp1252")
+            for argument, expected in (("--help", 0), ("--check", 1), ("--write", 0), ("--check", 0)):
+                with self.subTest(argument=argument, expected=expected):
+                    result = subprocess.run([sys.executable, str(script), argument], env=environment,
+                                            capture_output=True, encoding="cp1252", timeout=30)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertNotIn("codec can't encode", result.stderr)
+
 
 @unittest.skipUnless(os.environ.get("FORGESTEWARD_ZCODE_CLI"), "未指定 ZCode CLI；不代表真实发现已通过")
 class ZCodeRuntimeTests(unittest.TestCase):
