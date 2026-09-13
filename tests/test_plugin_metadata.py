@@ -30,6 +30,16 @@ class PluginMetadataTests(unittest.TestCase):
                 self.assertEqual(len(values), 1)
                 self.assertEqual(json.loads(values[0]), expected)
 
+    def test_plugin_and_skill_default_prompts_match(self):
+        for name in TITLES:
+            with self.subTest(plugin=name):
+                plugin = REPO / "plugins" / name
+                manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+                metadata = (plugin / "skills" / ("forge-steward-" + name) / "agents/openai.yaml").read_text(encoding="utf-8")
+                values = re.findall(r'^  default_prompt: (".*")\s*$', metadata, re.MULTILINE)
+                self.assertEqual(len(values), 1)
+                self.assertEqual(json.loads(values[0]), manifest["interface"]["defaultPrompt"])
+
     def test_manifest_identity_and_versions_stay_in_sync(self):
         for name in TITLES:
             with self.subTest(plugin=name):

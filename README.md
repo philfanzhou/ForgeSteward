@@ -195,14 +195,16 @@ To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and veri
 
 | Skill | Purpose |
 | --- | --- |
-| [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Onboard a repository by checking existing policies and adding only missing, non-conflicting workflow constraints and agent entry references. |
+| [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Check and fill missing workflow constraints and agent entry references, then submit a PR or MR without merging. |
 | [`forge-steward-find-work`](plugins/find-work/skills/forge-steward-find-work/SKILL.md) | Find open issues that are sufficiently clear and unblocked to begin work, then generate a bounded execution prompt without implementing it. |
 | [`forge-steward-review-and-merge`](plugins/review-and-merge/skills/forge-steward-review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
 | [`forge-steward-fix-feedback`](plugins/fix-feedback/skills/forge-steward-fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
 
 Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
 
-For first-time adoption, ask `forge-steward-check-workflow` to add the missing workflow constraints to the target repository. It preserves existing project rules, language, scope, and instruction sources; conflicting requirements are reported without being overwritten. A check-only request produces a report without edits. Adoption changes are limited to workflow documents and necessary agent document references, with commits and publishing governed by your request and repository policy. It never merges changes or installs other skills.
+Starting with **check-workflow package `0.3.0`**, explicitly selecting the skill without extra text requests the complete workflow: check, fill missing constraints and necessary agent entry references, validate, commit, push, and open a PR or MR. It should not stop at a report or local diff when delivery is permitted. This change is pending a repository release; the pinned `v0.2.1` examples above still install the earlier behavior.
+
+It preserves existing project rules, language, scope, and instruction sources; conflicting requirements are reported without being overwritten. Explicit check-only requests remain read-only, and local-only/no-publish requests stop at that boundary. Implicit skill selection does not authorize publishing beyond the actual request. Repository permissions and approval gates still apply. If nothing is missing, it makes no changes and opens no empty PR; if an equivalent task PR already exists, it avoids duplication. It only fills workflow documents and necessary agent references, not business code, tests, CI or permissions. It never merges changes or installs other skills.
 
 Repositories with equivalent rules need no duplicate template or mandatory onboarding pass before every task. The other skills remain independently usable and must still apply the target repository's policies. Agent-specific loading details and compatibility limits are documented in the bundled [entrypoint reference](plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md).
 

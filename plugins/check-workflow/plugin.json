@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "check-workflow",
-  "version": "0.2.1",
-  "description": "Add missing workflow constraints while preserving existing project rules.",
+  "version": "0.3.0",
+  "description": "Check and fill missing workflow constraints, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
