@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.1",
-  "description": "Add missing workflow constraints while preserving existing project rules.",
+  "version": "0.2.2",
+  "description": "Check and fill missing workflow constraints, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -17,11 +17,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Check Workflow - ForgeSteward",
-    "shortDescription": "Adopt workflow constraints without replacing policy.",
-    "longDescription": "Check existing project policies and add only missing, non-conflicting workflow constraints and coding-agent entry references.",
+    "shortDescription": "Fill missing workflow rules and submit a PR or MR.",
+    "longDescription": "Check existing policies, add missing non-conflicting workflow constraints and agent entry references, validate, and submit a PR or MR without merging. Explicit check-only requests remain read-only.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $forge-steward-check-workflow to onboard this repository by adding missing workflow constraints while preserving its existing rules."
+    "defaultPrompt": "Use $forge-steward-check-workflow to check this repository, fill missing workflow rules and agent entry references without changing existing policies, validate, then commit, push, and open a PR or MR without merging."
   }
 }

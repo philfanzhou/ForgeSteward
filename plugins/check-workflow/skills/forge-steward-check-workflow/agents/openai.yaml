@@ -1,4 +1,4 @@
 interface:
   display_name: "Check Workflow - ForgeSteward"
-  short_description: "Add missing workflow rules without replacing policy"
-  default_prompt: "Use $forge-steward-check-workflow to onboard this repository by adding missing workflow constraints while preserving its existing rules."
+  short_description: "Fill missing workflow rules and submit a PR or MR"
+  default_prompt: "Use $forge-steward-check-workflow to check this repository, fill missing workflow rules and agent entry references without changing existing policies, validate, then commit, push, and open a PR or MR without merging."
