@@ -39,7 +39,7 @@ class PluginMetadataTests(unittest.TestCase):
                 self.assertEqual({manifest["name"] for manifest in manifests}, {name})
                 versions = {manifest["version"] for manifest in manifests}
                 self.assertEqual(len(versions), 1)
-                self.assertRegex(versions.pop(), r"^\d+\.\d+\.\d+$")
+                self.assertRegex(versions.pop(), r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
                 skill_name = "forge-steward-" + name
                 skill = plugin / "skills" / skill_name
                 frontmatter = (skill / "SKILL.md").read_text(encoding="utf-8").split("---", 2)[1]
