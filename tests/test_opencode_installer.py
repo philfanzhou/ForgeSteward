@@ -60,22 +60,28 @@ class InstallerTests(unittest.TestCase):
 
     def test_list_and_subprocess_help(self):
         self.assertEqual(self.run_cli("list").count("0.2.0"), 4)
-        result = subprocess.run([sys.executable, str(REPO / "scripts/opencode.py"), "--help"], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0)
-        self.assertIn("uninstall", result.stdout)
+        for encoding in ("utf-8", "cp1252"):
+            with self.subTest(encoding=encoding):
+                environment = dict(os.environ, PYTHONIOENCODING=encoding)
+                result = subprocess.run(
+                    [sys.executable, str(REPO / "scripts/opencode.py"), "--help"],
+                    capture_output=True, text=True, encoding=encoding, env=environment,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("uninstall", result.stdout)
 
     def test_single_install_and_full_name(self):
         self.run_cli("install", "forge-steward-find-work")
         self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-find-work"])
         self.assertEqual((self.installed() / "SKILL.md").read_bytes(), (self.source_skill() / "SKILL.md").read_bytes())
-        receipt = json.loads((self.installed() / installer.RECEIPT).read_text())
+        receipt = json.loads((self.installed() / installer.RECEIPT).read_text(encoding="utf-8"))
         self.assertEqual(receipt["files"], installer.snapshot(self.source_skill()))
 
     def test_install_all_has_matching_frontmatter_and_resources(self):
         self.run_cli("install", "--all")
         self.assertEqual(len(list(self.root.iterdir())), 4)
         for path in self.root.iterdir():
-            self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text())
+            self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
         self.assertTrue((self.installed("check-workflow") / "references/agent-entrypoints.md").is_file())
         self.assert_no_transactions()
 
@@ -124,13 +130,13 @@ class InstallerTests(unittest.TestCase):
         new = self.source_skill() / "new.txt"
         new.write_text("new", encoding="utf-8")
         manifest_path = self.source / "plugins/find-work/plugin.json"
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["version"] = "0.3.0"
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         self.run_cli("install", "find-work", expected=1)
         self.assertIn("0.2.0 -> 0.3.0", self.run_cli("update", "find-work"))
         self.assertFalse((self.installed() / "obsolete.txt").exists())
-        self.assertEqual((self.installed() / "new.txt").read_text(), "new")
+        self.assertEqual((self.installed() / "new.txt").read_text(encoding="utf-8"), "new")
         self.assertIn("installed 0.3.0", self.run_cli("status", "find-work"))
 
     def test_update_missing_requires_install(self):
@@ -167,7 +173,7 @@ class InstallerTests(unittest.TestCase):
         receipt = self.installed() / installer.RECEIPT
         receipt.write_text("not json", encoding="utf-8")
         self.run_cli("uninstall", "find-work", expected=1)
-        self.assertEqual(receipt.read_text(), "not json")
+        self.assertEqual(receipt.read_text(encoding="utf-8"), "not json")
 
     def test_path_traversal_and_unknown_selection(self):
         for name in ("../outside", "/absolute", "missing", "--all"):
@@ -263,7 +269,7 @@ class InstallerTests(unittest.TestCase):
         outside.write_text("keep", encoding="utf-8")
         self.make_link(self.installed() / "link", outside)
         self.run_cli("uninstall", "find-work", expected=1)
-        self.assertEqual(outside.read_text(), "keep")
+        self.assertEqual(outside.read_text(encoding="utf-8"), "keep")
 
     def test_symlink_source_is_rejected(self):
         outside = self.base / "outside.txt"
@@ -274,7 +280,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_name_mismatch_is_rejected(self):
         skill = self.source_skill() / "SKILL.md"
-        skill.write_text(skill.read_text().replace("name: forge-steward-find-work", "name: different"), encoding="utf-8")
+        skill.write_text(skill.read_text(encoding="utf-8").replace("name: forge-steward-find-work", "name: different"), encoding="utf-8")
         self.run_cli("install", "find-work", expected=1)
         self.assertFalse(self.root.exists())
 
@@ -283,7 +289,7 @@ class InstallerTests(unittest.TestCase):
         lock = self.root.parent / installer.LOCK
         lock.write_text("pid=12345", encoding="utf-8")
         self.run_cli("install", "--all", expected=1)
-        self.assertEqual(lock.read_text(), "pid=12345")
+        self.assertEqual(lock.read_text(encoding="utf-8"), "pid=12345")
         self.assertFalse(self.root.exists())
 
     def test_interrupted_transaction_is_not_overwritten(self):
@@ -291,7 +297,7 @@ class InstallerTests(unittest.TestCase):
         leftover.mkdir(parents=True)
         (leftover / "backup.txt").write_text("keep", encoding="utf-8")
         self.assertIn("Recover the interrupted", self.run_cli("install", "--all", expected=1))
-        self.assertEqual((leftover / "backup.txt").read_text(), "keep")
+        self.assertEqual((leftover / "backup.txt").read_text(encoding="utf-8"), "keep")
         self.assertFalse((self.root.parent / installer.LOCK).exists())
 
     def test_invalid_receipt_schema_reports_error(self):
@@ -316,7 +322,7 @@ class InstallerTests(unittest.TestCase):
         self.run_cli("install", "--all")
         before = self.contents(self.root)
         for skill in self.source.glob("plugins/*/skills/*/SKILL.md"):
-            skill.write_text(skill.read_text() + "\nextra source content\n", encoding="utf-8")
+            skill.write_text(skill.read_text(encoding="utf-8") + "\nextra source content\n", encoding="utf-8")
         replace = os.replace
         calls = 0
 

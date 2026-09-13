@@ -246,7 +246,7 @@ def transact(root, changes, revision):
 
 
 def parser():
-    cli = argparse.ArgumentParser(description=__doc__)
+    cli = argparse.ArgumentParser(description="Manage OpenCode skills from this checkout using Python's standard library.")
     commands = cli.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="List skills available in this checkout")
     for command in ("install", "update", "uninstall", "status"):
