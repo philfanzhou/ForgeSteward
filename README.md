@@ -14,9 +14,9 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 | Skill | Purpose |
 | --- | --- |
-| `find-ready-issues` | Find open issues that are sufficiently clear and unblocked to begin work. |
-| `review-and-merge-change-request` | Review an open change request, verify required quality and policy gates, and merge only when the configured conditions are satisfied. |
-| `address-review-feedback` | Identify actionable review feedback, update the code, run relevant checks, and report what was addressed. |
+| `find-work` | Find open issues that are sufficiently clear and unblocked to begin work. |
+| `review-and-merge` | Review an open change request, verify required quality and policy gates, and merge only when the configured conditions are satisfied. |
+| `fix-feedback` | Identify actionable review feedback, update the code, run relevant checks, and report what was addressed. |
 
 Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
 
