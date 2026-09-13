@@ -1,8 +1,19 @@
 # ForgeSteward
 
-ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
+ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, ZCode, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
 The current development target is **0.2.3 (unreleased)**, with five independent plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, and `fix-feedback`. `prepare-work` replaces `find-work`: it completes actionable preparation and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. See [the migration and development-install guide](docs/prepare-execute-migration.md) before switching from the published four-plugin snapshot.
+
+## Install and use — ZCode development preview
+
+ZCode reuses our Claude-compatible marketplace and plugin manifests; no separate skill copies, ZCode-specific plugin manifests, or Python installer are needed. This support targets the **unreleased 0.2.3 source**, not the historical v0.2.1 examples below. Packaging and bundled-CLI discovery were checked with ZCode desktop **3.11.2** (bundled CLI **0.16.5**); desktop marketplace installation and model behavior remain unverified. See [ZCode setup and verification](docs/zcode.md).
+
+1. Open the repository you want to maintain in ZCode. Go to **Settings → Plugins → Create → Add marketplace** (some versions use **Discover → +**).
+2. For development testing, add the **absolute root path of a reviewed ForgeSteward checkout containing this guide**, not its `.claude-plugin` subdirectory. Adding `philfanzhou/ForgeSteward` instead follows the remote default branch; it does not select a release or include unmerged local changes. For a fixed release, use the [snapshot procedure](docs/zcode.md#固定版本与回退), after confirming that release exists.
+3. Under the `forge-steward` marketplace, install and enable any of the five plugins listed above. Verify installed versions and source paths, then confirm the skills in **Settings → Skills**.
+4. In a new task, type `$` and select `forge-steward-prepare-work`; `/` also has a Skills group. If the picker shows a plugin-qualified name, select that entry. You do not need to paste the skill's instructions again. Execution still needs the issue list: `$forge-steward-execute-work #123, #145`.
+
+ZCode's picker is not guaranteed to display Codex's `<Task> - ForgeSteward` label. Use the stable `forge-steward-` name and verify the source. Git/forge authentication, repository permissions and explicit task limits still apply. For updates, rollback and removal, follow [Upgrade ZCode skills](#upgrade-zcode-skills) and [ZCode removal](#zcode-removal); upgrading ZCode itself does not upgrade ForgeSteward.
 
 ## Install and use — published v0.2.1
 
@@ -10,7 +21,7 @@ The following examples install the historical v0.2.1 snapshot; they do not inclu
 
 The examples pin the `v0.2.1` repository snapshot. See its [release version matrix](docs/releases/v0.2.1.md), [fixed-version installation and rollback guide](docs/versioned-installation.md), and [release policy](docs/releasing.md). Verify the tag is published on the [GitHub Releases page](https://github.com/philfanzhou/ForgeSteward/releases); a document on `main` alone is not a published release. If you already configured the `forge-steward` marketplace, follow the switching guide before adding another ref with the same name. Omit the ref only when intentionally following development on the default branch.
 
-Already installed? See [Upgrade and keep only the selected version](#upgrade-and-keep-only-the-selected-version). To remove everything, see [Uninstall and verify](#uninstall-and-verify). Both cover Codex, Claude Code, and OpenCode; upgrading the agent application itself does not upgrade a pinned ForgeSteward release.
+Already installed? See [Upgrade and keep only the selected version](#upgrade-and-keep-only-the-selected-version). To remove everything, see [Uninstall and verify](#uninstall-and-verify). Both cover Codex, Claude Code, OpenCode and the ZCode preview; upgrading the agent application itself does not upgrade a pinned ForgeSteward release.
 
 ### Codex
 
@@ -101,6 +112,7 @@ Before removal, confirm the target release exists and is compatible, record your
 | Codex | Uninstall installed ForgeSteward plugins, replace the marketplace ref, reinstall the same subset. | Other environments, manual skill copies, or untracked caches need separate inspection. |
 | Claude Code | Uninstall in the recorded scopes, replace the marketplace ref, reinstall in those scopes. | Old version caches can await background cleanup; other scopes and manual copies are separate. |
 | OpenCode | Select the source tag, then `update` the installed skills in each intended scope. | Other scopes, retired names and manually copied skills are not removed by `update`. |
+| ZCode | Refresh a moving marketplace and update installed plugins; for a fixed snapshot, switch the local marketplace source and reinstall the selected subset. | Imported skills, retired names, other workspaces/hosts and unused caches need separate inspection. |
 
 ### Upgrade Codex
 
@@ -182,6 +194,14 @@ Repeat for your other installed skills, or use `update --all` only if every skil
 
 `update` replaces each selected managed directory, including obsolete files inside it; it does not create side-by-side version directories. It does not fetch source, remove retired skill names, or clean other discovery paths. Uninstall retired managed names explicitly; move confirmed manual/legacy copies outside discovery paths only after preserving edits. Modified or corrupt installations require inspection, not forced deletion. Verify versions/content with `status`, check the actual paths reported by `opencode debug skill`, and restart OpenCode. See [OpenCode installation maintenance](#opencode-installation-maintenance) for receipts and recovery.
 
+### Upgrade ZCode skills
+
+For a moving development source, first refresh the `forge-steward` marketplace, then use **Manage installed → Check for updates** and update the installed subset. ZCode compares marketplace entry versions with installed plugin versions; this repository derives those entry versions from `VERSION` and checks them in CI. Refreshing the marketplace alone does not prove installed content changed. Changes within the same unreleased version may require uninstall/reinstall, not a version bump or a fabricated update badge.
+
+For a fixed release or rollback, prepare and verify a separate clean checkout of the chosen published tag first. Record installed plugins and their old source, preserve custom changes outside discovery paths, stop active work, uninstall the selected marketplace's installed plugins, remove the old market source, add the new checkout root, and reinstall the intended subset. Keep the old checkout until recovery is no longer needed. Do not assume Codex `--ref` or Claude `@tag` syntax works in ZCode's source field. See the [fixed-snapshot procedure and verification limits](docs/zcode.md#固定版本与回退).
+
+Check the actual installed versions, files and skill paths in a new task. When moving from historical `find-work`, uninstall the retired plugin and any imported copy before selecting `prepare-work` / `execute-work`; a new name does not replace an old one automatically. Repeat for each intended scope and remote host. Do not link ZCode skills into another agent's versioned plugin cache, which can disappear during that agent's upgrade.
+
 ### Verify that only the intended version remains
 
 There are two separate goals: **only the selected version is available in new sessions**, and **no obsolete files remain on disk**. A successful install alone proves neither.
@@ -213,7 +233,7 @@ Repositories with equivalent rules need no duplicate template or mandatory onboa
 
 The skill names and core workflows use provider-neutral terminology. Platform adapters map a **change request** to a GitHub pull request, a GitLab merge request, or the equivalent concept on another forge, and map **review feedback** to that platform's comments, discussions, or review threads.
 
-Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a Codex compatibility manifest package it for Codex; a Claude manifest and repository marketplace package the same file for Claude Code. OpenCode can consume that unchanged skill directory from one of its Agent Skills locations, such as `.agents/skills/<name>`. OpenCode does not consume the Claude or Codex marketplace indexes.
+Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a Codex compatibility manifest package it for Codex; a Claude manifest and repository marketplace package the same file for Claude Code and ZCode. OpenCode can consume that unchanged skill directory from one of its Agent Skills locations, such as `.agents/skills/<name>`. OpenCode does not consume the Claude or Codex marketplace indexes.
 
 ## Calling the skills
 
@@ -223,7 +243,7 @@ All skill names use the `forge-steward-` prefix and the marketplace remains `for
 
 Open an agent session in the repository you want to maintain, select a skill, and append your request. In Codex CLI and the IDE extension, type `$` to select a skill or use `/skills`. Claude Code adds the plugin namespace to the skill name:
 
-| Plugin | Codex skill mention | Claude Code plugin command |
+| Plugin | Codex / ZCode skill mention (select the actual picker entry) | Claude Code plugin command |
 | --- | --- | --- |
 | `check-workflow` | `$forge-steward-check-workflow` | `/check-workflow:forge-steward-check-workflow` |
 | `prepare-work` | `$forge-steward-prepare-work` | `/prepare-work:forge-steward-prepare-work` |
@@ -246,6 +266,8 @@ $forge-steward-execute-work #123, #145, #167
 Execution processes the complete list, continues independent items when one is blocked, and submits separate PRs or MRs without merging. It reads the issues and owning repository policies itself; it needs neither an execution prompt nor the previous conversation. Preparation includes actionable technical investigation and experiments, but no production implementation. Genuine external blockers are recorded during preparation rather than hidden by a ready label.
 
 OpenCode loads these names through its native `skill` tool; use the natural-language example in the installation section. The Claude command syntax is not a shared cross-agent interface.
+
+ZCode supports `$` skill selection and the `/` menu's Skills group; `@` refers to workspace files. A plugin-qualified entry may appear instead of the bare name in the table. Its `agents/openai.yaml` display metadata is not a ZCode compatibility guarantee. See [ZCode skill invocation](https://zcode.z.ai/en/docs/skill).
 
 For review and merge, include authorization in your request, for example: "Review the current open change requests and merge those that meet acceptance and repository requirements."
 
@@ -359,6 +381,14 @@ Inspect each reported path, preserve user edits, and move only confirmed copies 
 
 OpenCode also discovers project/user `.agents/skills` and `.claude/skills` copies. Check those separately, along with ancestor and custom paths and any old unprefixed installations; the installer does not remove them. A scope being clean does not prove the skill is unavailable elsewhere. See [OpenCode discovery paths](https://opencode.ai/docs/skills/).
 
+### ZCode removal
+
+Stop skill-driven tasks, preserve local changes, then open **Settings → Plugins → Manage installed**. Uninstall each installed ForgeSteward plugin from its details, including historical `find-work` if present. Removing or disabling the marketplace alone is not the uninstall verification step. After plugin removal, remove the `forge-steward` marketplace source if you no longer need it.
+
+In **Settings → Skills**, inspect the actual paths of remaining `forge-steward-*` and legacy skills. Imported copies or symlinks are independent of plugin installations: preserve edits, confirm ownership, and move only the redundant copy/link outside discovery paths. Do not follow a symlink and delete another agent's source. Check project/user `.zcode/skills`, `.agents/skills`, configured roots and remote environments as applicable; verify in a new task that removed skills are absent. Keep intentionally installed skills.
+
+An uninstall is not a promise of immediate zero disk residue. Inspect only confirmed unused ForgeSteward cache/source paths before cleanup; never delete a whole `.zcode` or shared plugins directory. See [ZCode cleanup and recovery](docs/zcode.md#卸载与只保留目标版本).
+
 ### What removal does not undo
 
 Uninstall removes availability, not work already performed. Changes made by `check-workflow` to project rules or agent entry documents, code commits, issues, PRs, comments, and conversation history remain project/user assets. Reverting those requires a separate reviewed change; do not delete `AGENTS.md` or `CLAUDE.md` wholesale. Independently configured credentials, integrations and automation are not revoked by skill removal either. A downloaded ForgeSteward source checkout is separate from installed copies; retain it if you develop the project, or remove it only after checking for local work and completing uninstall verification.
@@ -373,7 +403,7 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 ## Agent instructions
 
-Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex and OpenCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Platform adapters must not duplicate shared guidance.
+Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex, OpenCode and ZCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Open this repository root as the ZCode workspace: ZCode does not recursively load nested `AGENTS.md` or expand `@import` / `@include`. Platform adapters must not duplicate shared guidance.
 
 Project design documents other than README files are written in Simplified Chinese. Issue and change-request titles are written in English, while their bodies and comments are written in Simplified Chinese.
 

@@ -13,6 +13,7 @@
 | Codex | `AGENTS.override.md`、`AGENTS.md`、已配置回退名，以及根到工作目录的实际作用域；同目录 override 可能使 AGENTS 不被读取 | 在实际生效、允许增补的入口中加入“进行此工作流前，读取并遵守 <仓库内相对路径> 的适用补充条款”。保留 override 和回退文件，不新建更高优先级文件来遮蔽旧规则。不把 Markdown 链接或 `@path` 当作自动导入证明 |
 | Claude Code | `CLAUDE.md`、相关目录入口和 `.claude/rules`；既有导入的路径与作用域 | 保留现有正文，可增加到唯一工作流源的 `@相对路径` 导入，路径相对入口文件解析，放在代码块之外。已经可达时不重复导入；不导入一个会反向导入当前入口的文件 |
 | OpenCode | `AGENTS.md`、`CLAUDE.md` 回退、现有 `opencode.json`/`opencode.jsonc` 的 instructions、禁用兼容设置及实际启动目录 | 优先在现有生效入口添加明确的读取指示；裸 `@path` 不是其自动导入协议。若仅有 CLAUDE 回退，不盲目新增 AGENTS 令旧规则失效；确需新增时必须保持旧规则仍明确可达、无循环且语义不变，否则保留为适配缺口。非文档配置不在本 Skill 修改范围 |
+| ZCode Agent | 用户 `~/.zcode/AGENTS.md` 与当前 Workspace 的 `AGENTS.md`；不自动合并祖先/子目录规则，不展开 `@import` / `@include`，`CLAUDE.md` 不是持续加载入口 | 仅在允许修改的工作区入口增补明确的读取指示，指向原权威文件及本次工作流补充。不要迁移或复制 CLAUDE 正文，也不改用户级文件。执行涉及子目录时显式读取其中适用规则，不能声称已自动注入。新增 AGENTS 可能改变 OpenCode 的 CLAUDE 回退，须同时验证；无法保持原规则可达时报告缺口 |
 | 其他 coding agent | 项目现有指令文件、目录匹配和文档引用机制 | 根据该 Agent 当前官方文档或实际配置做薄入口引用；不猜测通用文件会自动加载，不为未使用的 Agent 批量生成入口。无可靠依据时报告未验证及所需证据 |
 
 如果权威规则已经位于 CLAUDE.md，不将其迁移到 AGENTS.md 来满足统一布局。若一个入口的新增会改变另一 Agent 的原加载结果，先寻找不改变原规则路径的文档引用方式；无法做到时不执行该适配，其他独立增补可继续。
@@ -25,7 +26,7 @@
 
 ## 技能分发与规则接入的区别
 
-ForgeSteward 提供同一份标准 `SKILL.md` 和包内相对引用；Codex/Claude 插件清单属于发布适配。OpenCode 可以使用其支持的本地技能目录（例如 `.agents/skills/forge-steward-check-workflow/`），需要包含整个技能目录及 `references/`，不能只复制 SKILL.md。项目文档增补不会自动完成技能安装，也不要求另外三个 Skill 已安装。现有安装流程保持独立，不在接入文档时顺手改造。
+ForgeSteward 提供同一份标准 `SKILL.md` 和包内相对引用；Codex/Claude 插件清单属于发布适配，ZCode 复用 Claude 兼容插件清单。OpenCode 可以使用其支持的本地技能目录（例如 `.agents/skills/forge-steward-check-workflow/`），需要包含整个技能目录及 `references/`，不能只复制 SKILL.md。项目文档增补不会自动完成技能安装，也不要求其他 Skill 已安装。现有安装流程保持独立，不在接入文档时顺手改造。
 
 ## 官方依据
 
@@ -37,3 +38,5 @@ ForgeSteward 提供同一份标准 `SKILL.md` 和包内相对引用；Codex/Clau
 - [Claude Code Skills](https://code.claude.com/docs/en/skills)：标准技能正文、插件和资源路径。
 - [OpenCode Rules](https://opencode.ai/docs/rules/)：AGENTS/CLAUDE 回退、instructions 与显式读取引用。
 - [OpenCode Skills](https://opencode.ai/docs/skills/)：标准技能字段及本地目录发现。
+- [ZCode Agent](https://zcode.z.ai/cn/docs/agents)：工作区 AGENTS 与全局入口、非递归及非自动导入边界。
+- [ZCode Plugin](https://zcode.z.ai/cn/docs/plugin)：Claude 兼容插件清单；[ZCode Skill](https://zcode.z.ai/en/docs/skill)：技能选择与完整目录。

@@ -17,14 +17,14 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 - 仓库发布使用 `vX.Y.Z`；候选版可用 `vX.Y.Z-rc.N`，GitHub 标为 prerelease。`0.x` 阶段仍属早期接口，不代表 1.0 稳定承诺；首个正式编号为 `v0.2.0`，不追补不存在的历史 Tag。
 - 自动升版的允许范围以 [AGENTS.md 的统一版本规则](../AGENTS.md#统一版本) 为准：默认只递增最后一位，其他位或候选版渠道由用户明确指定；变化规模不构成自动跨位升版的授权。不兼容变化必须在版本说明中写清迁移，不以 patch 编号暗示兼容。
 - 根据整次发布的变化确定一个版本，同步更新 `VERSION` 和全部插件清单；即使某个插件功能未变，或只有根目录 README、安装器变化，也必须统一升版。开发提交可以继续使用尚未发布的目标版本，不要求逐提交升版。
-- 插件的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 同步名称及版本。市场引用路径须存在；不在市场重复维护同一插件版本字段。
+- 插件的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 同步名称及版本。Claude / ZCode 共用市场的 `plugins[].version` 是 ZCode 更新检测所需的派生值，不是独立版本源；统一清单后执行 `python3 scripts/sync_marketplace.py --write`，发布前运行 `--check`。Codex 市场格式不变。所有引用仍指向同快照内的相对路径，不通过索引版本单独切换插件代码。
 - 同一已发布插件版本不得对应不同包内容；后续仓库 Release 不重用旧插件版本，即使功能未变也更新版本字段。尤其 Claude 的显式版本影响缓存更新，不应靠移动 Tag 或只改市场版本来绕过缓存。参见 [Claude 版本规则](https://code.claude.com/docs/en/plugin-marketplaces#version-resolution-and-release-channels)。
 - 已发布 Tag 不移动、不覆盖、不删除再重建；修复发布新版本。附注 Tag 默认不等于密码学签名；需要签名时另行配置，不能将本规范冒充服务端 Tag 保护规则。
 
 ## 发布步骤与门禁
 
 1. 维护者确定版本及授权。在工作分支准备变更，新增 `docs/releases/<tag>.md` 的版本对应表、变更、迁移、验证边界，区分 README 的未发布目标与已发布推荐版本，发布确认后才更新固定安装推荐。历史表不随当前插件升版而改写。
-2. 核对 `VERSION`、全部插件的三份 manifest、市场清单及完整资源，全部包版本必须相同且等于 `VERSION`。人工核对目标 Tag 恰为 `v` 加 `VERSION`，本次 Release 对应表全部插件版本相同；同时对照上次发布记录确认使用新版本。CI 的元数据测试校验源码中的版本一致性，不代替远端 Tag 和 Release 对应表的发布核对。
+2. 核对 `VERSION`、全部插件的三份 manifest、共用市场的派生版本及完整资源，全部包版本必须相同且等于 `VERSION`，执行 `python3 scripts/sync_marketplace.py --check`。人工核对目标 Tag 恰为 `v` 加 `VERSION`，本次 Release 对应表全部插件版本相同；同时对照上次发布记录确认使用新版本。CI 的元数据测试校验源码中的版本一致性，不代替远端 Tag 和 Release 对应表的发布核对。
 3. 提交并审查 PR。执行 `python3 -m unittest discover -s tests -v`、`git diff --check`、相对文档链接和版本表核对；执行可用的 Agent 校验。PR 的三个 OS 安装器检查及固定 OpenCode 发现检查必须通过。若 Agent 包有变化，补充受影响 Agent 的安装验证；明确未做模型行为验证。
 4. 通过仓库保护合并，禁止向 main 直接推送或绕过检查。记录审查 head、实际 main 合并提交和 CI 链接；等待该 main 提交的四个检查通过，若合并后源码不同则补验。
 5. 使用只读查询核对目标 Tag/Release 不存在；已存在时核对目标而非覆盖。只对上一步确切的已验证提交创建附注 Tag，推送这一条 Tag，不执行批量 `--tags` 推送。发布命令应使用已解析的明确 SHA，不能在 main 后续移动后重新猜测目标。
