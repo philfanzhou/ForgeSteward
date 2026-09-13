@@ -6,7 +6,7 @@ README 已提供三种 Agent 的[升级快捷步骤](../README.md#upgrade-and-ke
 
 从 [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择已经发布的 Tag，并阅读对应表和迁移说明。下例使用 `v0.2.1`；在 Tag/Release 发布完成前不可将示例视作可用远端版本。
 
-`v0.2.1` 是仓库快照，插件 `0.2.1` 是各自包版本；`find-work@forge-steward` 中的 `@` 后面是市场名称，不支持将它直接替换成包版本号。本仓库两个市场都从快照内的相对路径加载插件，因此选择 Tag 固定整份市场，而不是独立解析每个插件的历史版本。仍可只安装一个技能；若需要不同快照的插件混搭，需要另外设计分发来源，不能靠修改缓存实现。
+项目要求统一版本：发布 Tag `vX.Y.Z` 对应全部插件包版本 `X.Y.Z`，包括功能未变的插件。源码根目录 `VERSION` 记录目标版本，不代表已发布；安装仍须选择已发布的 Tag。此规则从待发布的 `0.2.2` 起执行，历史版本以原对应表为准；示例 `v0.2.1` 的四个插件也均为 `0.2.1`。`find-work@forge-steward` 中的 `@` 后面是市场名称，不支持将它直接替换成包版本号。本仓库两个市场都从快照内的相对路径加载插件，因此选择 Tag 固定整份市场，而不是独立解析每个插件的历史版本。仍可只安装一个技能；若需要不同快照的插件混搭，需要另外设计分发来源，不能靠修改缓存实现。
 
 固定 Tag 后不应自动跟随 main。Tag 按项目规范不可移动；若需要更强的可复现性，应记录 Release 正文给出的完整 commit SHA，并与实际 Git checkout 核对。首次发布以前不存在 `v0.1.x` Tag，不能凭插件曾用过的版本号推定远端存在同名 Tag。
 
@@ -69,7 +69,7 @@ claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1 --scope user
 claude plugin install find-work@forge-steward --scope user
 ```
 
-混合作用域需要在各原项目目录按记录显式选择 `--scope project` 或 `--scope local` 处理对应声明；不要假定从一个项目运行 user 命令能清理其他项目。协调共享配置变更，管理员控制的配置交由其管理者处理。重新安装记录中的其他插件，在相应项目恢复原作用域；检查市场 ref、安装版本和新会话调用。保持 Tag 不变时刷新市场仍跟随该 ref，不会切回 main。显式包版本相同会使更新被跳过，不能把“刷新成功”当成已切换内容的证据。包内内容未变的相同版本不需要重装。
+混合作用域需要在各原项目目录按记录显式选择 `--scope project` 或 `--scope local` 处理对应声明；不要假定从一个项目运行 user 命令能清理其他项目。协调共享配置变更，管理员控制的配置交由其管理者处理。重新安装记录中的其他插件，在相应项目恢复原作用域；检查市场 ref、安装版本和新会话调用。保持 Tag 不变时刷新市场仍跟随该 ref，不会切回 main。显式包版本相同会使更新被跳过，不能把“刷新成功”当成已切换内容的证据。重复选择同一个 Tag 且版本、内容一致时无需重装；切换到新 Release 时，全部已选插件都应更新为该 Release 的统一版本。
 
 如果需要精确 commit 而非 Tag，可先克隆独立、干净的完整仓库，checkout Release SHA，然后通过 `claude plugin marketplace add /absolute/path/to/ForgeSteward` 添加本地市场；先处理同名旧市场。保留整个 checkout，不仅下载 marketplace.json，因为其插件路径是相对仓库的。不要在使用期间修改这个 checkout。
 

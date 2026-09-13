@@ -1,4 +1,4 @@
-"""校验插件与技能的显示名称一致，同时保留稳定的安装及调用标识。"""
+"""校验统一版本、显示名称及稳定的安装和调用标识。"""
 
 import json
 from pathlib import Path
@@ -16,6 +16,17 @@ TITLES = {
 
 
 class PluginMetadataTests(unittest.TestCase):
+    def test_all_plugins_match_repository_version(self):
+        version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertRegex(version, r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-rc\.(?:0|[1-9]\d*))?$")
+        plugins = sorted(path for path in (REPO / "plugins").iterdir() if path.is_dir())
+        self.assertTrue(plugins, "必须至少存在一个插件，禁止空集合通过版本检查")
+        for plugin in plugins:
+            for relative in ("plugin.json", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json"):
+                with self.subTest(plugin=plugin.name, manifest=relative):
+                    manifest = json.loads((plugin / relative).read_text(encoding="utf-8"))
+                    self.assertEqual(manifest["version"], version)
+
     def test_plugin_and_skill_display_names_match(self):
         for name, title in TITLES.items():
             with self.subTest(plugin=name):

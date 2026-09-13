@@ -90,7 +90,7 @@ With OpenCode installed, `opencode debug skill` lists the discovered names and l
 
 ## Upgrade and keep only the selected version
 
-Choose the newest **published, non-prerelease** tag you want from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), then read its plugin version matrix and migration notes. The commands below target `v0.2.1`; confirm that its Tag and Release are published before running them: **replace it with your chosen published tag before upgrading**. Reusing `v0.2.1` reinstalls that snapshot; it does not install unpublished fixes from a PR or `main`. A repository tag selects the whole marketplace snapshot, while each plugin has its own package version. `find-work@forge-steward` is a plugin/marketplace ID, not a version selector.
+Choose the newest **published, non-prerelease** tag you want from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), then read its plugin version matrix and migration notes. The commands below target `v0.2.1`; confirm that its Tag and Release are published before running them: **replace it with your chosen published tag before upgrading**. Reusing `v0.2.1` reinstalls that snapshot; it does not install unpublished fixes from a PR or `main`. A repository tag selects the whole marketplace snapshot. Under the unified version policy, tag `vX.Y.Z` contains only plugin packages versioned `X.Y.Z`, including plugins with unchanged functionality. `find-work@forge-steward` is a plugin/marketplace ID, not a version selector.
 
 Before removal, confirm the target release exists and is compatible, record your current ref, installed subset and scopes, and back up local modifications and any plugin data you need **outside all agent discovery/cache directories**. Stop active skill-driven work. Run each step only after the previous step succeeds; if reinstallation fails, restore the recorded release using the same procedure. Do not delete backups until the new installation is verified.
 
@@ -184,7 +184,7 @@ Repeat for your other installed skills, or use `update --all` only if every skil
 
 There are two separate goals: **only the selected version is available in new sessions**, and **no obsolete files remain on disk**. A successful install alone proves neither.
 
-1. Verify each intended environment/scope against the selected Release matrix. Inspect local installed manifests/content, not just the marketplace catalog. Unchanged plugin packages may legitimately keep their previous version across repository releases.
+1. Verify each intended environment/scope against the selected Release matrix. Inspect local installed manifests/content, not just the marketplace catalog. Every selected plugin must match the target release's unified package version; unchanged functionality is not a reason to retain an older package version.
 2. Check for duplicates or stale copies in other scopes and manual discovery paths, including old unprefixed names. A picker showing one name may hide another copy; inspect its source path and configuration. Keep one intended discovery source per skill per environment unless you deliberately manage multiple scopes.
 3. For disk cleanup, close relevant sessions, identify exact ForgeSteward-owned obsolete paths, and confirm no scope/configuration still references them. Use the agent's uninstall command for registered installations; move confirmed unused manual/cache copies to a backup outside all discovery paths before deleting them after verification. Do not delete a whole `.codex`, `.claude`, `.agents`, `.opencode`, or shared cache directory. Claude Code may retain orphaned version caches until its background sweep; no cross-agent one-command immediate cache purge is promised.
 4. Verify again in a new session. Keep the source checkout needed by OpenCode and any local-path marketplace; old downloaded clones are separate from installed skills and can be removed only after checking local work and references. Skill removal does not revert project rules, code, issues or PRs.
@@ -200,7 +200,7 @@ To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and veri
 | [`forge-steward-review-and-merge`](plugins/review-and-merge/skills/forge-steward-review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
 | [`forge-steward-fix-feedback`](plugins/fix-feedback/skills/forge-steward-fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
 
-Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
+Each skill remains independently installable, while all plugins are versioned together. The root [VERSION](VERSION) defines the current source's target version; all plugin manifests must match it, and the release tag must be `v` followed by that version. This policy starts with the pending `0.2.2` release and does not rewrite historical releases. A target version in source does not mean it has been published. See the [release policy](docs/releasing.md). Skills share a common core where behavior is genuinely portable across supported agents.
 
 Starting with **check-workflow package `0.2.2`**, explicitly selecting the skill without extra text requests the complete workflow: check, fill missing constraints and necessary agent entry references, validate, commit, push, and open a PR or MR. It should not stop at a report or local diff when delivery is permitted. This change is pending a repository release; the pinned `v0.2.1` examples above still install the earlier behavior.
 
@@ -216,7 +216,7 @@ Each plugin keeps one canonical `SKILL.md`. A portable root `plugin.json` and a 
 
 Starting with plugin version `0.2.1`, Codex plugin and skill display names use `<Task> - ForgeSteward`, for example `Find Work - ForgeSteward`. These human-facing labels are separate from the installation IDs and skill invocation names below. The `v0.2.1` snapshot contains this display-name fix. Existing `v0.2.0` installations retain the previous labels until you switch to the new snapshot; see the [version switching guide](docs/versioned-installation.md).
 
-All skill names use the `forge-steward-` prefix. Plugin names and the `forge-steward` marketplace remain unchanged: each plugin is still independently installed and versioned. For example, the plugin identifier is `find-work@forge-steward`, and its skill name is `forge-steward-find-work`.
+All skill names use the `forge-steward-` prefix. Plugin names and the `forge-steward` marketplace remain unchanged: each plugin is still independently installed, but all plugins share one version. For example, the plugin identifier is `find-work@forge-steward`, and its skill name is `forge-steward-find-work`.
 
 Open an agent session in the repository you want to maintain, select a skill, and append your request. In Codex CLI and the IDE extension, type `$` to select a skill or use `/skills`. Claude Code adds the plugin namespace to the skill name:
 
