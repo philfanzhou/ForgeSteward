@@ -2,13 +2,87 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-## The name
+## Install and use
 
-**Forge** literally means a workshop where metal is shaped, or the act of creating something through deliberate effort. In software development, a forge is also a platform where source code is hosted and collaboratively developed, such as GitHub, GitLab, or Gitea. Here it represents both the repository platform and the process of shaping an issue into dependable code.
+Choose your agent below. The four plugins install independently: `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Their skill names share the `forge-steward-` prefix. Install only the ones you need, then start a new agent session in the repository you want to maintain.
 
-**Steward** means a trusted caretaker: someone responsible for looking after a system, applying its rules, and keeping work moving without claiming unchecked ownership. Here it reflects a careful repository maintainer that inspects project state, protects code quality, and keeps consequential actions subject to explicit policy and human control.
+### Codex
 
-Together, **ForgeSteward** means a trusted steward for the software forge: an agent-assisted toolkit that helps maintainers move repository work forward while respecting review gates, project policy, and human judgment.
+Run these commands in your terminal (requires a Codex CLI with `plugin` support):
+
+```bash
+codex plugin marketplace add philfanzhou/ForgeSteward
+codex plugin add check-workflow@forge-steward
+codex plugin add find-work@forge-steward
+codex plugin add review-and-merge@forge-steward
+codex plugin add fix-feedback@forge-steward
+codex plugin list
+```
+
+In a new session, type `$` to select a skill, for example:
+
+```text
+$forge-steward-find-work Find up to 10 actionable issues and generate an execution prompt.
+```
+
+### Claude Code
+
+Run these commands one at a time in the Claude Code conversation:
+
+```text
+/plugin marketplace add philfanzhou/ForgeSteward
+/plugin install check-workflow@forge-steward
+/plugin install find-work@forge-steward
+/plugin install review-and-merge@forge-steward
+/plugin install fix-feedback@forge-steward
+```
+
+Restart the session and invoke the plugin's namespaced skill:
+
+```text
+/find-work:forge-steward-find-work Find up to 10 actionable issues and generate an execution prompt.
+```
+
+### OpenCode
+
+Use the included installer with Python 3.9 or newer. It copies each complete skill from this checkout into OpenCode's native search paths, including references, and needs no Python packages, model credentials, or running OpenCode process. OpenCode does not consume the Claude or Codex marketplaces.
+
+On macOS or Linux, obtain the source once (skip this if you already have this checkout):
+
+```bash
+mkdir -p "$HOME/code"
+git clone https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward"
+```
+
+From the repository you want to maintain, install all four skills with one command:
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" install --all --project .
+```
+
+Or install only one:
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" install find-work --project .
+```
+
+The installer accepts either a plugin short name or the full skill name. `--project .` writes to the current directory's `.opencode/skills/`; the project directory must already exist. To make the skills available across your projects, use `--user` instead of `--project .`. User installs use `OPENCODE_CONFIG_DIR/skills` when set, otherwise `XDG_CONFIG_HOME/opencode/skills`, or `~/.config/opencode/skills` by default. The resolved target is printed before changes.
+
+On native Windows with Python 3.9+ and Git installed, use PowerShell (substitute your checkout path):
+
+```powershell
+py -3 "$HOME\code\ForgeSteward\scripts\opencode.py" install --all --project .
+```
+
+The same script supports all three operating systems; the CI matrix checks macOS, Linux, and Windows. Actual OpenCode discovery is tested with `1.18.30` on macOS locally and Linux in CI. There is no separate native-Windows OpenCode runtime test.
+
+Restart OpenCode in the target repository and ask:
+
+```text
+Load the forge-steward-find-work skill and find actionable issues in this repository.
+```
+
+With OpenCode installed, `opencode debug skill` lists the discovered names and locations. See [installation maintenance and troubleshooting](#opencode-installation-maintenance) for updates, uninstalling, version selection, and conflicts.
 
 ## Skills
 
@@ -48,7 +122,7 @@ If the selector displays a qualified plugin skill name, select that entry. For e
 $forge-steward-find-work Find up to 10 actionable issues and generate an execution prompt.
 ```
 
-For OpenCode, install the complete skill directory under a supported location such as `.agents/skills/forge-steward-find-work/`, then ask: "Load the forge-steward-find-work skill and find actionable issues in this repository." OpenCode loads it through its native `skill` tool; the Claude command syntax is not a shared cross-agent interface.
+OpenCode loads these names through its native `skill` tool; use the natural-language example in the installation section. The Claude command syntax is not a shared cross-agent interface.
 
 For review and merge, include authorization in your request, for example: "Review the current open change requests and merge those that meet acceptance and repository requirements."
 
@@ -59,6 +133,39 @@ See the official [Codex skill invocation](https://learn.chatgpt.com/docs/build-s
 Each plugin moves to `0.2.0` for this invocation-name change. Update the installed plugins through your agent's plugin manager, then start a new session and select the prefixed skills. Update saved prompts and shortcuts: the old unprefixed skill names are no longer provided as aliases. Plugin installation identifiers remain unchanged.
 
 For manually installed skills, replace each old skill directory with the corresponding `forge-steward-<name>` directory, including its bundled resources. Preserve any local modifications before replacing files, and remove the old copy only after verifying the new installation. Keeping both copies exposes both skill names.
+
+## OpenCode installation maintenance
+
+Run these commands from the target project. Use `--user` in place of `--project .` for a user-level install:
+
+```bash
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" list
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status --all --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project .
+python3 "$HOME/code/ForgeSteward/scripts/opencode.py" uninstall find-work --project .
+```
+
+Replace `find-work` with `--all` to update all skills or uninstall all managed skills. `update` requires selected skills to be installed; if you installed only one, update it by name. `uninstall --all` removes only directories with this installer's receipt, even if their source no longer exists in the checkout. It preserves unrelated skills and may leave empty `.opencode/skills` containers.
+
+The installer uses the current local checkout and does not fetch or execute remote installation commands. To update from the repository, first update your source checkout with `git -C "$HOME/code/ForgeSteward" pull --ff-only`, then run `update`. For a reproducible version, select a reviewed commit or tag with `git -C "$HOME/code/ForgeSteward" checkout --detach <commit-or-tag>` before installing or updating. An explicit `update` follows that checkout, including an intentional downgrade. Use a separate clean checkout if your source has local work.
+
+Each installed skill contains `.forge-steward-install.json`, recording its plugin version, source commit (when Git is available), source dirty state, and content hashes. Repeating an identical install makes no changes. A changed source/version requires `update`; even when the version string is unchanged, content changes are detected.
+
+If a target was copied manually, its receipt is damaged, or its files have been edited, installation/update/uninstall stops with the affected path. There is no `--force` overwrite. Back up or move the complete conflicting directory outside OpenCode's skill search paths, inspect and preserve your edits, then install again. Existing `.agents/skills` or `.claude/skills` copies are not adopted or removed; use `opencode debug skill` to check for duplicate names or unexpected locations. Symlink sources, symlink install paths, and linked content are not managed by this installer.
+
+Selected targets are checked and staged before changing installed skills. Ordinary copy/rename failures roll back the batch. A lock prevents overlapping installer processes; avoid editing installed files while an operation runs. Forced termination or power loss can leave `.forge-steward.lock` and `.forge-steward-txn-*` beside the `skills` directory. Confirm the installer has stopped, preserve the entire transaction directory, and inspect its `old-<skill>` backups before restoring missing installations or moving conflicting copies aside. Once recovery is complete, move the transaction outside the config directory and remove the stale lock before retrying. No crash-durable or hostile-concurrent-writer guarantee is made.
+
+If OpenCode does not discover the skills, confirm the printed target and run `status`, then `opencode debug skill` from the target project. Check OpenCode's skill permissions, custom configuration, and any duplicate manual installs. The installer never changes agent permissions or configuration files.
+
+Development checks: `python3 -m unittest discover -s tests -v`. Set `FORGESTEWARD_OPENCODE` to an OpenCode executable to include actual discovery and removal checks in isolated temporary configuration directories; otherwise that test is explicitly skipped. See the Chinese [installer design and verification notes](docs/opencode-installer.md).
+
+## The name
+
+**Forge** literally means a workshop where metal is shaped, or the act of creating something through deliberate effort. In software development, a forge is also a platform where source code is hosted and collaboratively developed, such as GitHub, GitLab, or Gitea. Here it represents both the repository platform and the process of shaping an issue into dependable code.
+
+**Steward** means a trusted caretaker: someone responsible for looking after a system, applying its rules, and keeping work moving without claiming unchecked ownership. Here it reflects a careful repository maintainer that inspects project state, protects code quality, and keeps consequential actions subject to explicit policy and human control.
+
+Together, **ForgeSteward** means a trusted steward for the software forge: an agent-assisted toolkit that helps maintainers move repository work forward while respecting review gates, project policy, and human judgment.
 
 ## Agent instructions
 

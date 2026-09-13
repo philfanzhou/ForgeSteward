@@ -1,0 +1,38 @@
+# OpenCode 安装适配
+
+## 范围与选择
+
+实现 Issue #1。原 Issue 中的三个技能按当前仓库的四个插件理解，`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量。四个插件、版本及核心指令均不修改。本适配是仓库级工具，不是第五个 Skill。
+
+采用 Python 3.9+ 标准库脚本，避免额外包发布、运行时依赖和三份核心源码。用户取得仓库后，一条命令即可安装指定技能或全部技能；首次取得源码的 Git clone 是明确的准备步骤，不宣称已经提供无需 checkout 的远端一键安装服务。
+
+默认要求用户显式选择 `--project PATH` 或 `--user`。项目级安装到 `PATH/.opencode/skills`；用户级遵循 `OPENCODE_CONFIG_DIR`，否则使用 XDG 配置路径及 `~/.config/opencode` 默认值。打印解析后的目标，保留已有 Agent 配置和权限。
+
+依据：[OpenCode 技能发现文档](https://opencode.ai/docs/skills/)、[CLI 调试命令](https://opencode.ai/docs/cli/)、[全局配置路径源码](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/global.ts)。真实发现通过固定版本 `opencode-ai@1.18.30` 验证，不以源码 dev 分支推断任意已发布版本的行为。
+
+## 安装与归属
+
+- `list` 列出源码可安装项；选择可用插件短名或带 `forge-steward-` 前缀的完整技能名。目录、单行 frontmatter 的名称及描述需通过本仓库的格式检查。本脚本不是通用 YAML 或第三方 Skill 包解析器。
+- 安装完整技能目录，包括包内参考资源。`.forge-steward-install.json` 记录工具标识、收据格式、技能名、插件版本、源码提交/dirty 状态，以及文件摘要与空目录。
+- 相同版本及内容的重复安装保持文件与收据不变。版本或内容变化必须显式 `update`；允许用户通过 checkout 旧提交再 update 回退，不把一次本地安装包装成自动版本服务。
+- `status` 报告未安装、与源码一致、源码已变化、手动修改或无有效收据。发生冲突退出码为 1，查看状态本身不写目录。
+- `uninstall` 仅处理本工具有有效收据且内容未修改的目录，不需要原技能源码仍存在。卸载同时移除收据；无修改的重复卸载成功。空配置容器允许保留。
+- 收据用于本地归属及意外修改检测，不是签名或恶意篡改防护。需要可复现时使用干净 checkout 和固定提交；没有 Git 信息时明确记录未知，并依靠摘要识别实际复制内容。
+
+## 冲突与部分失败
+
+整批先检查目标，任一同名未托管目录、丢失/损坏收据、手动修改或符号链接导致整批停止，不覆盖。恢复方式是备份/移出原目录、人工保留差异后重装；不提供跳过保护的 `--force`。其他 Agent 路径的手动安装保持原样，重复名称由 OpenCode 的实际发现清单核对。
+
+安装器在配置目录加独占锁，将完整新副本暂存到 `skills` 之外，避免暂存文件被当成技能发现。提交时通过同文件系统 rename 替换目录；普通异常与 KeyboardInterrupt 尝试逆序回滚。回滚失败保留备份目录并报告路径，后续调用拒绝覆盖未恢复事务。
+
+该批次不是对运行中 OpenCode 的多目录原子快照；安装完成后重新启动会话。也不保证断电、SIGKILL、文件系统损坏或恶意并发写入下的自动恢复。异常中断时检查 `.forge-steward.lock` 和 `.forge-steward-txn-*` 中的 `old-<skill>` 副本，先保存、恢复实际安装，再移出事务目录及清理已无进程持有的锁。正常操作清理锁和暂存文件，不主动删除业务文件或其他技能。
+
+## 验证
+
+`python3 -m unittest discover -s tests -v` 覆盖单个/全部选择、目录名/frontmatter、资源完整性、幂等、版本/同版本内容变化、手动编辑/增删文件/空目录、未托管冲突、收据损坏、路径穿越和符号链接、用户级路径、源文件删除后卸载、锁、暂存失败及提交中途失败回滚。
+
+设置 `FORGESTEWARD_OPENCODE` 为 OpenCode 可执行文件后，同一套测试会在临时项目及隔离 XDG 配置中调用 `opencode debug skill --pure`，检查实际发现的四个名称和完整路径，并在卸载后确认清单为空；不调用模型或修改真实用户配置。未设置且 PATH 无 OpenCode 时明确跳过该项。
+
+GitHub Actions 在 macOS、Linux、Windows 上运行标准库测试，并在 Linux 使用固定的 OpenCode `1.18.30` 运行真实发现测试。Windows 运行脚本使用 `py -3` 或已配置的 Python 3.9+；符号链接测试在无创建权限时报告跳过，尚无 Windows 原生 OpenCode 运行时验证。
+
+README 已把三个 Agent 的安装与调用放在项目释义之前，并记录源码固定、更新、卸载、迁移、作用域和错误恢复。此次不修改 Claude/Codex 的分发机制，也不改变技能的业务流程与授权边界。
