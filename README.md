@@ -1,6 +1,6 @@
 # ForgeSteward
 
-ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready pull request.
+ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
 ## The name
 
@@ -14,23 +14,25 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 | Skill | Purpose |
 | --- | --- |
-| `github-ready-issues` | Find open issues in the current repository that are sufficiently clear and unblocked to begin work. |
-| `github-review-and-merge` | Review open pull requests, verify required quality and policy gates, and merge only when the configured conditions are satisfied. |
-| `github-fix-pr-comments` | Identify actionable pull-request feedback, update the code, run relevant checks, and report what was addressed. |
+| `find-ready-issues` | Find open issues that are sufficiently clear and unblocked to begin work. |
+| `review-and-merge-change-request` | Review an open change request, verify required quality and policy gates, and merge only when the configured conditions are satisfied. |
+| `address-review-feedback` | Identify actionable review feedback, update the code, run relevant checks, and report what was addressed. |
 
 Each skill is intended to remain independently installable and versioned, while sharing a common core where behavior is genuinely portable across supported agents.
+
+The skill names and core workflows use provider-neutral terminology. Platform adapters map a **change request** to a GitHub pull request, a GitLab merge request, or the equivalent concept on another forge, and map **review feedback** to that platform's comments, discussions, or review threads.
 
 ## Agent instructions
 
 Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex and OpenCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Platform adapters must not duplicate shared guidance.
 
-Project design documents other than README files are written in Simplified Chinese. GitHub issue and pull-request titles are written in English, while their bodies and comments are written in Simplified Chinese.
+Project design documents other than README files are written in Simplified Chinese. Issue and change-request titles are written in English, while their bodies and comments are written in Simplified Chinese.
 
 ## Principles
 
 - Prefer evidence from the current repository over assumptions.
 - Keep read-only discovery separate from code-changing and merge operations.
-- Require explicit gates for consequential actions such as pushing changes or merging a pull request.
+- Require explicit gates for consequential actions such as pushing changes or merging a change request.
 - Preserve human review and repository branch-protection rules.
 - Share portable skill logic while keeping agent-specific packaging and adapters isolated.
 - Make actions and decisions observable, reproducible, and easy to audit.
