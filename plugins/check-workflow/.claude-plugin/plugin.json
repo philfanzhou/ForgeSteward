@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.3.0",
+  "version": "0.2.2",
   "description": "Check and fill missing workflow constraints, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
