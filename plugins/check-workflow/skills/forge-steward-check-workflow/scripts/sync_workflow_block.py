@@ -103,6 +103,11 @@ def place(lines, name, block, after=None):
     return result + lines[position:]
 
 
+class Line(str):
+    """原文件中的一行，记录其换行符；模板和新增行是普通 str。"""
+    ending = ""
+
+
 class Document:
     def __init__(self, path):
         if path.is_symlink() or (path.exists() and not path.is_file()):
@@ -115,19 +120,26 @@ class Document:
             text = raw[3 if self.bom else 0:].decode("utf-8")
         except UnicodeDecodeError:
             raise SyncError(path.name + " is not valid UTF-8")
-        self.crlf = "\r\n" in text
-        self.lines = text.replace("\r\n", "\n").split("\n")
-        if self.lines[-1] == "":
-            self.lines.pop()
+        parts = text.split("\n")
+        self.lines = []
+        for index, part in enumerate(parts):
+            if index == len(parts) - 1 and not part:
+                break
+            crlf = index < len(parts) - 1 and part.endswith("\r")
+            line = Line(part[:-1] if crlf else part)
+            if index < len(parts) - 1:
+                line.ending = "\r\n" if crlf else "\n"
+            self.lines.append(line)
+        # 原有行保留各自的换行符，混用 LF/CRLF 时区块外也不变；新增行使用占多数的换行符。
+        crlf = sum(line.ending == "\r\n" for line in self.lines)
+        self.newline = "\r\n" if crlf > sum(line.ending == "\n" for line in self.lines) else "\n"
         try:
             outside_fences(self.lines)
         except SyncError as error:
             raise SyncError(path.name + ": " + str(error))
 
     def write(self, lines):
-        text = "\n".join(lines) + "\n"
-        if self.crlf:
-            text = text.replace("\n", "\r\n")
+        text = "".join(line + (getattr(line, "ending", "") or self.newline) for line in lines)
         self.path.write_bytes((b"\xef\xbb\xbf" if self.bom else b"") + text.encode("utf-8"))
 
 

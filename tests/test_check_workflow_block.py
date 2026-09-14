@@ -150,6 +150,21 @@ class WorkflowBlockTests(unittest.TestCase):
         self.assertEqual((self.root / "CLAUDE.md").read_bytes(), b"@AGENTS.md\r\n")
         self.run_script("--check")
 
+    def test_mixed_line_endings_outside_block_are_preserved(self):
+        prefix, suffix = b"# Rules\r\nLF line\n\r\n", b"\nTail\r\nLast"
+        stale = block("workflow", "en").replace("### Repair", "### Repair (edited)").encode("utf-8")
+        (self.root / "AGENTS.md").write_bytes(prefix + stale.replace(b"\n", b"\r\n") + suffix)
+        self.write("CLAUDE.md", "@AGENTS.md\n")
+        self.run_script("--write")
+        current = block("workflow", "en").encode("utf-8").replace(b"\n", b"\r\n")
+        self.assertEqual((self.root / "AGENTS.md").read_bytes(), prefix + current + suffix + b"\r\n")
+        self.run_script("--check")
+
+    def test_existing_pointer_is_updated_in_place(self):
+        self.write("AGENTS.md", block("claude-rules", "en") + "\n## Middle\n\n" + block("workflow", "en"))
+        self.write("CLAUDE.md", "Rules\n\n@AGENTS.md\n")
+        self.run_script("--check")
+
     def test_explicit_language_replaces_existing_language(self):
         self.run_script("--write", "--lang", "zh-CN")
         self.run_script("--write", "--lang", "en")
