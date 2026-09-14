@@ -86,7 +86,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(list(self.root.iterdir())), 5)
         for path in self.root.iterdir():
             self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
-        for resource in ("references/agent-entrypoints.md", "assets/workflow.en.md", "scripts/sync_workflow_block.py"):
+        for resource in ("references/agent-entrypoints.md", "references/legacy-additions.md", "assets/workflow.en.md", "scripts/sync_workflow_block.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
         self.assert_no_transactions()
 

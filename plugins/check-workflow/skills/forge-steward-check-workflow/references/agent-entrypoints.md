@@ -10,7 +10,7 @@ check-workflow 只使用以下布局，不按项目另行设计入口：
 | 根 `CLAUDE.md` | `@AGENTS.md` 导入行 | Claude Code 通过导入读取同一份区块 |
 | 根 `AGENTS.md` | `forge-steward:claude-rules` 区块，仅当 `CLAUDE.md` 另有内容时存在 | 提示不读取 `CLAUDE.md` 的 Agent 去读取其中的项目规则 |
 
-区块正文只有一份，位于 `AGENTS.md`；`CLAUDE.md` 只导入，不复制正文。区块外的文字不属于本技能管理范围。
+区块正文只有一份，位于 `AGENTS.md`；`CLAUDE.md` 只导入，不复制正文。区块外的文字不属于本技能管理范围；唯一例外是经内容和提交历史确认的旧版增补，见 [旧版增补识别与删除](legacy-additions.md)。
 
 ## 各 Agent 的加载关系与限制
 

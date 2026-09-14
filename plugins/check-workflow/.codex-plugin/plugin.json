@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.5",
-  "description": "Sync the standard ForgeSteward workflow block into a repository, then submit a PR or MR without merging.",
+  "version": "0.2.6",
+  "description": "Sync the standard ForgeSteward workflow block into a repository, remove confirmed additions from earlier versions, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -18,10 +18,10 @@
   "interface": {
     "displayName": "Check Workflow - ForgeSteward",
     "shortDescription": "Sync the standard workflow block via a PR or MR.",
-    "longDescription": "Add or replace the ForgeSteward workflow block in AGENTS.md from the bundled template, ensure CLAUDE.md imports it, validate, and submit a PR or MR without merging. Text outside the managed block is untouched; explicit check-only requests remain read-only.",
+    "longDescription": "Add or replace the ForgeSteward workflow block in AGENTS.md from the bundled template, ensure CLAUDE.md imports it, remove workflow additions written by earlier check-workflow versions once confirmed from their content and git history, validate, and submit a PR or MR without merging. Other text outside the managed block is untouched; explicit check-only requests remain read-only.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $forge-steward-check-workflow to sync this repository's ForgeSteward workflow block and agent entry import with the bundled template, validate, then commit, push, and open a PR or MR without merging."
+    "defaultPrompt": "Use $forge-steward-check-workflow to sync this repository's ForgeSteward workflow block and agent entry import with the bundled template, remove confirmed workflow additions from earlier check-workflow versions, validate, then commit, push, and open a PR or MR without merging."
   }
 }

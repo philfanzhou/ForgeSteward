@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "check-workflow",
-  "version": "0.2.5",
-  "description": "Sync the standard ForgeSteward workflow block into a repository, then submit a PR or MR without merging.",
+  "version": "0.2.6",
+  "description": "Sync the standard ForgeSteward workflow block into a repository, remove confirmed additions from earlier versions, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
