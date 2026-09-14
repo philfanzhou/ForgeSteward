@@ -1,25 +1,28 @@
 ---
 name: forge-steward-check-workflow
-description: Sync the ForgeSteward standard workflow block and agent entry import into a repository from the bundled template, replacing any block content that differs, then submit the change as a PR or MR without merging. Text outside the managed block is never changed. Explicit check-only requests remain read-only.
+description: Sync the ForgeSteward standard workflow block and agent entry import into a repository from the bundled template, remove workflow additions written by earlier check-workflow versions once confirmed from their content and history, then submit the change as a PR or MR without merging. Other text outside the managed block is never changed. Explicit check-only requests remain read-only.
 ---
 
 # Check Workflow
 
 ## 目标与授权
 
-让目标仓库包含 ForgeSteward 工作流所需的标准约束区块。区块正文由本技能随包提供的模板唯一确定，不由 Agent 根据仓库情况撰写、改写或裁剪：目标仓库没有区块或区块内容与模板不同时，整体替换为模板；一致时不做任何修改。同一技能版本重复运行，不会产生新的差异。
+让目标仓库包含 ForgeSteward 工作流所需的标准约束区块，并用它取代旧版本 check-workflow 写入的增补规则。区块正文由本技能随包提供的模板唯一确定，不由 Agent 根据仓库情况撰写、改写或裁剪：目标仓库没有区块或区块内容与模板不同时，整体替换为模板；一致时不修改区块。
 
-用户明确调用本技能（包括仅选择技能、不附加 prompt）时，默认任务是：检查 → 同步区块和入口 → 验证 → commit、push 并创建 Change Request（PR/MR），禁止合并。用户本轮的明确限制优先：仅检查时只运行检查并报告，不写文件、不建分支；仅本地修改时不提交或推送。自动选中本技能、引用技能名称或询问用法，不构成外部发布授权。遵守目标仓库的权限、审批及交付规则，不以默认流程绕过限制。
+`0.2.4` 及更早版本按仓库情况撰写增补，这些内容没有标记；而区块外的项目规则优先于区块，保留旧增补会让旧条款继续覆盖或重复标准区块。因此，经内容和提交历史确认属于旧版增补的内容，在同步区块的同一 Change Request 中删除。同一技能版本重复运行，不会产生新的差异。
+
+用户明确调用本技能（包括仅选择技能、不附加 prompt）时，默认任务是：检查 → 删除确认的旧版增补 → 同步区块和入口 → 验证 → commit、push 并创建 Change Request（PR/MR），禁止合并。用户本轮的明确限制优先：仅检查时只运行检查并报告区块差异和旧版增补候选，不写文件、不建分支；仅本地修改时不提交或推送。自动选中本技能、引用技能名称或询问用法，不构成外部发布授权。遵守目标仓库的权限、审批及交付规则，不以默认流程绕过限制。
 
 ## 管理范围
 
-只管理以下内容，区块外的文字不评价、不修改：
+只管理以下内容：
 
 - 根目录 `AGENTS.md` 中从 `<!-- forge-steward:workflow begin lang=… -->` 到 `<!-- forge-steward:workflow end -->` 的区块，正文取自 `assets/workflow.<语言>.md`。文件不存在时创建，没有区块时追加到文件末尾。
 - 根目录 `CLAUDE.md` 中的 `@AGENTS.md` 导入行，缺少时追加到文件末尾，文件不存在时创建。
 - `CLAUDE.md` 另有其他内容时，`AGENTS.md` 中的 `forge-steward:claude-rules` 读取指示区块，正文取自 `assets/claude-rules.<语言>.md`，首次写入时紧随工作流区块，已存在时原位更新；`CLAUDE.md` 不再有其他内容时移除该区块。
+- 经确认的旧版增补：旧版本 check-workflow 写入的工作流段落、为其新建的工作流文档，以及只指向这些内容的读取指示。识别证据、不删除的情形和删除方式见 [旧版增补识别与删除](references/legacy-additions.md)。
 
-项目与模板不同的要求，由项目写在区块之外；模板正文已声明区块外的项目规则优先。不为适配项目改动区块正文，也不把区块外的规则搬进区块。不修改业务代码、依赖、测试、CI、分支保护、全局或用户级 Agent 配置；不安装插件，不整理 Issue，不自动运行其他技能，不合并。各 Agent 的加载关系和已知限制见 [Agent 入口适配](references/agent-entrypoints.md)。
+除此之外，区块外的文字不评价、不修改。项目自行编写的规则即使与模板主题重叠、措辞相近或要求不同，也不删除、不改写。项目与模板不同的要求，由项目写在区块之外；模板正文已声明区块外的项目规则优先。不为适配项目改动区块正文，也不把区块外的规则或旧增补的内容搬进区块。不修改业务代码、依赖、测试、CI、分支保护、全局或用户级 Agent 配置；不安装插件，不整理 Issue，不自动运行其他技能，不合并。各 Agent 的加载关系和已知限制见 [Agent 入口适配](references/agent-entrypoints.md)。
 
 ## 执行步骤
 
@@ -31,19 +34,21 @@ description: Sync the ForgeSteward standard workflow block and agent entry impor
    python3 <skill>/scripts/sync_workflow_block.py --repo <仓库根目录> --check [--lang zh-CN|en]
    ```
 
-   - 退出码 `0`：已与模板一致。零修改结束，不创建分支、commit 或 Change Request；若存在第 1 步的开放 Change Request，报告它已不再需要，不自动关闭。
+   - 退出码 `0`：区块和入口已与模板一致。
    - 退出码 `1`：需要同步，输出列出将修改的文件及原因。
    - 退出码 `2`：标记不成对或嵌套、代码围栏未闭合、文件不是 UTF-8 普通文件、首次同步未指定语言等。报告原因后停止写入，不猜测修复方式。
    - 输出中的 `Warning` 只报告、不处理。例如根目录存在 `AGENTS.override.md` 时，Codex 在该目录读取 override 而看不到区块，报告为入口缺口。
-4. 需要同步时：已有第 1 步的开放 Change Request，就在其分支上继续，按仓库规范合入最新主线（不允许强推时使用 merge）；否则基于最新主线创建该分支。随后运行同一命令的 `--write`，再运行 `--check`，必须得到退出码 `0`。
-5. 核对 diff：只包含管理范围内的变化，区块外原有文字逐字节保留（脚本保留原有各行的换行符和 BOM，新增行使用文件中占多数的换行符）。发现其他变化时撤回并报告。
-6. 环境没有 Python 3 时，按脚本的同一规则手工操作：把模板文件内容逐字放入标记之间，不改动任何字符，完成后逐行比对区块与模板。无法保证逐字一致时只报告，不提交。
+4. 基于同一主线识别旧版增补：按 [旧版增补识别与删除](references/legacy-additions.md) 检查候选位置，逐项记录文件、行范围、标题或首行、加入提交及 Change Request、判定依据，分为“确认删除”和“待维护者决定”。仓库为浅克隆时先按权限补全所需历史；无法取得历史的候选列为待决定。没有候选时记录已检查的位置。
+5. 第 3 步退出码为 `0` 且第 4 步没有确认删除项时，零修改结束，不创建分支、commit 或 Change Request；若存在第 1 步的开放 Change Request，报告它已不再需要，不自动关闭。待决定项仍须在汇报中列出。
+6. 需要变更时：已有第 1 步的开放 Change Request，就在其分支上继续，按仓库规范合入最新主线（不允许强推时使用 merge）；否则基于最新主线创建该分支。先按参考文档删除确认的旧版增补，再运行同一命令的 `--write`，最后运行 `--check`，必须得到退出码 `0`。
+7. 核对 diff：除管理范围内的区块和入口变化外，只允许出现第 4 步确认项的删除，其余原有文字逐字节保留（脚本保留原有各行的换行符和 BOM，新增行使用文件中占多数的换行符）。删除后不得留下指向已删文档或章节的链接、目录项或读取指示；发现被删内容仍被项目自身规则引用时，撤回该项删除并改为待决定。发现其他变化时撤回并报告。
+8. 环境没有 Python 3 时，按脚本的同一规则手工同步区块：把模板文件内容逐字放入标记之间，不改动任何字符，完成后逐行比对区块与模板。无法保证逐字一致时只报告，不提交。
 
 ## 提交与交接
 
-1. 默认交付模式下，只暂存本任务修改的 `AGENTS.md` 和 `CLAUDE.md`，按目标仓库规范 commit、push，并创建或更新指向主线的 Change Request，不重复开 PR/MR。标题、正文语言和模板遵守目标仓库规则。
-2. Change Request 正文说明：技能版本、区块语言、修改的文件和原因（新建、同步区块、追加导入、增删读取指示）、检查命令及退出码、`Warning` 和未解决的入口缺口。
+1. 默认交付模式下，只暂存本任务修改或删除的文件：`AGENTS.md`、`CLAUDE.md`，以及删除确认旧版增补涉及的文件。按目标仓库规范 commit、push，并创建或更新指向主线的 Change Request，不重复开 PR/MR。标题、正文语言和模板遵守目标仓库规则。
+2. Change Request 正文说明：技能版本、区块语言、修改的文件和原因（新建、同步区块、追加导入、增删读取指示）、检查命令及退出码、`Warning` 和未解决的入口缺口；逐项列出删除的旧版增补（文件、原行范围、标题、加入提交或 Change Request、判定依据）和待维护者决定的候选及原因，说明维护者可在审查中撤回任一删除。
 3. 创建或推送的响应不明确时，先查询远端分支和同源 Change Request，确认后再重试。权限、认证、网络或仓库门禁阻止继续时，保存本地提交或差异，准确说明停在未提交、已提交未推送、已推送未建 PR/MR 中的哪一步。
 4. 回读实际 Change Request 的链接、base/head 与状态后结束；不等待合并，不自行审查或合并。
 
-用目标项目约定的语言汇报：操作模式、区块语言、检查命令与退出码、修改的文件、`Warning`、Change Request 链接或零修改结论、未完成事项和下一步。只宣称“区块与模板一致、入口文件已按规则写入”；没有运行目标 Agent 时，不宣称其运行时已加载这些规则。
+用目标项目约定的语言汇报：操作模式、区块语言、检查命令与退出码、修改的文件、删除的旧版增补与待决定候选、`Warning`、Change Request 链接或零修改结论、未完成事项和下一步。只宣称“区块与模板一致、入口文件已按规则写入、确认的旧版增补已删除”；没有运行目标 Agent 时，不宣称其运行时已加载这些规则。
