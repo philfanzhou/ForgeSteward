@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.4",
-  "description": "Check and fill missing workflow constraints, then submit a PR or MR without merging.",
+  "version": "0.2.5",
+  "description": "Sync the standard ForgeSteward workflow block into a repository, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -17,11 +17,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Check Workflow - ForgeSteward",
-    "shortDescription": "Fill missing workflow rules and submit a PR or MR.",
-    "longDescription": "Check existing policies, add missing non-conflicting workflow constraints and agent entry references, validate, and submit a PR or MR without merging. Explicit check-only requests remain read-only.",
+    "shortDescription": "Sync the standard workflow block via a PR or MR.",
+    "longDescription": "Add or replace the ForgeSteward workflow block in AGENTS.md from the bundled template, ensure CLAUDE.md imports it, validate, and submit a PR or MR without merging. Text outside the managed block is untouched; explicit check-only requests remain read-only.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $forge-steward-check-workflow to check this repository, fill missing workflow rules and agent entry references without changing existing policies, validate, then commit, push, and open a PR or MR without merging."
+    "defaultPrompt": "Use $forge-steward-check-workflow to sync this repository's ForgeSteward workflow block and agent entry import with the bundled template, validate, then commit, push, and open a PR or MR without merging."
   }
 }

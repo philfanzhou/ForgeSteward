@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.4",
-  "description": "Check and fill missing workflow constraints, then submit a PR or MR without merging.",
+  "version": "0.2.5",
+  "description": "Sync the standard ForgeSteward workflow block into a repository, then submit a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"

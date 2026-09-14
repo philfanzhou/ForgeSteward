@@ -9,32 +9,32 @@
     {
       "name": "check-workflow",
       "source": "./plugins/check-workflow",
-      "description": "Add missing workflow constraints while preserving existing project rules.",
-      "version": "0.2.4"
+      "description": "Sync the standard workflow block from a bundled template without touching other project rules.",
+      "version": "0.2.5"
     },
     {
       "name": "prepare-work",
       "source": "./plugins/prepare-work",
       "description": "Prepare issues for implementation through investigation and issue updates; return only a single-line issue list.",
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     {
       "name": "execute-work",
       "source": "./plugins/execute-work",
       "description": "Implement a fixed issue list sequentially and submit independent change requests without merging.",
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     {
       "name": "review-and-merge",
       "source": "./plugins/review-and-merge",
       "description": "Review a frozen change-request queue and merge only fully eligible changes.",
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     {
       "name": "fix-feedback",
       "source": "./plugins/fix-feedback",
       "description": "Resolve required feedback and verified gaps on open change requests without merging.",
-      "version": "0.2.4"
+      "version": "0.2.5"
     }
   ]
 }

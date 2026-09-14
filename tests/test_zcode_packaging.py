@@ -195,8 +195,8 @@ class ZCodeRuntimeTests(unittest.TestCase):
                     self.assertFalse(inspected["truncated"])
                     self.assertTrue(inspected["content"].strip())
                     if name == "forge-steward-check-workflow":
-                        for reference in ("agent-entrypoints.md", "workflow-requirements.md"):
-                            self.assertTrue((Path(inspected["baseDirectory"]) / "references" / reference).is_file())
+                        for reference in ("references/agent-entrypoints.md", "assets/workflow.zh-CN.md", "assets/workflow.en.md", "scripts/sync_workflow_block.py"):
+                            self.assertTrue((Path(inspected["baseDirectory"]) / reference).is_file())
             configuration.write_text(json.dumps({"plugins": {"enabled": False}}), encoding="utf-8")
             disabled = run("skills", "list")
             self.assertFalse(any(root in Path(item["path"]).resolve().parents for item in disabled["skills"]))
