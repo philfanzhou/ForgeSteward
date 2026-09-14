@@ -1,6 +1,6 @@
 {
   "name": "prepare-work",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Prepare issues for implementation through investigation and issue updates; return only a single-line issue list.",
   "author": {
     "name": "philfanzhou",
