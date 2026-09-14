@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "fix-feedback",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Resolve required feedback and verified gaps on open change requests without merging.",
   "author": {
     "name": "philfanzhou",

@@ -62,7 +62,7 @@ python3 scripts/sync_marketplace.py --check
 
 ## 项目规则适配
 
-ZCode 原生读取全局 `~/.zcode/AGENTS.md` 和当前 Workspace 的 `AGENTS.md`；不自动合并多层规则，也不展开 `@import` / `@include`。`CLAUDE.md` 不是持续加载入口。check-workflow 只在允许修改的项目入口增加明确的读取指示，保留原权威规则和跨 Agent 的回退关系，不迁移 CLAUDE 正文，不写全局规则，不宣称相对链接等于自动加载。具体约束见包内 [Agent 入口适配](../plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md)。
+ZCode 原生读取全局 `~/.zcode/AGENTS.md` 和当前 Workspace 的 `AGENTS.md`；不自动合并多层规则，也不展开 `@import` / `@include`。`CLAUDE.md` 不是持续加载入口。从 `0.2.5` 目标起，check-workflow 把标准工作流区块直接写入 Workspace 根目录的 `AGENTS.md`，ZCode 无需展开导入即可读取；`CLAUDE.md` 另有规则时，同时写入指向它的读取指示区块。它不迁移 CLAUDE 正文，不写全局规则，不宣称读取指示等于自动加载。具体约束见包内 [Agent 入口适配](../plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md)。
 
 ## 验证记录与复验
 

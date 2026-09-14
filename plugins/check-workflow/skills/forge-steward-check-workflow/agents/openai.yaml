@@ -1,4 +1,4 @@
 interface:
   display_name: "Check Workflow - ForgeSteward"
-  short_description: "Fill missing workflow rules and submit a PR or MR"
-  default_prompt: "Use $forge-steward-check-workflow to check this repository, fill missing workflow rules and agent entry references without changing existing policies, validate, then commit, push, and open a PR or MR without merging."
+  short_description: "Sync the standard workflow block via a PR or MR"
+  default_prompt: "Use $forge-steward-check-workflow to sync this repository's ForgeSteward workflow block and agent entry import with the bundled template, validate, then commit, push, and open a PR or MR without merging."
