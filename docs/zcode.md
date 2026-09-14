@@ -15,7 +15,7 @@
 3. 在 `forge-steward` 市场中按需安装 `check-workflow`、`prepare-work`、`execute-work`、`review-and-merge`、`fix-feedback`，检查启用状态、版本及实际来源。
 4. 在技能设置及新任务选择器确认名称。输入 `$` 选择技能，`/` 菜单也提供技能分组；若显示 `插件名:技能名` 则选择实际限定项。统一标识仍包含 `forge-steward-`，不承诺解析 Codex 的 `agents/openai.yaml` 显示标签。
 
-选择技能无需再粘贴完整 prompt，但所选操作需要的输入和授权仍须具备。例如 prepare 可以按默认范围运行，execute 需要明确 Issue 列表，review-and-merge 需要有效的审查合并授权；“仅检查”“不推送”等明确限制优先，选择器本身不绕过仓库权限。CLI/连接器的托管平台认证、Git、项目测试环境由使用方提供，安装 Skill 不自动授予这些能力。
+选择技能无需再粘贴完整 prompt，但所选操作需要的输入和授权仍须具备。例如 prepare 可以按默认范围运行，execute 需要明确 Issue 列表，明确选择 review-and-merge 即授权审查后直接合并满足条件的项，不再逐项确认；“仅检查”“不推送”等明确限制优先，选择器本身不绕过仓库权限。CLI/连接器的托管平台认证、Git、项目测试环境由使用方提供，安装 Skill 不自动授予这些能力。
 
 ## 固定版本与回退
 
