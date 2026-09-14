@@ -120,16 +120,14 @@ class Document:
             text = raw[3 if self.bom else 0:].decode("utf-8")
         except UnicodeDecodeError:
             raise SyncError(path.name + " is not valid UTF-8")
-        parts = text.split("\n")
+        *complete, last = text.split("\n")
         self.lines = []
-        for index, part in enumerate(parts):
-            if index == len(parts) - 1 and not part:
-                break
-            crlf = index < len(parts) - 1 and part.endswith("\r")
-            line = Line(part[:-1] if crlf else part)
-            if index < len(parts) - 1:
-                line.ending = "\r\n" if crlf else "\n"
+        for part in complete:
+            line = Line(part[:-1]) if part.endswith("\r") else Line(part)
+            line.ending = "\r\n" if part.endswith("\r") else "\n"
             self.lines.append(line)
+        if last:
+            self.lines.append(Line(last))
         # 原有行保留各自的换行符，混用 LF/CRLF 时区块外也不变；新增行使用占多数的换行符。
         crlf = sum(line.ending == "\r\n" for line in self.lines)
         self.newline = "\r\n" if crlf > sum(line.ending == "\n" for line in self.lines) else "\n"

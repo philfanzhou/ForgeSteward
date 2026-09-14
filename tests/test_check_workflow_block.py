@@ -161,8 +161,12 @@ class WorkflowBlockTests(unittest.TestCase):
         self.run_script("--check")
 
     def test_existing_pointer_is_updated_in_place(self):
-        self.write("AGENTS.md", block("claude-rules", "en") + "\n## Middle\n\n" + block("workflow", "en"))
+        pointer, tail = block("claude-rules", "en"), "\n## Middle\n\n" + block("workflow", "en")
+        self.write("AGENTS.md", pointer.replace("CLAUDE.md", "CLAUDE file") + tail)
         self.write("CLAUDE.md", "Rules\n\n@AGENTS.md\n")
+        self.assertIn("AGENTS.md", self.run_script("--check", expected=1))
+        self.run_script("--write")
+        self.assertEqual(self.read("AGENTS.md"), pointer + tail)
         self.run_script("--check")
 
     def test_explicit_language_replaces_existing_language(self):
