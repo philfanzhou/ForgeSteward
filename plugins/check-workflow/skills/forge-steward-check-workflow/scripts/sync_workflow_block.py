@@ -34,7 +34,7 @@ def template(name, language):
 
 def outside_fences(lines):
     """返回围栏代码块以外的行号；代码块中的标记和导入不生效。"""
-    fence, result = None, []
+    fence, opened, result = None, None, []
     for index, line in enumerate(lines):
         stripped = line.strip()
         if fence:
@@ -43,9 +43,12 @@ def outside_fences(lines):
             continue
         match = FENCE.match(line)
         if match:
-            fence = match.group(1)
+            fence, opened = match.group(1), index
         else:
             result.append(index)
+    # 未闭合的围栏会吞掉追加在末尾的区块或导入，导致无法收敛，须先由项目修正。
+    if fence:
+        raise SyncError("Unclosed code fence opened at line %d" % (opened + 1))
     return result
 
 
@@ -116,6 +119,10 @@ class Document:
         self.lines = text.replace("\r\n", "\n").split("\n")
         if self.lines[-1] == "":
             self.lines.pop()
+        try:
+            outside_fences(self.lines)
+        except SyncError as error:
+            raise SyncError(path.name + ": " + str(error))
 
     def write(self, lines):
         text = "\n".join(lines) + "\n"

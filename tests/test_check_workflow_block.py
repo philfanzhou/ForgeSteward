@@ -118,6 +118,18 @@ class WorkflowBlockTests(unittest.TestCase):
                 self.run_script("--write", "--lang", "zh-CN", expected=2)
                 self.assertEqual(self.state(), before)
 
+    def test_unclosed_code_fence_is_rejected_without_writing(self):
+        for name, other in (("AGENTS.md", "CLAUDE.md"), ("CLAUDE.md", "AGENTS.md")):
+            with self.subTest(file=name):
+                for path in self.root.iterdir():
+                    path.unlink()
+                self.write(name, "Rules\n```sh\nmake test\n")
+                self.write(other, "@AGENTS.md\n" if other == "CLAUDE.md" else block("workflow", "en"))
+                before = self.state()
+                self.assertIn(name + ": Unclosed code fence opened at line 2",
+                              self.run_script("--write", "--lang", "en", expected=2))
+                self.assertEqual(self.state(), before)
+
     def test_markers_inside_code_fence_are_ignored(self):
         example = "```md\n<!-- forge-steward:workflow begin lang=zh-CN -->\n```\n"
         self.write("AGENTS.md", example)
