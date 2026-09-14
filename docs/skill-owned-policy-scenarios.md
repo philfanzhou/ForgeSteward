@@ -1,6 +1,6 @@
 # 技能工作流政策场景验收
 
-本矩阵针对 `0.2.7` 把工作流政策收归技能后迁入的规则：四个技能不再采用仓库另行规定的同类工作流规则，并新增 feature 级拆分、复杂协议或状态任务的语义模型、第三次审查或修复前的逐 commit 审计，以及往返满 3 轮后跳过、等待人工处理的规则。它通过有限输入人工对照正文，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。`0.2.8` 目标补充 execute-work 的改名与 secret 扫描边界，以及 review-and-merge 合并后的本地主线更新、分支删除与 worktree 记录清理（E14–E15、R07–R09）。check-workflow 的删除行为见 [Check Workflow 接入验收](check-workflow-scenarios.md#027-删除与技能重复的项目规则)。
+本矩阵针对 `0.2.7` 把工作流政策收归技能后迁入的规则：四个技能不再采用仓库另行规定的同类工作流规则，并新增 feature 级拆分、复杂协议或状态任务的语义模型、第三次审查或修复前的逐 commit 审计，以及往返满 3 轮后跳过、等待人工处理的规则。它通过有限输入人工对照正文，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。`0.2.8` 目标补充 execute-work 的改名与 secret 扫描边界，以及 review-and-merge 合并后的本地主线更新、分支删除与 worktree 记录清理（E14–E15、R07–R10）。check-workflow 的删除行为见 [Check Workflow 接入验收](check-workflow-scenarios.md#027-删除与技能重复的项目规则)。
 
 | 编号 | 技能 | 输入 | 预期结果 |
 | --- | --- | --- | --- |
@@ -27,6 +27,7 @@
 | R05 | review-and-merge | 换会话继续；平台时间线显示 2 轮往返，交接记录写 1 轮 | 取较大值 2 轮，照常审查并先逐 commit 审计，不归零 |
 | R06 | review-and-merge | 往返已满 3 轮，用户本轮明确点名要求审查该项 | 按正常流程审查，输出注明轮次 |
 | R07 | review-and-merge | 合并完成，本地 `main` 落后于远端且工作区干净 | 用 `git merge --ff-only origin/main` 快进；不能快进或工作区有未提交改动时保留原状并报告，不重置 |
+| R10 | review-and-merge | 合并完成，当前检出的是已合并的功能分支，本地 `main` 落后于远端 | 不在功能分支上执行 `git merge --ff-only origin/main`；在检出 `main` 的干净工作区中快进 |
 | R08 | review-and-merge | squash 合并后，本轮创建的本地分支 `git branch -d` 报告未完全合并 | 不据此判定未合并；核对平台合并状态且本地 head 与已合并 Change Request 的 head 一致后才强制删除，不一致时保留并报告 |
 | R09 | review-and-merge | 本轮创建的 worktree 目录已移除，`git worktree list` 仍有残留记录 | 执行 `git worktree prune` 清理残留记录 |
 | X01 | fix-feedback | 已完成 2 轮往返，又收到必修意见；分支含一个与验收无关的重构 commit | 先暂停写代码并审计，移出该改动并登记后续 Issue，再修复必修项；推送后满 3 轮 |
