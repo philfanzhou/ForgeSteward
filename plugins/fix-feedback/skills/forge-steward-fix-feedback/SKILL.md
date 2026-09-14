@@ -20,6 +20,7 @@ description: Freeze the current repairable change-request queue, resolve only re
    - 由当前分支确定性导致、可复现且属于本次范围的 CI 失败；
    - 已确认未满足的原始验收条件。
 4. 跳过仅等待复审、等待已触发检查、只含可选建议、意见已经由当前 head 解决，或没有确定性修复项的 Change Request。说明跳过依据。
+5. 跳过多轮往返项。一轮往返指：该 Change Request 上出现要求修改的 Review Feedback（包括请求修改的审查、Comment、Discussion 或 Review Thread），作者随后推送新提交作出回应。依据平台时间线及交接记录中的 Review 轮次计数，二者不一致时取较大值，不因换会话归零。已达到 3 轮或以上的项说明原始范围本身存在问题，即使仍有必修内容也不纳入本轮，等待人工处理：不修改，不推送，不回复或解决 Review Thread，不添加标签。只在输出中记录链接、轮次及计数依据。无法确定轮次时按正常流程判断，并标明轮次未知。用户本轮明确点名要求处理该项时除外。
 
 ## 逐项修复
 
@@ -54,6 +55,7 @@ description: Freeze the current repairable change-request queue, resolve only re
 处理完整个冻结清单后，用中文汇总：
 
 - 冻结基线、实际待修项和跳过项。
+- 因往返达到 3 轮或以上而跳过、等待人工处理的 Change Request，附轮次及计数依据。
 - 每个 Change Request 的必修条目、修改、验证、提交和推送链接或标识。
 - 已可复审但尚未验收的 Change Request。
 - 未解决阻塞、并发变化、权限问题和下一步。
