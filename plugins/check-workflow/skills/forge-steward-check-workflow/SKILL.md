@@ -17,7 +17,7 @@ description: Sync the ForgeSteward standard workflow block and agent entry impor
 
 - 根目录 `AGENTS.md` 中从 `<!-- forge-steward:workflow begin lang=… -->` 到 `<!-- forge-steward:workflow end -->` 的区块，正文取自 `assets/workflow.<语言>.md`。文件不存在时创建，没有区块时追加到文件末尾。
 - 根目录 `CLAUDE.md` 中的 `@AGENTS.md` 导入行，缺少时追加到文件末尾，文件不存在时创建。
-- `CLAUDE.md` 另有其他内容时，`AGENTS.md` 中紧随工作流区块的 `forge-steward:claude-rules` 读取指示区块，正文取自 `assets/claude-rules.<语言>.md`；`CLAUDE.md` 不再有其他内容时移除该区块。
+- `CLAUDE.md` 另有其他内容时，`AGENTS.md` 中的 `forge-steward:claude-rules` 读取指示区块，正文取自 `assets/claude-rules.<语言>.md`，首次写入时紧随工作流区块，已存在时原位更新；`CLAUDE.md` 不再有其他内容时移除该区块。
 
 项目与模板不同的要求，由项目写在区块之外；模板正文已声明区块外的项目规则优先。不为适配项目改动区块正文，也不把区块外的规则搬进区块。不修改业务代码、依赖、测试、CI、分支保护、全局或用户级 Agent 配置；不安装插件，不整理 Issue，不自动运行其他技能，不合并。各 Agent 的加载关系和已知限制见 [Agent 入口适配](references/agent-entrypoints.md)。
 
@@ -36,7 +36,7 @@ description: Sync the ForgeSteward standard workflow block and agent entry impor
    - 退出码 `2`：标记不成对或嵌套、代码围栏未闭合、文件不是 UTF-8 普通文件、首次同步未指定语言等。报告原因后停止写入，不猜测修复方式。
    - 输出中的 `Warning` 只报告、不处理。例如根目录存在 `AGENTS.override.md` 时，Codex 在该目录读取 override 而看不到区块，报告为入口缺口。
 4. 需要同步时：已有第 1 步的开放 Change Request，就在其分支上继续，按仓库规范合入最新主线（不允许强推时使用 merge）；否则基于最新主线创建该分支。随后运行同一命令的 `--write`，再运行 `--check`，必须得到退出码 `0`。
-5. 核对 diff：只包含管理范围内的变化，区块外原有文字逐字节保留（脚本保持原文件的换行风格和 BOM）。发现其他变化时撤回并报告。
+5. 核对 diff：只包含管理范围内的变化，区块外原有文字逐字节保留（脚本保留原有各行的换行符和 BOM，新增行使用文件中占多数的换行符）。发现其他变化时撤回并报告。
 6. 环境没有 Python 3 时，按脚本的同一规则手工操作：把模板文件内容逐字放入标记之间，不改动任何字符，完成后逐行比对区块与模板。无法保证逐字一致时只报告，不提交。
 
 ## 提交与交接
