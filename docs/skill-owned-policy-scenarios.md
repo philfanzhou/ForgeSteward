@@ -1,6 +1,6 @@
 # 技能工作流政策场景验收
 
-本矩阵针对 `0.2.7` 把工作流政策收归技能后迁入的规则：四个技能不再采用仓库另行规定的同类工作流规则，并新增 feature 级拆分、复杂协议或状态任务的语义模型、第三次审查或修复前的逐 commit 审计，以及往返满 3 轮后跳过、等待人工处理的规则。它通过有限输入人工对照正文，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。check-workflow 的删除行为见 [Check Workflow 接入验收](check-workflow-scenarios.md#027-删除与技能重复的项目规则)。
+本矩阵针对 `0.2.7` 把工作流政策收归技能后迁入的规则：四个技能不再采用仓库另行规定的同类工作流规则，并新增 feature 级拆分、复杂协议或状态任务的语义模型、第三次审查或修复前的逐 commit 审计，以及往返满 3 轮后跳过、等待人工处理的规则。它通过有限输入人工对照正文，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。`0.2.8` 目标补充 execute-work 的改名与 secret 扫描边界，以及 review-and-merge 合并后的本地主线更新、分支删除与 worktree 记录清理（E14–E15、R07–R09）。check-workflow 的删除行为见 [Check Workflow 接入验收](check-workflow-scenarios.md#027-删除与技能重复的项目规则)。
 
 | 编号 | 技能 | 输入 | 预期结果 |
 | --- | --- | --- | --- |
@@ -18,12 +18,17 @@
 | E11 | execute-work | 实施中发现实际范围达到 feature 级且无法收敛 | 停止该项，更新或拆分跟踪，不把新项加入冻结队列，继续其余独立项 |
 | E12 | execute-work | 仓库 PR 模板要求中文正文，仓库规则另写“一个 PR 可关闭多个相关 Issue” | 按模板写正文；每个 Change Request 只关闭一个原 Issue，以技能为准 |
 | E13 | execute-work | 以文档交付的目标协议设计 | Change Request 记录实际演算的端到端场景和结果，不以链接或 CI 通过代替 |
+| E14 | execute-work | 修复一个函数的边界错误时，发现相邻变量和函数命名不佳 | 不在本项改名，只做验收所需的最小修改；需要时另行分诊登记 |
+| E15 | execute-work | 以文档交付的目标设计，secret 扫描、文档 lint 与 CI 全绿，但没有演算端到端场景 | secret 扫描同样不作为语义正确的证据；补齐实际演算的场景和结果后再提交 |
 | R01 | review-and-merge | 仓库规定可选建议必须全部修完才合并 | 可选建议不阻塞合并，以技能为准；必要检查与审批仍按仓库执行 |
 | R02 | review-and-merge | Change Request 关联 tracker，或单一 task 实际达到 feature 级 | 列为范围内阻塞，不合并 |
 | R03 | review-and-merge | 已完成 2 轮往返，本次审查发现两个 commit 无法追溯到验收 | 列为范围内阻塞，要求移出并另行登记 |
 | R04 | review-and-merge | 往返已满 3 轮，仍有跨文档状态矛盾 | 排除出冻结清单：不审查、不合并、不评论，只在输出记录链接、轮次和计数依据，等待人工处理 |
 | R05 | review-and-merge | 换会话继续；平台时间线显示 2 轮往返，交接记录写 1 轮 | 取较大值 2 轮，照常审查并先逐 commit 审计，不归零 |
 | R06 | review-and-merge | 往返已满 3 轮，用户本轮明确点名要求审查该项 | 按正常流程审查，输出注明轮次 |
+| R07 | review-and-merge | 合并完成，本地 `main` 落后于远端且工作区干净 | 用 `git merge --ff-only origin/main` 快进；不能快进或工作区有未提交改动时保留原状并报告，不重置 |
+| R08 | review-and-merge | squash 合并后，本轮创建的本地分支 `git branch -d` 报告未完全合并 | 不据此判定未合并；核对平台合并状态且本地 head 与已合并 Change Request 的 head 一致后才强制删除，不一致时保留并报告 |
+| R09 | review-and-merge | 本轮创建的 worktree 目录已移除，`git worktree list` 仍有残留记录 | 执行 `git worktree prune` 清理残留记录 |
 | X01 | fix-feedback | 已完成 2 轮往返，又收到必修意见；分支含一个与验收无关的重构 commit | 先暂停写代码并审计，移出该改动并登记后续 Issue，再修复必修项；推送后满 3 轮 |
 | X02 | fix-feedback | 往返已满 3 轮，仍有必修意见 | 跳过：不修改、不推送、不回复线程，只在输出记录，等待人工处理 |
 | X03 | fix-feedback | 仓库规定 Review 预算为五轮 | 不采用仓库预算，按技能规则满 3 轮往返后跳过 |
