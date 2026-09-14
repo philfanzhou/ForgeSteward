@@ -16,7 +16,7 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 
 - 仓库发布使用 `vX.Y.Z`；候选版可用 `vX.Y.Z-rc.N`，GitHub 标为 prerelease。`0.x` 阶段仍属早期接口，不代表 1.0 稳定承诺；首个正式编号为 `v0.2.0`，不追补不存在的历史 Tag。
 - 自动升版的允许范围以 [AGENTS.md 的统一版本规则](../AGENTS.md#统一版本) 为准：默认只递增最后一位，其他位或候选版渠道由用户明确指定；变化规模不构成自动跨位升版的授权。不兼容变化必须在版本说明中写清迁移，不以 patch 编号暗示兼容。
-- 根据整次发布的变化确定一个版本，同步更新 `VERSION` 和全部插件清单；即使某个插件功能未变，或只有根目录 README、安装器变化，也必须统一升版。开发提交可以继续使用尚未发布的目标版本，不要求逐提交升版。
+- 根据整次发布的变化确定一个版本，同步更新 `VERSION` 和全部插件清单；即使某个插件功能未变，或只有根目录 README、安装器变化，也必须统一升版。开发提交可以继续使用尚未发布的目标版本，不要求逐提交升版。Agent 修改时是否自动升版以 [AGENTS.md 的统一版本规则](../AGENTS.md#统一版本) 为准：仅当 `VERSION` 等于已发布版本（远端存在对应 Tag 及非 draft Release）时才递增，否则保持未发布的目标版本不变；用户明确要求不升版时从其要求。
 - 插件的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 同步名称及版本。Claude / ZCode 共用市场的 `plugins[].version` 是 ZCode 更新检测所需的派生值，不是独立版本源；统一清单后执行 `python3 scripts/sync_marketplace.py --write`，发布前运行 `--check`。Codex 市场格式不变。所有引用仍指向同快照内的相对路径，不通过索引版本单独切换插件代码。
 - 同一已发布插件版本不得对应不同包内容；后续仓库 Release 不重用旧插件版本，即使功能未变也更新版本字段。尤其 Claude 的显式版本影响缓存更新，不应靠移动 Tag 或只改市场版本来绕过缓存。参见 [Claude 版本规则](https://code.claude.com/docs/en/plugin-marketplaces#version-resolution-and-release-channels)。
 - 已发布 Tag 不移动、不覆盖、不删除再重建；修复发布新版本。附注 Tag 默认不等于密码学签名；需要签名时另行配置，不能将本规范冒充服务端 Tag 保护规则。

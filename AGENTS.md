@@ -31,6 +31,7 @@ ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维
 - 所有插件（包括未来新增插件）的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 中的版本必须与 `VERSION` 完全一致，不允许按插件独立升版。
 - Claude Code / ZCode 共用 `.claude-plugin/marketplace.json`。其中每个插件的 `version` 是供 ZCode 更新检测使用的派生字段，必须与 `VERSION` 和插件清单一致；用 `python3 scripts/sync_marketplace.py --write` 同步，CI 用 `--check` 校验。不要在 Codex 市场添加未经支持的版本字段，也不维护另一份 ZCode 技能正文或市场索引。
 - 每次发布统一升版，未修改功能的插件也同步版本；仅文档或安装器变更的发布同样遵守此规则。不要求每个开发提交都升版，未发布的同一目标版本可以继续完善。
+- Agent 修改仓库内容时，先用只读查询核对 `VERSION` 是否等于已发布版本，即远端已存在 Tag `v` 加 `VERSION` 且对应非 draft Release。仅在二者相等时，才随本次修改自动升版，并同步全部插件清单和共用市场；`VERSION` 仍是未发布的目标版本时保持版本号不变，不因后续修改再次升版。用户明确要求本次不升版时从其要求。无法确认发布状态时不自动升版，并在交付说明中标明。
 - Agent 或自动化修改版本时，只能将 `X.Y.Z` 的最后一位 `Z` 加一，保持 `X.Y` 不变；即使新增 Skill、改名或存在不兼容变化，也不得自行提升 minor 或 major。只有用户明确指定目标版本或指定调整其他位时才按其要求执行。不兼容变化仍须记录迁移说明。候选版后缀及发布渠道的新增或变更也须由用户明确指定，不借后缀绕过此限制。
 - 发布 Tag 必须为 `v` 加 `VERSION`，Release 对应表中的全部插件版本必须与其一致。发布前按 `docs/releasing.md` 核对；CI 必须校验所有插件清单与 `VERSION` 一致。
 - 已发布 Tag 和历史版本对应表保持不变，不因采用新规则改写历史；修复必须使用新版本。修改版本规则不等于授权合并、发布或升级用户安装。
