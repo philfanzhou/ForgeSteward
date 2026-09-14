@@ -271,7 +271,7 @@ OpenCode loads these names through its native `skill` tool; use the natural-lang
 
 ZCode supports `$` skill selection and the `/` menu's Skills group; `@` refers to workspace files. A plugin-qualified entry may appear instead of the bare name in the table. Its `agents/openai.yaml` display metadata is not a ZCode compatibility guarantee. See [ZCode skill invocation](https://zcode.z.ai/en/docs/skill).
 
-For review and merge, include authorization in your request, for example: "Review the current open change requests and merge those that meet acceptance and repository requirements."
+Explicitly invoking review and merge, even without an extra prompt, authorizes it to merge every change request that passes review, acceptance and repository requirements without asking for confirmation. To review without merging, say so explicitly, for example: "Review the current open change requests, but do not merge."
 
 See the official [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills), [Claude Code skill namespaces](https://code.claude.com/docs/en/skills), and [OpenCode skill loading](https://opencode.ai/docs/skills/) documentation for the host-specific interfaces.
 

@@ -7,7 +7,7 @@ Below, a Change Request is a change awaiting review and merge, such as a Pull Re
 ### Stages and authorization
 
 - Work has four stages: preparation, implementation, review and merge, and repair. Each stage can run on its own; none requires running another stage first or starts the next stage automatically.
-- Reading and analysis, editing issues, changing code, pushing, opening Change Requests and merging each need their own authorization. Mentioning or automatically loading a skill does not authorize external writes or merges.
+- Reading and analysis, editing issues, changing code, pushing, opening Change Requests and merging each need their own authorization. Explicitly invoking a stage's skill authorizes that skill's default flow; for example, the review and merge stage merges a change as soon as it meets the merge conditions, without asking for confirmation on each item. Explicit restrictions from the user in the current task take precedence. Mentioning or automatically loading a skill does not authorize external writes or merges.
 - Do not bypass branch protection, required approvals or platform permissions.
 
 ### Preparation
