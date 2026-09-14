@@ -1,4 +1,4 @@
 interface:
   display_name: "Check Workflow - ForgeSteward"
-  short_description: "Sync the standard workflow block via a PR or MR"
-  default_prompt: "Use $forge-steward-check-workflow to sync this repository's ForgeSteward workflow block and agent entry import with the bundled template, remove confirmed workflow additions from earlier check-workflow versions, validate, then commit, push, and open a PR or MR without merging."
+  short_description: "Remove project rules that duplicate the skills via a PR or MR"
+  default_prompt: "Use $forge-steward-check-workflow to remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including workflow blocks written by earlier check-workflow versions, validate, then commit, push, and open a PR or MR without merging."

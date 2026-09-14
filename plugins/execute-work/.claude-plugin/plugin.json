@@ -1,6 +1,6 @@
 {
   "name": "execute-work",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Implement a fixed issue list sequentially and submit independent change requests without merging.",
   "author": {
     "name": "philfanzhou",
