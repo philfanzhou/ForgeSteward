@@ -1,4 +1,4 @@
 interface:
   display_name: "Prepare Work - ForgeSteward"
   short_description: "Prepare issues and return a single-line issue list."
-  default_prompt: "Use $forge-steward-prepare-work to prepare actionable issues and return only a single-line issue list."
+  default_prompt: "Use $forge-steward-prepare-work to prepare as many independent ready issues as the batch limit allows and return only a single-line issue list."
