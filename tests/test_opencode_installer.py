@@ -398,11 +398,14 @@ class InstallerTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True, capture_output=True)
 
         def discovered():
-            result = subprocess.run([executable, "debug", "skill", "--pure"], cwd=self.project,
-                                    env=env, capture_output=True, text=True, timeout=60)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            return {item["name"]: item for item in json.loads(result.stdout)
-                    if item["name"].startswith(installer.PREFIX)}
+            # OpenCode 在 macOS 上写管道时会在 65536 字节处截断输出，改为写入临时文件再读取。
+            with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as stdout:
+                result = subprocess.run([executable, "debug", "skill", "--pure"], cwd=self.project,
+                                        env=env, stdout=stdout, stderr=subprocess.PIPE, text=True, timeout=60)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                stdout.seek(0)
+                return {item["name"]: item for item in json.load(stdout)
+                        if item["name"].startswith(installer.PREFIX)}
 
         self.run_cli("install", "--all")
         skills = discovered()
