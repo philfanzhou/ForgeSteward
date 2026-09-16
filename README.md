@@ -220,7 +220,7 @@ To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and veri
 | Skill | Purpose |
 | --- | --- |
 | [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Remove workflow policy rules that duplicate the ForgeSteward skills from agent instructions, contributor docs and templates, then submit a PR or MR without merging. |
-| [`forge-steward-prepare-work`](plugins/prepare-work/skills/forge-steward-prepare-work/SKILL.md) | Resolve actionable preparation blockers, persist scope and evidence in issues, and return only a single-line list of as many ready issues as the batch limit allows. |
+| [`forge-steward-prepare-work`](plugins/prepare-work/skills/forge-steward-prepare-work/SKILL.md) | Resolve actionable preparation blockers, persist scope and evidence in issues, and return only a single-line ready issue list filled with backlog issues before newly created ones. |
 | [`forge-steward-execute-work`](plugins/execute-work/skills/forge-steward-execute-work/SKILL.md) | Implement the complete supplied issue list sequentially and submit independent change requests without merging. |
 | [`forge-steward-review-and-merge`](plugins/review-and-merge/skills/forge-steward-review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
 | [`forge-steward-fix-feedback`](plugins/fix-feedback/skills/forge-steward-fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
