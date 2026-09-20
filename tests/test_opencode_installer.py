@@ -78,6 +78,10 @@ class InstallerTests(unittest.TestCase):
         self.run_cli("install", "forge-steward-prepare-work")
         self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-prepare-work"])
         self.assertEqual((self.installed() / "SKILL.md").read_bytes(), (self.source_skill() / "SKILL.md").read_bytes())
+        # prepare-work 的门禁等规则位于引用文件，安装不得只复制入口。
+        for relative, content in self.contents(self.source_skill()).items():
+            with self.subTest(resource=relative):
+                self.assertEqual((self.installed() / relative).read_bytes(), content)
         receipt = json.loads((self.installed() / installer.RECEIPT).read_text(encoding="utf-8"))
         self.assertEqual(receipt["files"], installer.snapshot(self.source_skill()))
 

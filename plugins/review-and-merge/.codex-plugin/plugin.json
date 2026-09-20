@@ -1,6 +1,6 @@
 {
   "name": "review-and-merge",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "Review a frozen change-request queue and merge only fully eligible changes.",
   "author": {
     "name": "philfanzhou",
