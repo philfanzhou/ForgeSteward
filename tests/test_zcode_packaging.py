@@ -45,8 +45,7 @@ class ZCodePackagingTests(unittest.TestCase):
                 description = re.findall(r"^description: (.+)$", frontmatter, re.MULTILINE)
                 self.assertEqual(name, [skill.parent.name])
                 self.assertEqual(len(description), 1)
-                self.assertLessEqual(len(description[0]), 1024)
-                self.assertLessEqual(len(body.encode("utf-8")), 100 * 1024)
+                # 长度与 Unicode 单位统一由 check_skill_limits.py 及其测试维护。
                 for reference in re.findall(r"\]\((references/[^)#]+)(?:#[^)]*)?\)", content):
                     target = (skill.parent / reference).resolve()
                     self.assertIn(skill.parent.resolve(), target.parents)
@@ -151,6 +150,39 @@ class ZCodePackagingTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("FORGESTEWARD_ZCODE_CLI"), "未指定 ZCode CLI；不代表真实发现已通过")
 class ZCodeRuntimeTests(unittest.TestCase):
+    def test_documented_loader_boundaries_in_temporary_skill(self):
+        cli = Path(os.environ["FORGESTEWARD_ZCODE_CLI"]).resolve()
+        node = shutil.which("node")
+        self.assertIsNotNone(node)
+        with tempfile.TemporaryDirectory(prefix="forgesteward-zcode-limits-") as directory:
+            root = Path(directory).resolve()
+            name = "forgesteward-size-probe"
+            skill = root / ".agents/skills" / name / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+
+            def run(*arguments):
+                # 大体积探针写入文件，避免 Node 管道退出时丢失 stdout 尾部。
+                with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+                    result = subprocess.run([node, str(cli), *arguments, "--cwd", str(root), "--json"],
+                                            cwd=root, stdout=output, stderr=subprocess.PIPE, text=True, timeout=60)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    output.seek(0)
+                    return json.load(output)
+
+            # 已核对的 CLI 按整个文件的十进制字节数截断，包含 frontmatter。
+            prefix = f"---\nname: {name}\ndescription: Boundary probe\n---\n".encode()
+            for size in (100_000, 100_001):
+                skill.write_bytes(prefix + b"x" * (size - len(prefix)))
+                loaded = run("skills", "inspect", name)["skill"]
+                self.assertEqual(loaded["sizeBytes"], size)
+                self.assertEqual(loaded["bytesRead"], min(size, 100_000))
+                self.assertEqual(loaded["truncated"], size > 100_000)
+            for count in (512, 513):
+                skill.write_text(f"---\nname: {name}\ndescription: {'😀' * count}\n---\nProbe\n", encoding="utf-8")
+                listed = run("skills", "list")
+                found = [item for item in listed["skills"] if Path(item["path"]).resolve() == skill]
+                self.assertEqual(len(found), 1 if count == 512 else 0)
+
     def test_bundled_cli_discovers_and_reads_relocated_plugins(self):
         cli = Path(os.environ["FORGESTEWARD_ZCODE_CLI"]).resolve()
         self.assertTrue(cli.is_file())
@@ -175,7 +207,9 @@ class ZCodeRuntimeTests(unittest.TestCase):
                 return json.loads(result.stdout)
 
             installed = run("plugins", "list")
-            actual = {item["name"]: item for item in installed["plugins"]
+            # 0.16.9 直接返回列表，0.16.5 返回含 plugins 的对象。
+            installed_plugins = installed if isinstance(installed, list) else installed["plugins"]
+            actual = {item["name"]: item for item in installed_plugins
                       if root in Path(item["rootPath"]).resolve().parents}
             self.assertEqual(set(actual), {p.name for p in plugins})
             version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
@@ -193,10 +227,12 @@ class ZCodeRuntimeTests(unittest.TestCase):
                     inspected = run("skills", "inspect", item.get("qualifiedName", name))["skill"]
                     self.assertEqual(Path(inspected["metadata"]["path"]).resolve(), Path(item["path"]).resolve())
                     self.assertFalse(inspected["truncated"])
-                    self.assertTrue(inspected["content"].strip())
-                    if name == "forge-steward-check-workflow":
-                        for reference in ("references/skill-owned-rules.md", "scripts/remove_workflow_blocks.py"):
-                            self.assertTrue((Path(inspected["baseDirectory"]) / reference).is_file())
+                    source = Path(item["path"])
+                    expected = source.read_text(encoding="utf-8").split("---", 2)[2].strip()
+                    self.assertEqual(inspected["content"], expected)
+                    self.assertEqual(inspected["sizeBytes"], source.stat().st_size)
+                    for reference in (source.parent / "references").rglob("*.md"):
+                        self.assertTrue((Path(inspected["baseDirectory"]) / reference.relative_to(source.parent)).is_file())
             configuration.write_text(json.dumps({"plugins": {"enabled": False}}), encoding="utf-8")
             disabled = run("skills", "list")
             self.assertFalse(any(root in Path(item["path"]).resolve().parents for item in disabled["skills"]))

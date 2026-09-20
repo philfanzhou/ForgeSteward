@@ -78,6 +78,10 @@ class InstallerTests(unittest.TestCase):
         self.run_cli("install", "forge-steward-prepare-work")
         self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-prepare-work"])
         self.assertEqual((self.installed() / "SKILL.md").read_bytes(), (self.source_skill() / "SKILL.md").read_bytes())
+        # prepare-work 的门禁等规则位于引用文件，安装不得只复制入口。
+        for relative, content in self.contents(self.source_skill()).items():
+            with self.subTest(resource=relative):
+                self.assertEqual((self.installed() / relative).read_bytes(), content)
         receipt = json.loads((self.installed() / installer.RECEIPT).read_text(encoding="utf-8"))
         self.assertEqual(receipt["files"], installer.snapshot(self.source_skill()))
 
@@ -86,6 +90,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(list(self.root.iterdir())), 5)
         for path in self.root.iterdir():
             self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
+            source = self.source / "plugins" / path.name.removeprefix(installer.PREFIX) / "skills" / path.name
+            for relative, content in self.contents(source).items():
+                with self.subTest(skill=path.name, resource=relative):
+                    self.assertEqual((path / relative).read_bytes(), content)
         for resource in ("references/skill-owned-rules.md", "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
         self.assert_no_transactions()
@@ -412,6 +420,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(set(skills), set(installer.catalog(self.source)))
         for name, item in skills.items():
             self.assertEqual(Path(item["location"]).resolve(), self.root / name / "SKILL.md")
+            expected = (self.root / name / "SKILL.md").read_text(encoding="utf-8").split("---", 2)[2].strip()
+            self.assertEqual(item["content"].strip(), expected)
         self.run_cli("uninstall", "--all")
         self.assertEqual(discovered(), {})
         # 同一可执行程序还须发现默认 XDG 和自定义配置目录的用户级安装。

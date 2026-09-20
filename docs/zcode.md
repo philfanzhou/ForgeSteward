@@ -66,6 +66,8 @@ ZCode 原生读取全局 `~/.zcode/AGENTS.md` 和当前 Workspace 的 `AGENTS.md
 
 ## 验证记录与复验
 
+2026-09-20 补充核对桌面 `3.14.0` / 内置 CLI `0.16.9` 的长度边界与完整正文加载；详见[跨 Agent 兼容性记录](skill-compatibility.md)。以下旧版本记录保留历史范围。原静态测试中的“正文 100 × 1024 字节”已改为共同预算检查，因为当前实现实际限制完整文件为 100,000 字节。
+
 | 验证层级 | 本轮结果 / 边界 |
 | --- | --- |
 | 官方版本与安装包静态核对 | 桌面 3.11.2；安装包中的 `findMarketplaceManifestPath` 接受根 `marketplace.json` 或 `.claude-plugin/marketplace.json`；未覆盖安装 |
