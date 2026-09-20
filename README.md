@@ -6,6 +6,8 @@ The current source targets **0.2.12**, with five independent plugins: `check-wor
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, follow the rename instructions in the selected Release, not just a tag substitution in the historical commands below.
 
+For contributors: run `python3 scripts/check_skill_limits.py --check` after changing skills. See the [cross-agent loading limits and authoring budgets](docs/skill-compatibility.md) for Codex, Claude Code, OpenCode, and ZCode.
+
 ## Install and use — ZCode development preview
 
 ZCode reuses our Claude-compatible marketplace and plugin manifests; no separate skill copies, ZCode-specific plugin manifests, or Python installer are needed. This preview is included from **v0.2.3**, not in the historical v0.2.1 examples below. Packaging and bundled-CLI discovery were checked with ZCode desktop **3.11.2** (bundled CLI **0.16.5**); desktop marketplace installation and model behavior remain unverified. See [ZCode setup and verification](docs/zcode.md).

@@ -420,6 +420,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(set(skills), set(installer.catalog(self.source)))
         for name, item in skills.items():
             self.assertEqual(Path(item["location"]).resolve(), self.root / name / "SKILL.md")
+            expected = (self.root / name / "SKILL.md").read_text(encoding="utf-8").split("---", 2)[2].strip()
+            self.assertEqual(item["content"].strip(), expected)
         self.run_cli("uninstall", "--all")
         self.assertEqual(discovered(), {})
         # 同一可执行程序还须发现默认 XDG 和自定义配置目录的用户级安装。
