@@ -1,27 +1,38 @@
-"""防止 prepare-work 入口再次超出 Codex 注入预算或丢失分阶段规则。"""
+"""防止技能入口超出 Codex 注入预算或丢失分阶段规则。"""
 
 from pathlib import Path
 import re
 import unittest
 
 
-SKILL = (Path(__file__).resolve().parents[1] / "plugins/prepare-work/skills"
-         / "forge-steward-prepare-work")
+PLUGINS = Path(__file__).resolve().parents[1] / "plugins"
 # 上游当前主提示词上限为 8,000 UTF-8 字节；本项目保留 2,000 字节余量。
-# 引用文件也限制单次读取规模，但这不是 Codex 工具输出的通用上限。
-FILE_BUDGET_BYTES = 6_000
+ENTRYPOINT_BUDGET_BYTES = 6_000
 
 
 class SkillContextBudgetTests(unittest.TestCase):
-    def test_prepare_entrypoint_and_references_fit_byte_budget(self):
-        for path in [SKILL / "SKILL.md", *sorted((SKILL / "references").glob("*.md"))]:
-            with self.subTest(file=path.name):
-                self.assertLessEqual(len(path.read_bytes()), FILE_BUDGET_BYTES,
+    def test_all_entrypoints_fit_byte_budget(self):
+        skills = sorted(PLUGINS.glob("*/skills/*/SKILL.md"))
+        self.assertTrue(skills, "必须存在可检查的技能入口")
+        for path in skills:
+            with self.subTest(skill=path.parent.name):
+                self.assertLessEqual(len(path.read_bytes()), ENTRYPOINT_BUDGET_BYTES,
                                      "请将详细规则拆到按阶段读取的引用文件")
 
-    def test_prepare_references_are_local_existing_and_reachable(self):
+    def test_prepare_references_fit_read_budget(self):
+        # 保留 prepare-work 已建立的分块读取预算；不是工具输出的通用上限。
+        for path in (PLUGINS / "prepare-work/skills/forge-steward-prepare-work/references").glob("*.md"):
+            with self.subTest(file=path.name):
+                self.assertLessEqual(len(path.read_bytes()), 6_000)
+
+    def test_all_references_are_local_existing_and_reachable(self):
+        for entrypoint in sorted(PLUGINS.glob("*/skills/*/SKILL.md")):
+            with self.subTest(skill=entrypoint.parent.name):
+                self.check_references(entrypoint.parent)
+
+    def check_references(self, skill):
         visited = set()
-        pending = [SKILL / "SKILL.md"]
+        pending = [skill / "SKILL.md"]
         while pending:
             source = pending.pop().resolve()
             if source in visited:
@@ -31,12 +42,11 @@ class SkillContextBudgetTests(unittest.TestCase):
                 if "://" in link or link.startswith("#"):
                     continue
                 target = (source.parent / link.split("#", 1)[0]).resolve()
-                self.assertIn(SKILL.resolve(), target.parents, link)
+                self.assertIn(skill.resolve(), target.parents, link)
                 self.assertTrue(target.is_file(), link)
                 if target.suffix == ".md":
                     pending.append(target)
-        references = {p.resolve() for p in (SKILL / "references").rglob("*.md")}
-        self.assertTrue(references, "详细规则必须随技能分发")
+        references = {p.resolve() for p in (skill / "references").rglob("*.md")}
         self.assertTrue(references.issubset(visited), "引用规则必须能从入口找到")
 
 

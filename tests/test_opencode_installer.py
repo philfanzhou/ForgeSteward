@@ -90,6 +90,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(list(self.root.iterdir())), 5)
         for path in self.root.iterdir():
             self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
+            source = self.source / "plugins" / path.name.removeprefix(installer.PREFIX) / "skills" / path.name
+            for relative, content in self.contents(source).items():
+                with self.subTest(skill=path.name, resource=relative):
+                    self.assertEqual((path / relative).read_bytes(), content)
         for resource in ("references/skill-owned-rules.md", "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
         self.assert_no_transactions()
