@@ -2,7 +2,7 @@
 
 ## 范围与选择
 
-本适配最初实现 Issue #1，当时仓库有四个插件。`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量；当前源码包含五个插件。本适配是仓库级工具，不是独立 Skill。改名迁移见 [prepare-work 与 execute-work](prepare-execute-migration.md)，不需要修改安装器算法。
+本适配最初实现 Issue #1，当时仓库有四个插件。`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量；当前源码包含六个插件。本适配是仓库级工具，不是独立 Skill。改名迁移见 [prepare-work 与 execute-work](prepare-execute-migration.md)，不需要修改安装器算法。`work-cycle` 可独立安装，但完整运行还需同版本的五个阶段技能及可用的子 Agent 能力。
 
 采用 Python 3.9+ 标准库脚本，避免额外包发布、运行时依赖和三份核心源码。用户取得仓库后，一条命令即可安装指定技能或全部技能；首次取得源码的 Git clone 是明确的准备步骤，不宣称已经提供无需 checkout 的远端一键安装服务。
 

@@ -1,0 +1,23 @@
+{
+  "name": "work-cycle",
+  "version": "0.2.13",
+  "description": "Run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
+  "author": {
+    "name": "philfanzhou",
+    "url": "https://github.com/philfanzhou"
+  },
+  "homepage": "https://github.com/philfanzhou/ForgeSteward#readme",
+  "repository": "https://github.com/philfanzhou/ForgeSteward",
+  "license": "MIT",
+  "keywords": ["agent-skills", "repository-maintenance", "multi-agent"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Work Cycle - ForgeSteward",
+    "shortDescription": "Run complete work cycles through stage subagents.",
+    "longDescription": "Run up to five complete work cycles by default, delegating each stage to its own subagent, reviewing and merging eligible changes, and pausing only items still blocked after a third repair round.",
+    "developerName": "philfanzhou",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use $forge-steward-work-cycle to run complete work cycles through subagents and merge eligible changes."
+  }
+}

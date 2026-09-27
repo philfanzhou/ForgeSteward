@@ -13,6 +13,7 @@ TITLES = {
     "execute-work": "Execute Work",
     "review-and-merge": "Review and Merge",
     "fix-feedback": "Fix Feedback",
+    "work-cycle": "Work Cycle",
 }
 
 
@@ -81,6 +82,11 @@ class PluginMetadataTests(unittest.TestCase):
                     relative = source["path"] if isinstance(source, dict) else source
                     self.assertEqual((REPO / relative).resolve(), REPO / "plugins" / plugin["name"])
                     self.assertTrue((REPO / relative / "plugin.json").is_file())
+
+    def test_orchestrator_bundled_version_matches_unified_version(self):
+        bundled = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/scripts/VERSION"
+        self.assertEqual(bundled.read_text(encoding="utf-8").strip(),
+                         (REPO / "VERSION").read_text(encoding="utf-8").strip())
 
 
 if __name__ == "__main__":

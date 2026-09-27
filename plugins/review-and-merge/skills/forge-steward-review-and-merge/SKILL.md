@@ -38,7 +38,7 @@ description: Freeze and review the current open change requests, merge only thos
 处理完整个冻结清单后，用中文汇总：
 
 - 冻结基线和处理顺序。
-- 因往返达到 3 轮或以上而排除、等待人工处理的 Change Request，附轮次及计数依据。
+- 第 3 轮修复后的终审及合并结果；终审仍有范围内必修问题而暂停的 Change Request，附当前 head、轮次和计数依据。
 - 每个 Change Request 的审查结论及证据。
 - 实际执行的 Review、合并、关闭和清理操作；明确区分已审查、已批准、已合并和未合并。
 - 仓库未启用合并后自动删除源分支，或远端源分支仍然保留时，提示用户：列出保留的远端源分支和设置状态，由用户决定是否修改仓库设置或手动删除。
