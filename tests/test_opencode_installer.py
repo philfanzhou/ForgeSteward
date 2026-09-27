@@ -87,7 +87,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_install_all_has_matching_frontmatter_and_resources(self):
         self.run_cli("install", "--all")
-        self.assertEqual(len(list(self.root.iterdir())), 5)
+        self.assertEqual(len(list(self.root.iterdir())), len(installer.catalog(self.source)))
         for path in self.root.iterdir():
             self.assertIn("name: " + path.name + "\n", (path / "SKILL.md").read_text(encoding="utf-8"))
             source = self.source / "plugins" / path.name.removeprefix(installer.PREFIX) / "skills" / path.name
@@ -96,6 +96,8 @@ class InstallerTests(unittest.TestCase):
                     self.assertEqual((path / relative).read_bytes(), content)
         for resource in ("references/skill-owned-rules.md", "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
+        for resource in ("references/startup.md", "references/cycles.md", "scripts/check_workflow_gate.py", "scripts/VERSION"):
+            self.assertTrue((self.installed("orchestrate-work") / resource).is_file())
         self.assert_no_transactions()
 
     def test_repeat_install_is_byte_and_mtime_identical(self):
@@ -344,7 +346,7 @@ class InstallerTests(unittest.TestCase):
         with mock.patch.object(installer.os, "replace", side_effect=fail_once):
             output = self.run_cli("uninstall", "--all", expected=1)
         self.assertEqual(before, self.contents(self.root))
-        self.assertEqual(output.count("managed installation remains"), 5)
+        self.assertEqual(output.count("managed installation remains"), len(installer.catalog(self.source)))
         self.assert_no_transactions()
 
     def test_subprocess_residue_exit_code(self):

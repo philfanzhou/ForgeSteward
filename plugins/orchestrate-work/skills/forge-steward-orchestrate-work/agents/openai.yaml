@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchestrate Work - ForgeSteward"
+  short_description: "Run complete work cycles through stage subagents."
+  default_prompt: "Use $forge-steward-orchestrate-work to run complete work cycles through subagents and merge eligible changes."

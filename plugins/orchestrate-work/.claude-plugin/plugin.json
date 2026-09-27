@@ -1,7 +1,7 @@
 {
-  "name": "fix-feedback",
+  "name": "orchestrate-work",
   "version": "0.2.13",
-  "description": "Resolve required feedback and verified gaps on open change requests without merging.",
+  "description": "Run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -9,6 +9,6 @@
   "homepage": "https://github.com/philfanzhou/ForgeSteward#readme",
   "repository": "https://github.com/philfanzhou/ForgeSteward",
   "license": "MIT",
-  "keywords": ["agent-skills", "review-feedback", "repository-maintenance"],
+  "keywords": ["agent-skills", "repository-maintenance", "multi-agent"],
   "skills": "./skills/"
 }
