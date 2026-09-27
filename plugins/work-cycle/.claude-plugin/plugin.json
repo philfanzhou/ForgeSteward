@@ -1,5 +1,5 @@
 {
-  "name": "orchestrate-work",
+  "name": "work-cycle",
   "version": "0.2.13",
   "description": "Run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {

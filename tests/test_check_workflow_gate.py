@@ -1,4 +1,4 @@
-"""Verify the low-frequency trigger and local Git state used by orchestrate-work."""
+"""Verify the low-frequency trigger and local Git state used by work-cycle."""
 
 from datetime import datetime, timedelta, timezone
 import importlib.util
@@ -11,7 +11,7 @@ import unittest
 
 
 REPO = Path(__file__).resolve().parents[1]
-SCRIPT = REPO / "plugins/orchestrate-work/skills/forge-steward-orchestrate-work/scripts/check_workflow_gate.py"
+SCRIPT = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/scripts/check_workflow_gate.py"
 spec = importlib.util.spec_from_file_location("check_workflow_gate", SCRIPT)
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)

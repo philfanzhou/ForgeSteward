@@ -13,7 +13,7 @@ TITLES = {
     "execute-work": "Execute Work",
     "review-and-merge": "Review and Merge",
     "fix-feedback": "Fix Feedback",
-    "orchestrate-work": "Orchestrate Work",
+    "work-cycle": "Work Cycle",
 }
 
 
@@ -84,7 +84,7 @@ class PluginMetadataTests(unittest.TestCase):
                     self.assertTrue((REPO / relative / "plugin.json").is_file())
 
     def test_orchestrator_bundled_version_matches_unified_version(self):
-        bundled = REPO / "plugins/orchestrate-work/skills/forge-steward-orchestrate-work/scripts/VERSION"
+        bundled = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/scripts/VERSION"
         self.assertEqual(bundled.read_text(encoding="utf-8").strip(),
                          (REPO / "VERSION").read_text(encoding="utf-8").strip())
 

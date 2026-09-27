@@ -37,8 +37,8 @@
       "version": "0.2.13"
     },
     {
-      "name": "orchestrate-work",
-      "source": "./plugins/orchestrate-work",
+      "name": "work-cycle",
+      "source": "./plugins/work-cycle",
       "description": "Run bounded work cycles through stage subagents and merge eligible changes.",
       "version": "0.2.13"
     }

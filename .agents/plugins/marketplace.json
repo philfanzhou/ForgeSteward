@@ -65,10 +65,10 @@
       "category": "Productivity"
     },
     {
-      "name": "orchestrate-work",
+      "name": "work-cycle",
       "source": {
         "source": "local",
-        "path": "./plugins/orchestrate-work"
+        "path": "./plugins/work-cycle"
       },
       "policy": {
         "installation": "AVAILABLE",

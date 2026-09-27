@@ -1,9 +1,9 @@
 ---
-name: forge-steward-orchestrate-work
+name: forge-steward-work-cycle
 description: Run a bounded number of complete ForgeSteward work cycles with mandatory stage subagents, from issue preparation and implementation through review, feedback repair, and eligible merges. An optional positive integer sets the maximum cycles; the default is five. Use only for an explicitly requested end-to-end run, not for a single stage or a read-only review.
 ---
 
-# Orchestrate Work
+# Work Cycle
 
 ## 规则加载
 
