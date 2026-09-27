@@ -1,7 +1,7 @@
 {
   "name": "work-cycle",
-  "version": "0.2.13",
-  "description": "Run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
+  "version": "0.2.14",
+  "description": "Review existing open change requests, then run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"

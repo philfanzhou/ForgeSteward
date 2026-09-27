@@ -1,7 +1,7 @@
 {
   "name": "work-cycle",
-  "version": "0.2.13",
-  "description": "Run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
+  "version": "0.2.14",
+  "description": "Review existing open change requests, then run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Work Cycle - ForgeSteward",
     "shortDescription": "Run complete work cycles through stage subagents.",
-    "longDescription": "Run up to five complete work cycles by default, delegating each stage to its own subagent, reviewing and merging eligible changes, and pausing only items still blocked after a third repair round.",
+    "longDescription": "Review the existing open change request queue first, then run up to five complete issue work cycles by default. Each stage uses its own subagent. Eligible changes are merged and their source branches cleaned up; items still blocked after a third repair round are paused individually.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],

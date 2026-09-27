@@ -1,4 +1,4 @@
 interface:
   display_name: "Check Workflow - ForgeSteward"
-  short_description: "Remove project rules that duplicate the skills via a PR or MR"
-  default_prompt: "Use $forge-steward-check-workflow to remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including workflow blocks written by earlier check-workflow versions, validate, then commit, push, and open a PR or MR without merging."
+  short_description: "Check branch settings and remove duplicate workflow rules"
+  default_prompt: "Use $forge-steward-check-workflow to inspect branch cleanup settings and remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including blocks written by earlier check-workflow versions. Validate, then commit, push, and open a PR or MR for any deletion without merging."

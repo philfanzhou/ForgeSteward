@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.13",
-  "description": "Remove workflow rules that duplicate the ForgeSteward skills from a repository's agent instructions, contributor docs, and templates, then submit a PR or MR without merging.",
+  "version": "0.2.14",
+  "description": "Check branch cleanup settings and remove workflow rules that duplicate the ForgeSteward skills, then submit any deletion as a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
