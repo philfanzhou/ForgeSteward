@@ -1,6 +1,6 @@
 ---
 name: forge-steward-check-workflow
-description: Remove workflow policy rules that duplicate the ForgeSteward skills from a repository's agent instructions, contributor docs, and issue or change-request templates, including workflow blocks written by earlier check-workflow versions, then submit the deletion as a PR or MR without merging. Project conventions such as language, formats, build commands, and engineering constraints are kept. Explicit check-only requests remain read-only.
+description: Check repository branch cleanup settings and remove workflow policy rules that duplicate the ForgeSteward skills from agent instructions, contributor docs, and issue or change-request templates, then submit any deletion as a PR or MR without merging. Project conventions remain intact. Explicit check-only requests remain read-only.
 ---
 
 # Check Workflow
@@ -15,7 +15,7 @@ description: Remove workflow policy rules that duplicate the ForgeSteward skills
 
 工作流政策只在 ForgeSteward 的 prepare-work、execute-work、review-and-merge 和 fix-feedback 技能正文中维护，包括：Issue ready 门禁、任务粒度、Change Request 范围、Review 分类与轮次、修复范围、合并后结项、交接和授权。项目里另写一套同类规则，无论与技能措辞相同、更严格还是更宽松，都会形成第二个规则来源：技能执行时出现冲突，技能升级后项目规则又会过时。本技能删除这些规则，使工作流政策只以技能为准。
 
-本技能只删除，不写入：不向项目添加规则、标记区块、读取指示或 Agent 入口，也不代写替代条款。项目仍需要、但技能明确交由仓库决定的约定（见[项目约定](references/skill-owned-rules.md#项目约定保留)）予以保留。
+本技能对受版本控制的项目文件只删除、不写入：不向项目添加规则、标记区块、读取指示或 Agent 入口，也不代写替代条款。项目仍需要、但技能明确交由仓库决定的约定（见[项目约定](references/skill-owned-rules.md#项目约定保留)）予以保留。另以只读方式检查托管平台的合并后自动删除源分支设置，记录启用、停用或无法确认；不修改仓库设置。合并后的实际分支清理由 `review-and-merge` 执行，本技能不合并或删除分支。
 
 用户明确调用本技能（包括仅选择技能、不附加 prompt）时，默认任务是：检查 → 删除 → 验证 → commit、push 并创建 Change Request（PR/MR），禁止合并。用户本轮的明确限制优先：仅检查时只报告删除候选，不写文件、不建分支；仅本地修改时不提交或推送。自动选中本技能、引用技能名称或询问用法，不构成外部发布授权。遵守目标仓库的权限、审批及分支保护，不以默认流程绕过限制。
 
@@ -29,7 +29,7 @@ description: Remove workflow policy rules that duplicate the ForgeSteward skills
 
 ## 汇报与变更汇总
 
-结束时用目标项目约定的语言向用户汇报：操作模式、检查命令与退出码、Change Request 链接或零修改结论、待决定项、技能缺口、未完成事项和下一步。
+结束时用目标项目约定的语言向用户汇报：操作模式、合并后自动删除源分支设置及证据或无法确认的原因、检查命令与退出码、Change Request 链接或零修改结论、待决定项、技能缺口、未完成事项和下一步。设置停用本身不产生项目文件变更或空 Change Request。
 
 本次运行修改了任何项目文件时（包括仅本地修改，或提交、推送、创建 Change Request 中途受阻），汇报中必须包含变更汇总。汇总依据实际的 `git status` 和 `git diff`（已提交时对比主线）填写，不按计划推测，不省略任何文件：
 

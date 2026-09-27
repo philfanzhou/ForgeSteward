@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
-  "version": "0.2.13",
-  "description": "Remove workflow rules that duplicate the ForgeSteward skills from a repository's agent instructions, contributor docs, and templates, then submit a PR or MR without merging.",
+  "version": "0.2.14",
+  "description": "Check branch cleanup settings and remove workflow rules that duplicate the ForgeSteward skills, then submit any deletion as a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -17,11 +17,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Check Workflow - ForgeSteward",
-    "shortDescription": "Remove project rules that duplicate the skills via a PR or MR.",
-    "longDescription": "Find workflow policy rules (issue readiness, task granularity, change-request scope, review classification and rounds, repair, merge follow-up, and handoff) in AGENTS.md, CLAUDE.md, CONTRIBUTING.md, workflow docs, and issue or change-request templates that duplicate the ForgeSteward skills, remove them together with workflow blocks written by earlier check-workflow versions, validate, and submit a PR or MR without merging. Project conventions such as language, formats, build commands, and engineering constraints are kept; nothing is added to the project; explicit check-only requests remain read-only.",
+    "shortDescription": "Check branch settings and remove duplicate workflow rules.",
+    "longDescription": "Read the repository setting for automatic source branch deletion after merge, then find and remove workflow policy rules in agent instructions, contributor docs, workflow docs, and issue or change-request templates that duplicate the ForgeSteward skills. Submit any deletion as a PR or MR without merging. Project conventions remain intact; repository settings are not changed; explicit check-only requests remain read-only.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $forge-steward-check-workflow to remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including workflow blocks written by earlier check-workflow versions, validate, then commit, push, and open a PR or MR without merging."
+    "defaultPrompt": "Use $forge-steward-check-workflow to inspect branch cleanup settings and remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including blocks written by earlier check-workflow versions. Validate, then commit, push, and open a PR or MR for any deletion without merging."
   }
 }
