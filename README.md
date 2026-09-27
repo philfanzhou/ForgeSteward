@@ -2,7 +2,7 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, ZCode, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-The current source targets **0.2.13**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. A source version is not proof of publication: confirm the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases). See the [v0.2.13 version matrix and changes](docs/releases/v0.2.13.md). The new orchestration skill runs bounded work cycles through mandatory stage subagents; the five existing skills retain their independent entrypoints and complete bundled rules.
+The current source targets **0.2.14**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. A source version is not proof of publication: confirm the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases). See the [v0.2.14 version matrix, changes, and migration notes](docs/releases/v0.2.14.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules.
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, follow the rename instructions in the selected Release, not just a tag substitution in the historical commands below.
 
@@ -221,12 +221,12 @@ To remove ForgeSteward entirely instead of upgrading, follow [Uninstall and veri
 
 | Skill | Purpose |
 | --- | --- |
-| [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Remove workflow policy rules that duplicate the ForgeSteward skills from agent instructions, contributor docs and templates, then submit a PR or MR without merging. |
+| [`forge-steward-check-workflow`](plugins/check-workflow/skills/forge-steward-check-workflow/SKILL.md) | Inspect branch cleanup settings, remove workflow policy rules that duplicate the ForgeSteward skills, and submit any deletion as a PR or MR without merging. |
 | [`forge-steward-prepare-work`](plugins/prepare-work/skills/forge-steward-prepare-work/SKILL.md) | Resolve actionable preparation blockers, persist scope and evidence in issues, and return only a single-line ready issue list filled with backlog issues before newly created ones. |
 | [`forge-steward-execute-work`](plugins/execute-work/skills/forge-steward-execute-work/SKILL.md) | Implement the complete supplied issue list sequentially and submit independent change requests without merging. |
 | [`forge-steward-review-and-merge`](plugins/review-and-merge/skills/forge-steward-review-and-merge/SKILL.md) | Review a frozen change-request queue and merge only the changes that satisfy their scope, acceptance, checks, and repository policy. |
 | [`forge-steward-fix-feedback`](plugins/fix-feedback/skills/forge-steward-fix-feedback/SKILL.md) | Resolve required review feedback and verified gaps on original change-request branches, then push without merging. |
-| [`forge-steward-work-cycle`](plugins/work-cycle/skills/forge-steward-work-cycle/SKILL.md) | Run up to five complete work cycles by default, delegating each stage to a subagent and merging eligible changes. |
+| [`forge-steward-work-cycle`](plugins/work-cycle/skills/forge-steward-work-cycle/SKILL.md) | Review existing open change requests, then run up to five issue work cycles by default through stage subagents and merge eligible changes. |
 
 Each skill remains independently installable, while all plugins are versioned together. The root [VERSION](VERSION) defines the current source's target version; all plugin manifests must match it, and the release tag must be `v` followed by that version. The unified policy was introduced in the `0.2.2` development baseline and does not rewrite historical releases. Automatic version changes increment only the last component unless the user explicitly specifies otherwise; incompatible changes still require migration notes. A target version in source does not mean it has been published. See the [release policy](docs/releasing.md). Skills share a common core where behavior is genuinely portable across supported agents.
 
