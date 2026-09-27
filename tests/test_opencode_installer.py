@@ -394,9 +394,10 @@ class InstallerTests(unittest.TestCase):
             self.run_cli("uninstall", "--all", user=True)
 
     def test_real_opencode_discovery(self):
-        executable = os.environ.get("FORGESTEWARD_OPENCODE") or shutil.which("opencode")
+        # 此测试针对 CI 固定的 OpenCode 1.18.30；PATH 上的其他主版本可能没有 debug skill --pure。
+        executable = os.environ.get("FORGESTEWARD_OPENCODE")
         if not executable:
-            self.skipTest("Set FORGESTEWARD_OPENCODE to run actual OpenCode discovery")
+            self.skipTest("Set FORGESTEWARD_OPENCODE to a compatible OpenCode CLI for actual discovery")
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OPENCODE_", "XDG_"))}
         for key, suffix in (("XDG_CONFIG_HOME", "config"), ("XDG_DATA_HOME", "data"),
                             ("XDG_CACHE_HOME", "cache"), ("XDG_STATE_HOME", "state"),
