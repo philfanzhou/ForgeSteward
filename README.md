@@ -10,7 +10,7 @@ For contributors: run `python3 scripts/check_skill_limits.py --check` after chan
 
 ## Install and use — ZCode development preview
 
-ZCode reuses our Claude-compatible marketplace and plugin manifests; no separate skill copies, ZCode-specific plugin manifests, or Python installer are needed. This preview is included from **v0.2.3**, not in the historical v0.2.1 examples below. Packaging and bundled-CLI discovery were checked with ZCode desktop **3.11.2** (bundled CLI **0.16.5**); desktop marketplace installation and model behavior remain unverified. See [ZCode setup and verification](docs/zcode.md).
+ZCode reuses our Claude-compatible marketplace and plugin manifests; no separate skill copies, ZCode-specific plugin manifests, or Python installer are needed. This preview is included from **v0.2.3**, not in the historical v0.2.1 examples below. All six skills were discovered and read without truncation in an isolated workspace with ZCode desktop **3.14.3** (bundled CLI **0.16.9**); desktop marketplace installation and model behavior remain unverified. See [ZCode setup and verification](docs/zcode.md).
 
 1. Open the repository you want to maintain in ZCode. Go to **Settings → Plugins → Create → Add marketplace** (some versions use **Discover → +**).
 2. For development testing, add the **absolute root path of a reviewed ForgeSteward checkout containing this guide**, not its `.claude-plugin` subdirectory. Adding `philfanzhou/ForgeSteward` instead follows the remote default branch; it does not select a release or include unmerged local changes. For a fixed release, use the [snapshot procedure](docs/zcode.md#固定版本与回退), after confirming that release exists.
