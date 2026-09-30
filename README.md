@@ -6,7 +6,7 @@ The current source targets **0.2.15**, with six independently installable plugin
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, follow the rename instructions in the selected Release, not just a tag substitution in the historical commands below.
 
-For contributors: run `python3 scripts/check_skill_limits.py --check` after changing skills. Descriptions must stay within **500 UTF-16 units** to fit the default DeepSeek Harness catalog display. See the [cross-agent loading limits and authoring budgets](docs/skill-compatibility.md) for Codex, Claude Code, OpenCode, ZCode, and the DeepSeek Harness investigation; managed DeepSeek installation and end-to-end workflows are tracked separately.
+For contributors: run `python3 scripts/check_skill_limits.py --check` after changing skills. Descriptions must stay within **500 UTF-16 units** to fit the default DeepSeek Harness catalog display. See the [cross-agent loading limits and authoring budgets](docs/skill-compatibility.md) for Codex, Claude Code, OpenCode, ZCode, and the DeepSeek Harness investigation; managed DeepSeek installation is available in current source; end-to-end workflows remain separately tracked.
 
 ## Install and use — ZCode development preview
 
@@ -18,6 +18,32 @@ ZCode reuses our Claude-compatible marketplace and plugin manifests; no separate
 4. In a new task, type `$` and select `forge-steward-prepare-work`; `/` also has a Skills group. If the picker shows a plugin-qualified name, select that entry. You do not need to paste the skill's instructions again. Execution still needs the issue list: `$forge-steward-execute-work #123, #145`.
 
 ZCode's picker is not guaranteed to display Codex's `<Task> - ForgeSteward` label. Use the stable `forge-steward-` name and verify the source. Git/forge authentication, repository permissions and explicit task limits still apply. For updates, rollback and removal, follow [Upgrade ZCode skills](#upgrade-zcode-skills) and [ZCode removal](#zcode-removal); upgrading ZCode itself does not upgrade ForgeSteward.
+
+## Install and use — DeepSeek Harness development preview
+
+Current source provides a managed filesystem installer for DeepSeek Harness, starting with the unpublished **0.2.15** target. Use a reviewed checkout containing `scripts/deepseek.py`; older published snapshots such as v0.2.1 do not contain this adapter. Obtain the source once:
+
+```bash
+mkdir -p "$HOME/code"
+git clone https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-deepseek"
+git -C "$HOME/code/ForgeSteward-deepseek" rev-parse HEAD
+git -C "$HOME/code/ForgeSteward-deepseek" status --short
+```
+
+From the project you want to maintain, with Python 3.9+:
+
+```bash
+python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" install prepare-work --project .
+python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" status prepare-work --project .
+python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" update prepare-work --project .
+python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" uninstall prepare-work --project .
+```
+
+Use `--all` in place of the name to install all current skills, or `--user` in place of `--project .` for `$DSH_HOME/skills` (default `~/.dsh/skills`). Project paths use the nearest Git root, including worktree `.git` files; without a Git root they use the explicit project directory. The absolute target is printed. If Harness's configured `dshHome` overrides the environment, pass that same home through `DSH_HOME`. Relative environment paths use the calling cwd. On Windows use `py -3` and your checkout's Windows path.
+
+Start a new Harness session, check the discovered names and sources, and load `forge-steward-prepare-work`. Full bodies and resources were verified with the actual **0.2.0-rc.2** filesystem Provider in isolated project and user roots on macOS. Native Windows Harness, desktop GUI and full work-cycle model behavior remain unverified. Claude/Codex marketplaces are not Harness marketplaces; other discovery roots can shadow the managed copy.
+
+Updates are explicit and follow the local checkout, including intentional rollback. Select a published tag containing this adapter or a reviewed full commit in a separate clean checkout, then run `update` for the installed subset. The installer never downloads source or modifies credentials/configuration. Edited, corrupt, linked or unmanaged content is preserved; no force overwrite is provided. Uninstall checks only the printed target and reports leftovers with exit `2`; inspect other scopes and discovery roots separately, then verify in a fresh session. See the Chinese [DeepSeek installation, fixed-source rollback, recovery and verification guide](docs/deepseek-installer.md) for executable commands and the exact boundaries.
 
 ## Install and use — published v0.2.1
 

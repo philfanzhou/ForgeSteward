@@ -1,6 +1,6 @@
 # 跨 Agent 技能长度与加载兼容
 
-本说明记录 ForgeSteward 支持的 Codex、Claude Code、OpenCode 和 ZCode 及待接入的 DeepSeek Harness 的加载差异，并说明本仓库如何防止修改后再次出现技能截断。仓库级修改要求见 [AGENTS.md](../AGENTS.md#skill-长度与跨-agent-兼容)；可执行预算的唯一数值来源是 [check_skill_limits.py](../scripts/check_skill_limits.py)。长度预算复核日期：2026-09-30。
+本说明记录 ForgeSteward 支持的 Codex、Claude Code、OpenCode 和 ZCode 及 DeepSeek Harness 的文件系统安装适配 的加载差异，并说明本仓库如何防止修改后再次出现技能截断。仓库级修改要求见 [AGENTS.md](../AGENTS.md#skill-长度与跨-agent-兼容)；可执行预算的唯一数值来源是 [check_skill_limits.py](../scripts/check_skill_limits.py)。长度预算复核日期：2026-09-30。
 
 ## 已核对的差异
 
@@ -10,7 +10,7 @@
 | Claude Code，官方技能文档；本机 CLI `2.1.278` | 官方建议 `SKILL.md` 少于 500 行；本次未确认一般本地技能首次加载时的固定字节硬限制 | 压缩后每项保留前 5,000 tokens，总计 25,000 tokens，较旧技能可能不再附加；发现列表也有独立预算 | 将行数建议纳入本仓库维护约束；明确缺失规则时重新读取，不承诺压缩后全部永久保留 |
 | OpenCode，CI 固定 `1.18.30`，提交 `3104c1428ec91f809e5ab86631300de41eb6952e`；本机另有 `2.0.16` | 核对的 V1 CLI Skill 工具加载正文后，经通用工具输出截断器处理；默认 2,000 行 / 50 × 1,024 UTF-8 字节，可由配置改变，计入工具包装内容。V2 加载方式已变化，本轮未核对其模型接收边界 | V1 官方格式要求名称 1–64 字符、描述 1–1,024 字符；V2 文档说明按需加载入口正文，描述用于发现，未声明同一长度上限 | 不把“读出了文件”当作模型必然完整收到；保持入口和引用短小，检测工具截断后补读 |
 | ZCode 桌面 `3.14.0` / 内置 CLI `0.16.9`，官方技能文档及本机加载实现 | 官方称正文超过 100KB 截断；本机实际在去掉 frontmatter **之前**按整个文件 **100,000 字节**限制读取 | 描述超过 1,024 个 JavaScript UTF-16 单元时整项被忽略；发现列表使用描述摘要，另有总预算 | 不能沿用“正文 100 KiB”作为精确边界；使用更保守的共同入口预算，单独校验描述 |
-| DeepSeek Harness，桌面及内置包 `0.2.0-rc.2`，本机加载实现 | 文件系统提供方完整读取并解析技能，正文去掉 frontmatter 后 trim；本轮未发现提供方固定字节截断边界，不据此承诺模型上下文无限 | 发现列表先合并描述空白并 trim，默认最多 500 个 JavaScript UTF-16 单元，超过时取前 497 单元加 `...`；可由 `catalogDescriptionMaxLength` 配置覆盖；不是正文上限或超长描述整项忽略 | 将共用描述维护预算收紧到 500，保留正文预算；加载已验证，安装维护及工作周期端到端支持另由 Issue 跟踪 |
+| DeepSeek Harness，桌面及内置包 `0.2.0-rc.2`，本机加载实现 | 文件系统提供方完整读取并解析技能，正文去掉 frontmatter 后 trim；本轮未发现提供方固定字节截断边界，不据此承诺模型上下文无限 | 发现列表先合并描述空白并 trim，默认最多 500 个 JavaScript UTF-16 单元，超过时取前 497 单元加 `...`；可由 `catalogDescriptionMaxLength` 配置覆盖；不是正文上限或超长描述整项忽略 | 将共用描述维护预算收紧到 500，保留正文预算；加载及受管安装生命周期已验证；工作周期端到端支持另由 Issue 跟踪 |
 
 Claude 的 500 行是编写建议；Codex 和 ZCode 上述数值是核对版本的截断边界；OpenCode 数值是通用工具输出的默认配置。三者不具有相同含义，也不是对所有历史和未来版本的保证。UTF-8 字节数、Unicode 字符数、JavaScript UTF-16 单元和模型 token 数不可互换。
 
@@ -58,7 +58,7 @@ OpenCode 的真实发现测试核对六项加载正文与源文件一致，CI �
 
 2026-09-30，DeepSeek Harness 桌面 `0.2.0-rc.2` 的实际 `FileSystemSkillProvider` 在隔离临时项目中发现六项技能，逐项核对完整正文、`resourceBase` 及全部资源逐字节一致；项目子目录也能发现根技能。旧源码的六项描述长度为 332、394、305、707、321、335 个 UTF-16 单元；本次只有 prepare-work 的描述改变。该版本的目录包加载探针还完整读入 120,003 UTF-8 字节正文及 1,100 单元描述，证明不能把 500 误当作提供方正文读取上限；该探针不证明模型收到超长正文。描述 formatter 的 500/501、emoji 及混合字符边界另经实际安装包源码执行复验，本次六项描述在默认目录中完整展示。仓库 `AGENTS.md` 经真实规则加载器读取，无省略及截断。验证未改用户配置、安装技能或调用模型。
 
-DeepSeek Harness 的受管安装生命周期见 [Issue #40](https://github.com/philfanzhou/ForgeSteward/issues/40)，工作周期模型行为见 [Issue #41](https://github.com/philfanzhou/ForgeSteward/issues/41)。桌面 GUI、真实子 Agent 阶段执行、业务授权与模型压缩恢复均未在本轮完成认证。现有子 Agent 组件与工具配置的静态可用性不等于 `work-cycle` 端到端通过；正式支持仍待对应 Issue 交付。
+DeepSeek Harness 的受管安装生命周期与复验入口见 [安装维护文档](deepseek-installer.md)，对应 [Issue #40](https://github.com/philfanzhou/ForgeSteward/issues/40)。2026-09-30 使用 `0.2.0-rc.2` 的实际提供方在隔离项目和用户作用域复验完整正文、resourceBase、全部资源摘要、候选排名、Git worktree 标记及卸载后重新发现；标准库生命周期回归纳入三 OS CI。未配置真实运行时则明确跳过，不把跳过记为通过；原生 Windows Harness 未验证。工作周期模型行为见 [Issue #41](https://github.com/philfanzhou/ForgeSteward/issues/41)。桌面 GUI、真实子 Agent 阶段执行、业务授权与模型压缩恢复均未在本轮完成认证。现有子 Agent 组件与工具配置的静态可用性不等于 `work-cycle` 端到端通过；正式支持仍待对应 Issue 交付。
 
 Codex 截断路径依据固定源码提交核对，本机 CLI `0.157.1` 的只读提示词渲染确认六项入口均可出现在发现列表；该命令不证明正文注入。Claude Code 依据官方说明核对，本机 `2.1.283` 对六个插件执行 `plugin validate --strict` 均通过；该验证不证明模型实际收到完整正文。本轮不宣称完成 Codex、Claude Code 的模型调用或压缩恢复端到端测试。ZCode 桌面 GUI 市场生命周期仍不在 CLI 验证范围内。
 
