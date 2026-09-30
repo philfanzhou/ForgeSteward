@@ -1,0 +1,381 @@
+{
+  "说明": "本记录只描述隔离本地夹具与真实SDK模型的有限验收，不代表生产平台或GUI。原始轨迹保留在本次临时测试目录，摘要便于核对。",
+  "sourceBaseline": "1bc5fe4498663dc37678b1d709e013ff67838525",
+  "version": "0.2.15",
+  "client": "macOS DeepSeek Harness 0.2.0-rc.2",
+  "provider": "deepseek-account",
+  "model": "deepseek-flash",
+  "scenarios": [
+    {
+      "scenario": "startup",
+      "status": "passed",
+      "children": [
+        {
+          "id": "5dd9899e-a5ad-4546-ada5-4679f4126c32",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        },
+        {
+          "id": "a43c4e88-3082-4555-862e-0836bdb57f8b",
+          "stage": "prepare-work",
+          "stopReason": "completed",
+          "references": [
+            "blockers.md",
+            "queue-and-triage.md",
+            "readiness.md",
+            "handoff.md"
+          ]
+        }
+      ],
+      "prs": {
+        "P0": {
+          "head": "d16250ecdaedd363fa25e6683298f0e22051775c",
+          "round": 0,
+          "reviewed": "d16250ecdaedd363fa25e6683298f0e22051775c",
+          "feedback": null,
+          "merged": true,
+          "deleted": true
+        }
+      },
+      "shutdown": null,
+      "rawSha256": "83313aaf0b8f2d02a78d6200bb3b85a313ff892f61d78ef60fe527628336717e"
+    },
+    {
+      "scenario": "repair",
+      "status": "passed",
+      "children": [
+        {
+          "id": "96483da1-7dad-4c96-b583-95bd4c8e5d46",
+          "stage": "prepare-work",
+          "stopReason": "completed",
+          "references": [
+            "blockers.md",
+            "queue-and-triage.md",
+            "readiness.md",
+            "handoff.md"
+          ]
+        },
+        {
+          "id": "628f5839-891d-4216-9ed7-cb63605dfb31",
+          "stage": "execute-work",
+          "stopReason": "completed",
+          "references": [
+            "implementation.md"
+          ]
+        },
+        {
+          "id": "ed2c5d72-1843-4c4a-8845-ac76b8748637",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        },
+        {
+          "id": "c66a3048-28cd-4df0-a77a-f680ff0c18cd",
+          "stage": "fix-feedback",
+          "stopReason": "completed",
+          "references": [
+            "repair.md"
+          ]
+        },
+        {
+          "id": "e103db1c-ddf6-41b1-ac86-ac5084262043",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        }
+      ],
+      "prs": {
+        "I1": {
+          "head": "08e6d5918fa78dd97bdb9f426da6f7f26f8a4a58",
+          "round": 1,
+          "reviewed": "08e6d5918fa78dd97bdb9f426da6f7f26f8a4a58",
+          "feedback": null,
+          "merged": true,
+          "deleted": true
+        }
+      },
+      "shutdown": null,
+      "rawSha256": "827e3593883486035809387dbfb841c3bae9f2a8f5af91c9a7e239b46633f49c"
+    },
+    {
+      "scenario": "waiting",
+      "status": "passed",
+      "children": [
+        {
+          "id": "5e5095a9-c0d5-43a9-8d22-19e4f62fcefd",
+          "stage": "prepare-work",
+          "stopReason": "completed",
+          "references": [
+            "blockers.md",
+            "queue-and-triage.md",
+            "readiness.md",
+            "handoff.md"
+          ]
+        },
+        {
+          "id": "022b374b-ee28-496c-ae83-51bd527461ed",
+          "stage": "execute-work",
+          "stopReason": "completed",
+          "references": [
+            "implementation.md"
+          ]
+        },
+        {
+          "id": "19232701-f413-49aa-b76d-527a2a186ff4",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        }
+      ],
+      "prs": {
+        "I1": {
+          "head": "f2d0b45bc660a5a4f41fb89a7ba637afa94c6314",
+          "round": 0,
+          "reviewed": "f2d0b45bc660a5a4f41fb89a7ba637afa94c6314",
+          "feedback": null,
+          "merged": false,
+          "deleted": false
+        }
+      },
+      "shutdown": null,
+      "rawSha256": "db74310896256922b8e89ec0af724b3870ca666aa0458e0d11eb2483c9dc0927"
+    },
+    {
+      "scenario": "uncertain",
+      "status": "passed",
+      "children": [
+        {
+          "id": "fa17b67a-9f2b-45f9-a2ad-16ad0475bfb0",
+          "stage": "prepare-work",
+          "stopReason": "completed",
+          "references": [
+            "blockers.md",
+            "queue-and-triage.md",
+            "readiness.md",
+            "handoff.md"
+          ]
+        },
+        {
+          "id": "e3397f25-aecf-42a1-bd26-c6507ad0ee8d",
+          "stage": "execute-work",
+          "stopReason": "completed",
+          "references": [
+            "implementation.md"
+          ]
+        },
+        {
+          "id": "84f9d9e3-5ff1-4290-acd3-97d560baf559",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        }
+      ],
+      "prs": {
+        "I1": {
+          "head": "ce3598f82379004f2386d65334d757f7f22b6f9b",
+          "round": 0,
+          "reviewed": "ce3598f82379004f2386d65334d757f7f22b6f9b",
+          "feedback": null,
+          "merged": true,
+          "deleted": true
+        }
+      },
+      "shutdown": null,
+      "rawSha256": "ff5de2ada0a1d9fa687e430c7275838d82dca2aff657df8907311101b6ed14ed"
+    },
+    {
+      "scenario": "rounds",
+      "status": "passed",
+      "children": [
+        {
+          "id": "eb11d99f-3584-4af0-9337-00661c4fa0a6",
+          "stage": "prepare-work",
+          "stopReason": "completed",
+          "references": [
+            "blockers.md",
+            "queue-and-triage.md",
+            "readiness.md",
+            "handoff.md"
+          ]
+        },
+        {
+          "id": "55aeada5-4681-4547-a0ca-a308a9f0554c",
+          "stage": "execute-work",
+          "stopReason": "completed",
+          "references": [
+            "implementation.md"
+          ]
+        },
+        {
+          "id": "ab987c7b-4900-4a2d-8d27-f70a6fdfb067",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        },
+        {
+          "id": "340792e3-9fa9-46eb-b31c-be001ad995c6",
+          "stage": "fix-feedback",
+          "stopReason": "completed",
+          "references": [
+            "repair.md"
+          ]
+        },
+        {
+          "id": "e37c6277-f833-4273-8b11-2ffee95f7061",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        },
+        {
+          "id": "5a3710bb-4c3d-4ec3-8b37-5f4564eb01ce",
+          "stage": "fix-feedback",
+          "stopReason": "completed",
+          "references": [
+            "repair.md"
+          ]
+        },
+        {
+          "id": "306f9cdc-8c01-4a8e-888f-a40f97c10132",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        },
+        {
+          "id": "e61862bc-80b9-4954-ab00-0e95d540c36f",
+          "stage": "fix-feedback",
+          "stopReason": "completed",
+          "references": [
+            "repair.md"
+          ]
+        },
+        {
+          "id": "f555650c-7a3c-4627-b764-98e46da8d56b",
+          "stage": "review-and-merge",
+          "stopReason": "completed",
+          "references": [
+            "post-merge.md",
+            "review.md"
+          ]
+        }
+      ],
+      "prs": {
+        "I1": {
+          "head": "8d33b3a0fbdcc5d9ab98f1a0e57a915c53caab7e",
+          "round": 3,
+          "reviewed": "8d33b3a0fbdcc5d9ab98f1a0e57a915c53caab7e",
+          "feedback": "required",
+          "merged": false,
+          "deleted": false
+        },
+        "I2": {
+          "head": "7c64be21de46b105930fd544dedd29833126f534",
+          "round": 0,
+          "reviewed": "7c64be21de46b105930fd544dedd29833126f534",
+          "feedback": null,
+          "merged": true,
+          "deleted": true
+        }
+      },
+      "shutdown": null,
+      "rawSha256": "12c3ff0d8627a62ce4371c742b4abc8d8789f89da6e375af4cd2a02e2623a25b"
+    },
+    {
+      "scenario": "missing",
+      "status": "passed",
+      "children": [],
+      "prs": {},
+      "shutdown": null,
+      "rawSha256": "4dd88e1ebdd1efe1028e9d4ec12aa97ebdfc20ca4d9773737faed7e802dd8546"
+    },
+    {
+      "scenario": "stop",
+      "status": "passed",
+      "children": [
+        {
+          "id": "c3eea514-feb1-42ae-9bd4-ada247f84e59",
+          "stopped": true,
+          "terminal": "unknown"
+        }
+      ],
+      "prs": {},
+      "shutdown": {
+        "acknowledged": true,
+        "exit_code": 0,
+        "owned_processes_gone": true,
+        "platform_unchanged": true
+      },
+      "rawSha256": "b567112ec512c99cf7330ade5de7e28a97a43b5d15cc0c79159effd4d420d049"
+    }
+  ],
+  "constraints": {
+    "status": "failed",
+    "原因": "360 秒 deadline 内没有 parent turn/end；两个 child completed、用户约束已传递、平台只含 handoff。保持父周期未完成，不重试。",
+    "children": [
+      {
+        "id": "a0518107-4920-41c7-be5c-cbd5c1db5f46",
+        "stopReason": "completed"
+      },
+      {
+        "id": "b3181b3c-fc68-42aa-829e-ff363f92547f",
+        "stopReason": "completed"
+      }
+    ],
+    "operations": [
+      {
+        "key": "seed:None:0",
+        "operation": "seed",
+        "target": null,
+        "head": null
+      },
+      {
+        "key": "handoff:review-and-merge:1",
+        "operation": "handoff",
+        "target": "review-and-merge",
+        "head": null
+      },
+      {
+        "key": "handoff:prepare-work:2",
+        "operation": "handoff",
+        "target": "prepare-work",
+        "head": null
+      }
+    ],
+    "rawSha256": "0353c8829963e2a609faf43517ea76695ed32d29cc2af69a58d562e9b092d595"
+  },
+  "developmentFailures": [
+    {
+      "scenario": "constraints-old-fixture",
+      "原因": "parent preflight 直接调用 prepare，原夹具prepare漏只读保护；严格观察器拒绝父代阶段。保护已修复。",
+      "rawSha256": "2a1fde8b187254239d7c1e76ed8564ad2e00506558accbe12dcbba338a9d1b27"
+    },
+    {
+      "scenario": "rounds-observer",
+      "原因": "原观察器错误要求只能加载一次skill；额外只读work-cycle上下文合法，同一原始轨迹按actor/资源/终态门禁重新核对通过。"
+    }
+  ]
+}

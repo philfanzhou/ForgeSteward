@@ -92,4 +92,8 @@ python3 -m unittest discover -s tests -p test_deepseek_installer.py -v
 
 未配置 `FORGESTEWARD_DEEPSEEK` 明确 skip，配置但缺包、缺 Node 或不兼容则失败。探针仅导入显式运行时，以隔离项目、用户、agents、custom、bundled 根调用真实 Provider，不输出其他用户技能、不调用模型。逐项比较全部完整正文、resourceBase 和资源摘要，检查 `.git` 文件子目录、home 矩阵和候选排名；项目 CLI 卸载后同提供方仍发现用户副本，再卸载用户后重发现为空。
 
-本机 macOS 的 `0.2.0-rc.2` 实际包已通过上述验证；原生 Windows Harness、桌面 GUI、模型行为及完整 work-cycle 未验证。CI 不获取 Harness，只明确跳过真实测试；OpenCode 真实发现 CI 继续固定 `1.18.30` Linux。长度检查通过不证明模型永远完整收到全部规则，详见 [跨 Agent 兼容边界](skill-compatibility.md)。
+本机 macOS 的 `0.2.0-rc.2` 实际包已通过上述验证；原生 Windows Harness、桌面 GUI 未验证；模型与工作周期的有限验收及剩余边界另见 [委派验收记录](deepseek-work-cycle.md)。CI 不获取 Harness，只明确跳过真实测试；OpenCode 真实发现 CI 继续固定 `1.18.30` Linux。长度检查通过不证明模型永远完整收到全部规则，详见 [跨 Agent 兼容边界](skill-compatibility.md)。
+
+## 工作周期行为验收
+
+正式安装与发现通过后，委派、等待、停止及隔离平台门禁的有限验收见 [DeepSeek 工作周期验证](deepseek-work-cycle.md)。Provider 发现不代表模型已经执行完整工作周期；原生工具替身、真实模型和未验证的 GUI 边界分别记录。
