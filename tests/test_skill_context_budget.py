@@ -62,14 +62,21 @@ class SkillContextBudgetTests(unittest.TestCase):
         self.assertTrue(any("500 lines > 499" in error for error in self.errors()))
 
     def test_description_counts_javascript_utf16_units(self):
-        for valid, invalid in (("a" * 1024, "a" * 1025), ("中" * 1024, "中" * 1025),
-                               ("😀" * 512, "😀" * 513)):
+        for valid, invalid in (("a" * 500, "a" * 501), ("中" * 500, "中" * 501),
+                               ("😀" * 250, "😀" * 251), ("😀" * 250, "😀" * 250 + "a")):
             with self.subTest(character=valid[0]):
                 self.write_skill(description=valid)
                 self.assertEqual(self.errors(), [])
                 self.write_skill(description=invalid)
                 self.assertTrue(any("description" in error and "UTF-16 units >" in error
                                     for error in self.errors()))
+
+    def test_cli_rejects_description_beyond_catalog_budget(self):
+        self.write_skill(description="中" * 501)
+        result = subprocess.run([sys.executable, str(SCRIPT), "--repo", str(self.repo), "--check"],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("description 501 UTF-16 units > 500", result.stderr)
 
     def test_unsupported_frontmatter_cannot_hide_long_description(self):
         for description in ("", ">\n  long text", "|\n  long text", '"quoted"',
@@ -130,6 +137,13 @@ class SkillContextBudgetTests(unittest.TestCase):
         other.parent.mkdir(parents=True)
         other.write_text("---\nname: future\ndescription: Future skill\n---\n" + "x" * 6_000)
         self.assertTrue(any(str(other) in error for error in self.errors()))
+
+    def test_future_plugin_cannot_bypass_description_budget(self):
+        other = self.repo / "plugins/future/skills/future/SKILL.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("---\nname: future\ndescription: " + "a" * 501 + "\n---\nRules\n")
+        self.assertTrue(any(str(other) in error and "description 501 UTF-16 units > 500" in error
+                            for error in self.errors()))
 
     def test_empty_repository_and_invalid_utf8_fail(self):
         self.entry.unlink()
