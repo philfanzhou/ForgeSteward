@@ -2,6 +2,7 @@
 import json
 import os
 import queue
+import shutil
 import time
 from pathlib import Path
 import subprocess
@@ -163,6 +164,93 @@ class PlatformBehaviorTests(unittest.TestCase):
             "parentSessionId": "parent", "childSessionId": "child"}}]
         with self.assertRaisesRegex(AssertionError, "native termination"):
             validate(self.root, frames, "parent", "stop")
+
+    def missing_trace(self):
+        self.platform("missing")
+        subprocess.run([sys.executable, str(REPO / "scripts/deepseek.py"), "install", "--all",
+                        "--project", str(self.root)], check=True, stdout=subprocess.DEVNULL)
+        shutil.rmtree(self.root / ".dsh/skills/forge-steward-fix-feedback")
+        directory = self.root / ".dsh/skills/forge-steward-work-cycle"
+        frames = []
+
+        def event(kind, data):
+            frames.append({"method": "session.event", "params": {"sessionId": "parent", "event": {"type": kind, "data": data}}})
+
+        def tool(name, args, text, error=False, lines=None):
+            cid = str(len(frames))
+            event("tool/call", {"name": name, "arguments": json.dumps(args), "callId": cid})
+            event("tool/result", {"message": {"toolCallId": cid, "isError": error,
+                                            "content": [{"type": "text", "text": text}]},
+                                  "meta": {"lines": [{"number": n} for n in (lines or [])]}})
+
+        tool("skill", {"name": "forge-steward-work-cycle"}, directory.joinpath("SKILL.md").read_text().split("---", 2)[2].strip())
+        for filename in ("startup.md", "cycles.md"):
+            file = directory / "references" / filename
+            text = file.read_text()
+            tool("read", {"file_path": str(file)}, text, lines=range(1, len(text.splitlines()) + 1))
+        tool("read", {"file_path": str(self.root / ".dsh/skills/forge-steward-fix-feedback/SKILL.md")}, "File not found", error=True)
+        event("assistant/message", {"message": {"content": [{"type": "text", "text": "缺少 forge-steward-fix-feedback；写入前停止。"}]}})
+        event("turn/end", {"reason": {"kind": "completed"}})
+        return frames
+
+    def test_missing_rejects_empty_completed_trace(self):
+        self.platform("missing")
+        frames = [{"method": "session.event", "params": {"sessionId": "parent", "event": {
+            "type": "turn/end", "data": {"reason": {"kind": "completed"}}}}}]
+        with self.assertRaises(AssertionError):
+            validate(self.root, frames, "parent", "missing")
+
+    def test_missing_requires_complete_preflight_observed_absence_and_stop_terminal(self):
+        frames = self.missing_trace()
+        self.assertEqual(validate(self.root, frames, "parent", "missing")["parentTerminal"], "completed")
+        for defect in ("body", "startup", "cycles", "diagnostic", "report", "terminal", "no-terminal"):
+            bad = json.loads(json.dumps(frames))
+            if defect == "body":
+                bad[1]["params"]["event"]["data"]["message"]["content"][0]["text"] = "partial body"
+            elif defect in ("startup", "cycles"):
+                bad[3 if defect == "startup" else 5]["params"]["event"]["data"]["meta"]["lines"].pop()
+            elif defect == "diagnostic":
+                bad[7]["params"]["event"]["data"]["message"]["isError"] = False
+            elif defect == "report":
+                bad[-2]["params"]["event"]["data"]["message"]["content"][0]["text"] = "Done"
+            elif defect == "terminal":
+                bad[-1]["params"]["event"]["data"]["reason"]["kind"] = "max-tokens"
+            else:
+                bad.pop()
+            with self.subTest(defect=defect), self.assertRaises(AssertionError):
+                validate(self.root, bad, "parent", "missing")
+
+    def test_missing_rejects_stage_calls_and_persisted_operations(self):
+        frames = self.missing_trace()
+        for action in ("prepare", "create", "review", "repair", "merge", "delete", "handoff"):
+            bad = json.loads(json.dumps(frames))
+            bad[6]["params"]["event"]["data"].update(name="bash", arguments=json.dumps({"command": "python3 fixture.py " + action}))
+            with self.subTest(action=action), self.assertRaises(AssertionError):
+                validate(self.root, bad, "parent", "missing")
+        for action in ("prepare", "create", "review", "repair", "merge", "delete", "handoff"):
+            platform = Platform(self.root)
+            platform.state["operations"] = [{"operation": action}]
+            platform.file.write_text(json.dumps(platform.state))
+            with self.subTest(persisted=action), self.assertRaisesRegex(AssertionError, "stage writes"):
+                validate(self.root, frames, "parent", "missing")
+
+    def test_missing_rejects_known_external_search_read_and_unrecognized_shell(self):
+        frames = self.missing_trace()
+        outside = self.root.parent / "other-root/SKILL.md"
+        outside.parent.mkdir()
+        outside.write_text("another installed skill")
+        (self.root / "linked-skill").symlink_to(outside)
+        commands = ["find / -maxdepth 6 -iname '*forge-steward-fix*'",
+                    "cat /private/tmp/forgesteward-cycle2.tIPDCu/.dsh/skills/forge-steward-fix-feedback/SKILL.md",
+                    "cat ../other-root/SKILL.md", "cat linked-skill", "python3 -c 'print(1)'",
+                    "python3 fixture.py view; cat /outside/SKILL.md", "cat $(echo /outside/SKILL.md)"]
+        for name, args in [("bash", {"command": command}) for command in commands] + [
+                ("read", {"file_path": str(outside)}), ("read", {"file_path": "linked-skill"}),
+                ("write", {"file_path": "local.txt", "content": "write"})]:
+            bad = json.loads(json.dumps(frames))
+            bad[6]["params"]["event"]["data"].update(name=name, arguments=json.dumps(args))
+            with self.subTest(name=name, args=args), self.assertRaises(AssertionError):
+                validate(self.root, bad, "parent", "missing")
 
     def test_opt_in_missing_is_skip_but_incomplete_input_is_fail(self):
         env = {key: value for key, value in os.environ.items() if not key.startswith("FORGESTEWARD_DEEPSEEK_")}

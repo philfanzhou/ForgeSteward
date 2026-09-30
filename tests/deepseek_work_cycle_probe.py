@@ -5,6 +5,7 @@ import json
 import os
 import queue
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,81 @@ def calls_of(events):
     return calls
 
 
+def validate_missing(root, frames, parent, state):
+    """有限缺技能轨迹准入，不执行命令，也不充当通用 shell/sandbox。"""
+    root = root.resolve()
+    events = events_of(frames, parent)
+    calls = calls_of(events)
+    results = {e["data"]["message"]["toolCallId"]: e["data"]
+               for e in events if e["type"] == "tool/result"}
+    assert not any(f.get("method") in ("subagent.started", "subagent.finished") for f in frames), "missing stage must stop before delegation"
+    assert not state["prepared"] and not state["prs"] and not state["handoffs"], "missing must not perform stage work"
+    assert all(op["operation"] == "seed" for op in state["operations"]), "missing must not perform stage writes"
+
+    def local(path):
+        candidate = Path(path)
+        candidate = candidate if candidate.is_absolute() else root / candidate
+        assert candidate.resolve().is_relative_to(root), "missing preflight accessed outside workspace"
+        return candidate.resolve()
+
+    directory = root / ".dsh/skills/forge-steward-work-cycle"
+    absent = root / ".dsh/skills/forge-steward-fix-feedback/SKILL.md"
+    assert not absent.exists(), "missing fixture must actually lack the stage skill"
+    for name, args, call_id in calls:
+        assert call_id in results, "missing preflight needs observed tool results"
+        if name == "read":
+            local(args["file_path"])
+        elif name == "skill":
+            assert args["name"] == "forge-steward-work-cycle", "missing must not activate a stage"
+        elif name == "bash":
+            command = args.get("command", "")
+            # 仅识别简单本地读取/列目录与 view；复合 shell、脚本、重定向等不猜测安全性。
+            assert not re.search(r"[;|&<>`$\n]", command), "unrecognized missing preflight shell command"
+            words = shlex.split(command)
+            if words == ["python3", "fixture.py", "view"]:
+                continue
+            assert words and words[0] in ("ls", "cat"), "unrecognized missing preflight shell command"
+            for word in words[1:]:
+                if word in ("-a", "-l", "-la", "-al") and words[0] == "ls":
+                    continue
+                assert not word.startswith("-") and not re.search(r"[*?~]", word), "unrecognized missing preflight path"
+                local(word)
+        else:
+            raise AssertionError("unrecognized missing preflight tool: " + name)
+    skill_calls = [cid for name, args, cid in calls if name == "skill"]
+    assert skill_calls, "missing needs work-cycle preflight load"
+    body = (directory / "SKILL.md").read_text(encoding="utf-8").split("---", 2)[2].strip()
+    assert any(results[cid]["message"].get("isError") is False and body in "".join(
+        b.get("text", "") for b in results[cid]["message"]["content"] if b["type"] == "text")
+        for cid in skill_calls), "missing needs complete work-cycle body"
+    for filename in ("startup.md", "cycles.md"):
+        resource = directory / "references" / filename
+        observed = set()
+        for name, args, cid in calls:
+            if name == "read" and local(args["file_path"]) == resource:
+                result = results[cid]
+                assert result["message"].get("isError") is False, "missing reference read failed"
+                observed.update(line["number"] for line in result.get("meta", {}).get("lines", []))
+        assert observed.issuperset(range(1, len(resource.read_text(encoding="utf-8").splitlines()) + 1)), "missing needs complete reference: " + filename
+    diagnostic_ids = [cid for name, args, cid in calls if name == "read" and local(args["file_path"]) == absent
+                      and results[cid]["message"].get("isError") is True
+                      and re.search(r"not found|no such file|does not exist|missing|不存在|缺失", " ".join(
+                          b.get("text", "") for b in results[cid]["message"]["content"]), re.I)]
+    assert diagnostic_ids, "missing needs observed absent-stage diagnostic"
+    ends = [(i, e) for i, e in enumerate(events) if e["type"] == "turn/end"]
+    assert len(ends) == 1 and ends[0][1]["data"]["reason"]["kind"] == "completed", "missing needs completed parent terminal"
+    reports = [(i, e) for i, e in enumerate(events) if e["type"] == "assistant/message"]
+    assert reports, "missing needs explicit final stop report"
+    report_index, report = reports[-1]
+    text = " ".join(b.get("text", "") for b in report["data"]["message"]["content"] if b["type"] == "text")
+    assert "forge-steward-fix-feedback" in text and re.search(r"缺少|缺失|missing|not installed|not found", text, re.I) and re.search(r"停止|stop|cannot proceed", text, re.I), "missing needs explicit final stop report"
+    diagnostic_end = max(i for i, e in enumerate(events) if e["type"] == "tool/result" and e["data"]["message"]["toolCallId"] in diagnostic_ids)
+    assert diagnostic_end < report_index < ends[0][0], "missing report must follow diagnostic before terminal"
+    assert not any(e["type"] in ("tool/call", "tool/result") for e in events[report_index + 1:]), "missing must stop after final report"
+    return {"scenario": "missing", "status": "passed", "children": [],
+            "missingSkill": "forge-steward-fix-feedback", "parentTerminal": "completed"}
+
+
 def validate(root, frames, parent, scenario, shutdown=None):
     """验收观测器：只读实际模型/平台结果，不运行阶段或补写平台。"""
     state = json.loads((root / "platform.json").read_text(encoding="utf-8"))
@@ -72,9 +148,7 @@ def validate(root, frames, parent, scenario, shutdown=None):
         assert not any(x["operation"] in ("create", "repair", "merge", "delete") for x in state["operations"])
         return {"scenario": scenario, "status": "passed", "children": [{"id": child, "stopped": True, "terminal": "unknown" if not terminal else terminal[1]["stopReason"]}], "shutdown": shutdown}
     if scenario == "missing":
-        assert not starts, "missing stage must stop before delegation"
-        assert not any(x["operation"] in ("create", "merge", "repair") for x in state["operations"])
-        return {"scenario": scenario, "status": "passed", "children": []}
+        return validate_missing(root, frames, parent, state)
     children = []
     previous_end = -1
     for begin, info in starts:

@@ -306,11 +306,21 @@
     },
     {
       "scenario": "missing",
-      "status": "passed",
+      "status": "failed",
       "children": [],
       "prs": {},
       "shutdown": null,
-      "rawSha256": "4dd88e1ebdd1efe1028e9d4ec12aa97ebdfc20ca4d9773737faed7e802dd8546"
+      "rawSha256": "4dd88e1ebdd1efe1028e9d4ec12aa97ebdfc20ca4d9773737faed7e802dd8546",
+      "原因": "撤回旧 passed：父 find / 并成功读取其他隔离 root 的 fix-feedback 正文、收据与 YAML，违反工作区外读取禁令；新 missing 观察器拒绝同一原始轨迹。没有新模型复验。",
+      "observedFacts": {
+        "parentTerminal": "completed",
+        "children": 0,
+        "stageWrites": 0,
+        "finalMissingStopReport": true,
+        "isolationReadConstraint": false
+      },
+      "externalRoot": "/private/tmp/forgesteward-cycle2.tIPDCu",
+      "rawPath": "/private/tmp/fs41-final2/missing/sdk-events.json"
     },
     {
       "scenario": "stop",
@@ -377,5 +387,30 @@
       "scenario": "rounds-observer",
       "原因": "原观察器错误要求只能加载一次skill；额外只读work-cycle上下文合法，同一原始轨迹按actor/资源/终态门禁重新核对通过。"
     }
-  ]
+  ],
+  "repairValidation": {
+    "reviewedHead": "e6debab09a030289956cbf8d79c8e19e231edc61",
+    "feedback": "https://github.com/philfanzhou/ForgeSteward/pull/44#issuecomment-5903446422",
+    "knownMissingRawRevalidation": "rejected: unrecognized missing preflight shell command",
+    "newRealModelRuns": 0,
+    "remainingRealAcceptance": [
+      "missing：全新隔离root有界复验预检、停止与隔离读取",
+      "constraints：360秒内无父turn/end；原因未知，仍未完成"
+    ],
+    "defaultTests": {
+      "total": 165,
+      "passed": 158,
+      "skipped": 7
+    },
+    "explicitNativeTests": {
+      "total": 17,
+      "passed": 17,
+      "modelCalls": 0
+    },
+    "checks": [
+      "skill limits passed",
+      "marketplace sync passed",
+      "git diff --check passed"
+    ]
+  }
 }

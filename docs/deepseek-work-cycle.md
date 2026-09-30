@@ -42,10 +42,12 @@ python3 tests/deepseek_work_cycle_probe.py \
 | waiting | 审批未满足：保留未合并，不伪造 repair |
 | uncertain | create 已持久化但回包失败：回查保持单次 create，不重新创建 |
 | rounds | I1 三次修复后终审仍 required，保留暂停；I2 独立完成；无第四次修复 |
-| missing | 删除一个阶段技能后，在阶段写入与派发前停止 |
+| missing | 删除 fix-feedback 后，父完整加载 work-cycle/startup/cycles、直接读取缺失资源得到诊断，最终明确报告停止且 completed；零阶段操作/派发并遵守隔离读取约束 |
 | stop | 首个 child 开始即 SDK shutdown；观察器保存部分状态，核对平台未变及本次进程树已退出，不启动后继，不把 child 当 completed |
 
 停止场景的特殊边界：此版本 SDK 在 root disposal 中先解除通知订阅，可能没有发出 child finished。观察器保留 child 终态 `unknown`，结合本次 shutdown 回包、原生 spawn 的进程内实现、CLI 及其已观察后裔退出、平台前后状态不变证明这次停止没有继续写入。它没有制造一个 `aborted/completed` 通知，也不宣称真实 child 业务成功。其他失败/超时场景同样保留未完成状态，原生工具探针分别验证明确 aborted/error/max-tokens 的失败映射。
+
+missing 观察器只接受有限预检轨迹：本地 `read`、work-cycle `skill`、简单本地 `ls/cat` 或精确 `python3 fixture.py view`。路径按实际 root 解析，拒绝工作区外、相对逃逸和指向外部的符号链接；复合 shell、脚本、未知工具或阶段操作明确失败，不能根据最终文本推定它们安全。正常通过仍须完整资源、直接缺失读取诊断、诊断后的最终停止报告与父 completed，单独的空 completed 不足。此规则是测试验收准入，既不阻止命令运行，也不是生产运行时或任意恶意模型的通用沙箱保证。
 
 默认回归进入现有三 OS CI，不向 CI 提供账号或模型 route。原生包与真实模型输入未配置的 skip 需与默认通过分列。原生 Windows、GUI 操作、任意其他客户端版本/配置、任意模型永远守约及生产平台均未保证；本次没有调整用户真实安装、发布 Tag/Release、迁移公开数据或部署服务。
 
@@ -55,17 +57,22 @@ python3 tests/deepseek_work_cycle_probe.py \
 
 | 证据 | 实际结果 |
 | --- | --- |
-| 默认标准库回归 | 共 161 项，154 通过、7 项未配置客户端/包等条件的显式 skip；新增显式原生 13 项全部通过 |
+| 默认标准库回归 | 首次实施 161 项，154 通过、7 skip；本次修复新增 4 项无模型 missing 准入反例（含多个子例），修复后结果见下文 |
 | 显式原生工具 probe | 前台等待/dispose、六种 stop reason、背景回执、取消、不重派和缺失能力断言通过 |
 | 真实模型 startup | 两个独立 child；平台合并与清理、prepare `[]`、完整资源、串行及依赖前独立回查通过 |
 | 真实模型 repair | 5 child，完整清单→执行→必修→原分支修复→新审查、本地合并/清理及父独立回查通过 |
 | 真实模型 waiting/uncertain | 各 3 child；审批等待无 merge；未知写回先回查，仅 1 次 create；通过 |
 | 真实模型 rounds | 9 child；I1 恰 3 次修复后终审暂停，I2 独立合并/清理；同一原始日志按正确 actor 门禁复验通过 |
-| 真实模型 missing/stop | 缺技能 0 child、无阶段写；停止场景仅 1 个未知终态 child，shutdown 确认、本次进程树退出、平台未变且无后继；通过上述有限停止断言 |
+| 真实模型 missing | **未通过，撤回旧 passed 分类**：0 child、无阶段写及最终报告缺技能/停止是有限事实；父实际 `find / -maxdepth 6 ...`，随后成功读取 `/private/tmp/forgesteward-cycle2.tIPDCu` 的 fix-feedback 正文、收据及 YAML，违反工作区外读取禁令。新观察器重验同一原始 SHA 轨迹明确拒绝，未重跑模型，不主张完整 missing 通过 |
+| 真实模型 stop | 仅 1 个未知终态 child，shutdown 确认、本次进程树退出、平台未变且无后继；通过有限停止断言，未计业务完成 |
 | 真实模型 constraints | **未通过**：唯一一次修复夹具后复验中，两 child completed、约束均传递且平台无越界写，但 360 秒内未收到父 turn/end；保留父周期未完成，关闭本次 SDK，不重派 |
 
 开发失败已保留：首个 prompt 的 `content` 字段被原生协议拒绝（正确字段为 `contentBlocks`），其后固定 session id 与持久会话冲突，均在模型写入前失败；修复入口后用 UUID 和新 root。早期 repair 轨迹在 review→repair 间省略父模型独立回查，强化观察器后判失败，未降低门禁。一次只读父会话在 4096 输出上限处 max-tokens，无 child 或平台写入；保留失败并在正常 SDK 输出预算下重新验收，不映射为 completed。
 
 只读场景的早期失败进一步确认父 preflight 直接调用 `fixture.py prepare`，而夹具原 prepare 分支绕过 mutate 保护；已在适配夹具补上同一保护并增加回归。修复后只进行一次全新隔离复验，没有延长 deadline 或继续尝试让模型通过。最新失败不是旧的 prepare 越界，而是最终父模型输出没有在 360 秒内终态；原因尚未确定，不能推定是认证、审批或模型服务故障。
 
-交付状态：新增测试/入口/记录可审查，但 #41 整体仍未完成。Draft Change Request 不关闭原 Issue，不符合完整验收的合并门禁。恢复条件是有界真实只读场景达到完整父终态，并重新核对约束、child 资源/终态、平台现状及交接；恢复前先读本次失败轨迹，不复用失败工作区重发同一写入。共享技能与实际用户安装均没有修改。
+本次修复对应 [#44 首次必修反馈](https://github.com/philfanzhou/ForgeSteward/pull/44#issuecomment-5903446422)：旧观察器在 missing 提前返回，连未加载技能/无诊断的空 completed 都判通过；已要求完整预检和终态，并增加空轨迹、部分引用/正文、无诊断/停止报告、非 completed/缺终态、阶段操作、外部读取/扫描、相对逃逸和符号链接反例。旧 missing 原始 SHA `4dd88e1ebdd1efe1028e9d4ec12aa97ebdfc20ca4d9773737faed7e802dd8546` 保留，摘要改为 failed；没有发现密钥读取或生产写入，不扩大为未经证实的生产缺陷。
+
+修复后验证：默认标准库共 165 项，158 通过、7 条件 skip；精确 `FORGESTEWARD_DEEPSEEK=/tmp/forgesteward-prepare.wYz4WN/harness/dsh` 的本切片 17 项全部通过（含真实原生工具、受控 provider，无付费模型）。技能预算、市场版本同步及 diff 检查通过。仅确定性验收资产/分类修复，没有新增真实模型运行，不能把合成有效轨迹通过当成真实 missing 已验收。
+
+交付状态：新增测试/入口/记录可审查，但 #41 整体仍未完成。Draft Change Request 不关闭原 Issue，不符合完整验收的合并门禁。恢复条件分别为：全新隔离 root 的有界 missing 验收证明预检、停止和隔离读取全部满足；有界真实只读场景达到完整父终态，并重新核对约束、child 资源/终态、平台现状及交接。恢复前先读失败轨迹，不复用失败工作区重发同一写入。两个确定性反馈的修复不解除这些真实运行门禁。共享技能与实际用户安装均没有修改。
