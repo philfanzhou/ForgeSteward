@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "Check branch cleanup settings and remove workflow rules that duplicate the ForgeSteward skills, then submit any deletion as a PR or MR without merging.",
   "author": {
     "name": "philfanzhou",

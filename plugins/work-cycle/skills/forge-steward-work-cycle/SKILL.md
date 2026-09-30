@@ -7,7 +7,7 @@ description: Review the existing open change requests, then run a bounded number
 
 ## 规则加载
 
-开始前完整读取 [启动与低频检查](references/startup.md) 和 [轮次、交接与终止](references/cycles.md)。这些文件是本技能必需规则，路径以本 `SKILL.md` 所在目录为基准。读取结果截断时分段补读到末尾；文件缺失或不可读时说明路径并停止受影响操作。上下文压缩后重新读取缺失的当前阶段规则。
+开始前完整读取 [启动与低频检查](references/startup.md)、[子 Agent 生命周期与恢复](references/agents.md) 和 [轮次、交接与终止](references/cycles.md)。这些文件是本技能必需规则，路径以本 `SKILL.md` 所在目录为基准。读取结果截断时分段补读到末尾；文件缺失或不可读时说明路径并停止受影响操作。上下文压缩后重新读取缺失的当前阶段规则。
 
 各阶段子 Agent 必须从自己实际安装的技能目录完整读取对应 `SKILL.md` 及该入口要求的引用文件；本编排技能不复制或替代五个技能的业务规则。
 
@@ -21,7 +21,7 @@ description: Review the existing open change requests, then run a bounded number
 
 编排 Agent 只负责预检、低频检查判定、派发、等待、核对交接和最终汇总。每次实际调用 `check-workflow`、`prepare-work`、`execute-work`、`review-and-merge`、`fix-feedback`，**必须**创建负责该阶段的子 Agent，让该子 Agent 加载并执行对应技能；不能由编排 Agent 在自身上下文代做，也不能只让子 Agent 提供建议后由编排 Agent 代做。后续再审查同样创建新的审查子 Agent。阶段完成后等待其结果，保存简短、可追溯的交接，再启动依赖它的阶段；同一仓库的写入阶段不并行。
 
-启动前确认运行环境提供创建和等待子 Agent 的能力，并确认五个阶段技能均可由子 Agent 读取，且与本插件使用相同的统一版本。能力或技能缺失时记录具体缺口并停止，不悄悄退化为单 Agent 执行。不同 Agent 的子 Agent API 属于各自适配层，本技能不指定某个平台命令。子 Agent 只继承本次显式调用的范围和仓库授权，执行自身技能的完整门禁。
+启动前确认运行环境提供创建和等待子 Agent 的能力，并确认五个阶段技能均可由子 Agent 读取，且与本插件使用相同的统一版本。确认能力或技能缺失时记录具体缺口并停止，不悄悄退化为单 Agent 执行。额度较低、接近限制的提醒不构成能力缺失；实际调用失败先按 [生命周期与恢复规则](references/agents.md) 核对状态并有限恢复，不因一次失败直接结束。不同 Agent 的子 Agent API 属于各自适配层，本技能不指定某个平台命令。子 Agent 只继承本次显式调用的范围和仓库授权，执行自身技能的完整门禁。
 
 ## 总体顺序
 
