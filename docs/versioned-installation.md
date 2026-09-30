@@ -125,7 +125,7 @@ OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本�
 
 ## DeepSeek Harness
 
-从未发布 `0.2.15` 源码目标提供文件系统安装适配。使用包含 `scripts/deepseek.py` 的独立干净 checkout，以已发布 Tag 或完整审阅 commit 固定源码，再显式 update 已安装子集；旧 `v0.2.1` 不含该入口。版本降级、收据与冲突恢复、DSH_HOME/项目 Git 根及卸载边界见 [DeepSeek 安装维护](deepseek-installer.md#显式更新固定源码及回退)。客户端升级不会更新技能；不同作用域和兼容根需分别检查。
+从 `v0.2.15` 起提供文件系统安装适配。使用包含 `scripts/deepseek.py` 的独立干净 checkout，以已发布 Tag 或完整审阅 commit 固定源码，再显式 update 已安装子集；旧 `v0.2.1` 不含该入口。版本降级、收据与冲突恢复、DSH_HOME/项目 Git 根及卸载边界见 [DeepSeek 安装维护](deepseek-installer.md#显式更新固定源码及回退)。客户端升级不会更新技能；不同作用域和兼容根需分别检查。
 
 ## ZCode
 

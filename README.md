@@ -21,7 +21,7 @@ ZCode's picker is not guaranteed to display Codex's `<Task> - ForgeSteward` labe
 
 ## Install and use — DeepSeek Harness development preview
 
-Current source provides a managed filesystem installer for DeepSeek Harness, starting with the unpublished **0.2.15** target. Use a reviewed checkout containing `scripts/deepseek.py`; older published snapshots such as v0.2.1 do not contain this adapter. Obtain the source once:
+ForgeSteward provides a managed filesystem installer for DeepSeek Harness, starting with the published **v0.2.15** release. Use a reviewed checkout containing `scripts/deepseek.py`; older published snapshots such as v0.2.1 do not contain this adapter. Obtain the source once:
 
 ```bash
 mkdir -p "$HOME/code"
