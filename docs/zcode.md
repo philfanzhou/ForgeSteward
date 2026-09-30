@@ -2,7 +2,7 @@
 
 ## 状态与方案
 
-ZCode 支持从 `v0.2.3` 起交付。当前 `0.2.14` 源码包含六个独立插件和每项唯一的技能正文，不增设 `.zcode-plugin`、第二个市场、安装器或另一份工作流。ZCode 直接使用现有 `.claude-plugin/plugin.json` 与 `.claude-plugin/marketplace.json`；所有 `source` 仍指向同一快照的 `./plugins/<插件名>`。旧 Tag 不补写这些变化。
+ZCode 支持从 `v0.2.3` 起交付。当前 `0.2.15` 源码包含六个独立插件和每项唯一的技能正文，不增设 `.zcode-plugin`、第二个市场、安装器或另一份工作流。ZCode 直接使用现有 `.claude-plugin/plugin.json` 与 `.claude-plugin/marketplace.json`；所有 `source` 仍指向同一快照的 `./plugins/<插件名>`。旧 Tag 不补写这些变化。
 
 2026-09-27 本机 ZCode 桌面为 `3.14.3`，内置 CLI 独立编号为 `0.16.9`。应用更新和 ForgeSteward 技能更新是两件事，不通过改本仓库版本来更新 ZCode。
 
