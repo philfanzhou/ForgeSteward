@@ -2,7 +2,7 @@
 
 ## 范围及来源
 
-从未发布源码目标 `0.2.15` 起提供 `scripts/deepseek.py`，适配 DeepSeek Harness 的原生文件系统技能发现。Python 3.9+ 标准库即可运行，无需 npm 插件、运行中的 Harness 或模型密钥。六项技能保留原始目录、正文、引用与脚本；`--all` 自动读取当前 catalog，不固定未来数量。Claude/Codex 的 marketplace 不是 Harness 原生市场。
+从 `v0.2.15` 起提供 `scripts/deepseek.py`，适配 DeepSeek Harness 的原生文件系统技能发现。Python 3.9+ 标准库即可运行，无需 npm 插件、运行中的 Harness 或模型密钥。六项技能保留原始目录、正文、引用与脚本；`--all` 自动读取当前 catalog，不固定未来数量。Claude/Codex 的 marketplace 不是 Harness 原生市场。
 
 共享生命周期实现位于 `scripts/skill_installer.py`；`scripts/opencode.py` 保留既有命令、作用域、schema 1 收据、输出及退出码。DeepSeek 薄适配只处理路径和发现提示，不改变技能业务规则。安装单项不要求同时安装全部；完整 `work-cycle` 还需同版本五项阶段技能和子 Agent 能力，该模型行为另由 [Issue #41](https://github.com/philfanzhou/ForgeSteward/issues/41) 验收。
 
@@ -10,7 +10,7 @@
 
 ## 首次安装与作用域
 
-先取得独立、可信的 checkout。下例跟随当前开发源码，使用前核对其 commit、`VERSION` 和修改；未发布 `0.2.15` 不能当作已发布 Tag。若已有源码，直接使用其绝对路径。
+先取得独立、可信的 checkout。下例跟随当前开发源码，使用前核对其 commit、`VERSION` 和修改；开发源码不能当作已发布 Tag，需要固定版本时改用 `v0.2.15` 或更后的已发布 Tag。若已有源码，直接使用其绝对路径。
 
 ```bash
 mkdir -p "$HOME/code"
