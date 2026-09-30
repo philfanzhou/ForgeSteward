@@ -4,7 +4,7 @@
 
 从 `v0.2.15` 起提供 `scripts/deepseek.py`，适配 DeepSeek Harness 的原生文件系统技能发现。Python 3.9+ 标准库即可运行，无需 npm 插件、运行中的 Harness 或模型密钥。六项技能保留原始目录、正文、引用与脚本；`--all` 自动读取当前 catalog，不固定未来数量。Claude/Codex 的 marketplace 不是 Harness 原生市场。
 
-共享生命周期实现位于 `scripts/skill_installer.py`；`scripts/opencode.py` 保留既有命令、作用域、schema 1 收据、输出及退出码。DeepSeek 薄适配只处理路径和发现提示，不改变技能业务规则。安装单项不要求同时安装全部；完整 `work-cycle` 还需同版本五项阶段技能和子 Agent 能力，该模型行为另由 [Issue #41](https://github.com/philfanzhou/ForgeSteward/issues/41) 验收。
+共享生命周期实现位于 `scripts/skill_installer.py`；`scripts/opencode.py` 保留既有命令、作用域、schema 1 收据、输出及退出码。DeepSeek 薄适配只处理路径和发现提示，不改变技能业务规则。安装单项不要求同时安装全部；完整 `work-cycle` 还需同版本五项阶段技能和子 Agent 能力。该委派行为已由维护者在本机 `0.2.0-rc.2` 中实际运行验证，对应的自动化探针未纳入本仓库 CI；其他客户端、模型与配置未获兼容保证。
 
 依据：[官方 Skills 说明](https://deepseek-harness.github.io/deepseek-harness/en/reference/subsystems/skills)，以及 2026-09-30 本机桌面/内置包 `0.2.0-rc.2` 的实际 `FileSystemSkillProvider` 和 `resolveDshHome`。包内 `dsh-skill-filesystem/lib/index.js` SHA-256 为 `244e92e032ef15e96cb60c9e2cfddf5d89e167eb171fcbfd83e9415b0455a0d7`，`dsh-home-paths/lib/index.js` 为 `97c1c10b299a4f2aec5f34bac5370cad3834391cd75c91a76b1e7b8a643584f5`。这是核对版本的证据，不承诺未来所有客户端。
 
