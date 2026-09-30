@@ -2,11 +2,11 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, ZCode, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-The current source targets **0.2.14**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. A source version is not proof of publication: confirm the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases). See the [v0.2.14 version matrix, changes, and migration notes](docs/releases/v0.2.14.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules.
+The current source targets **0.2.15**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. A source version is not proof of publication: confirm the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases). See the [v0.2.15 version matrix, changes, and migration notes](docs/releases/v0.2.15.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules.
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, follow the rename instructions in the selected Release, not just a tag substitution in the historical commands below.
 
-For contributors: run `python3 scripts/check_skill_limits.py --check` after changing skills. See the [cross-agent loading limits and authoring budgets](docs/skill-compatibility.md) for Codex, Claude Code, OpenCode, and ZCode.
+For contributors: run `python3 scripts/check_skill_limits.py --check` after changing skills. Descriptions must stay within **500 UTF-16 units** to fit the default DeepSeek Harness catalog display. See the [cross-agent loading limits and authoring budgets](docs/skill-compatibility.md) for Codex, Claude Code, OpenCode, ZCode, and the DeepSeek Harness investigation; managed DeepSeek installation and end-to-end workflows are tracked separately.
 
 ## Install and use — ZCode development preview
 

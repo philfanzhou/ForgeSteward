@@ -1,6 +1,6 @@
 ---
 name: forge-steward-prepare-work
-description: Prepare repository issues for implementation by investigating mainline blockers, resolving actionable technical questions, and persisting scope, acceptance criteria, and audit evidence. Return only a single-line list of independent ready issues, filling the batch first with backlog issues that were open at the cleanup-cycle baseline (including their split tasks and unblocking prerequisites) up to the default limit of 10 or the user's requested count, and only then with urgent or other newly created issues, without implementing them or generating an execution prompt. Use for work discovery, issue preparation, or advancing blocked tasks toward a PR; not for production implementation or review repair.
+description: Prepare repository issues for implementation by investigating blockers and recording scope, acceptance criteria, and evidence. Use for work discovery, issue preparation, or advancing blocked tasks; not implementation or review repair. Return only a single-line list of independent ready issues, prioritizing baseline backlog and its prerequisites before newly created work. Default to at most 10 issues unless the user specifies a count; do not implement or generate an execution prompt.
 ---
 
 # Prepare Work
