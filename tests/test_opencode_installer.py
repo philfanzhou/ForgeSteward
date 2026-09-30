@@ -1,7 +1,6 @@
 """验证真实文件操作、事务回滚及 OpenCode 所需的安装结构。"""
 
 from contextlib import redirect_stderr, redirect_stdout
-import importlib.util
 import io
 import json
 import os
@@ -15,12 +14,15 @@ from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("installer", REPO / "scripts/opencode.py")
-installer = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(installer)
+sys.path.insert(0, str(REPO / "scripts"))
+import opencode
+import skill_installer as installer
 
 
 class InstallerTests(unittest.TestCase):
+    adapter = opencode
+    agent_dir = ".opencode"
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -29,7 +31,7 @@ class InstallerTests(unittest.TestCase):
         shutil.copytree(REPO / "plugins", self.source / "plugins")
         self.project = self.base / "project with spaces"
         self.project.mkdir()
-        self.root = self.project / ".opencode/skills"
+        self.root = self.project / self.agent_dir / "skills"
         self.environment = mock.patch.dict(os.environ, {})
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -41,7 +43,7 @@ class InstallerTests(unittest.TestCase):
             args += ["--user"] if user else ["--project", str(self.project)]
         output = io.StringIO()
         with redirect_stdout(output), redirect_stderr(output):
-            code = installer.main(args, repo=self.source)
+            code = self.adapter.main(args, repo=self.source)
         self.assertEqual(code, expected, output.getvalue())
         return output.getvalue()
 
@@ -68,7 +70,7 @@ class InstallerTests(unittest.TestCase):
             with self.subTest(encoding=encoding):
                 environment = dict(os.environ, PYTHONIOENCODING=encoding)
                 result = subprocess.run(
-                    [sys.executable, str(REPO / "scripts/opencode.py"), "--help"],
+                    [sys.executable, str(Path(self.adapter.__file__)), "--help"],
                     capture_output=True, text=True, encoding=encoding, env=environment,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -352,7 +354,7 @@ class InstallerTests(unittest.TestCase):
     def test_subprocess_residue_exit_code(self):
         self.installed().mkdir(parents=True)
         result = subprocess.run(
-            [sys.executable, str(REPO / "scripts/opencode.py"), "uninstall", "--all",
+            [sys.executable, str(Path(self.adapter.__file__)), "uninstall", "--all",
              "--project", str(self.project)], capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -456,7 +458,7 @@ class InstallerTests(unittest.TestCase):
     def test_symlink_target_cannot_redirect_writes(self):
         outside = self.base / "outside"
         outside.mkdir()
-        self.make_link(self.project / ".opencode", outside, True)
+        self.make_link(self.project / self.agent_dir, outside, True)
         self.run_cli("install", "prepare-work", expected=1)
         self.assertEqual(list(outside.iterdir()), [])
 
@@ -464,7 +466,7 @@ class InstallerTests(unittest.TestCase):
     def test_windows_junction_cannot_redirect_writes(self):
         outside = self.base / "outside"
         outside.mkdir()
-        subprocess.run(["cmd", "/c", "mklink", "/J", str(self.project / ".opencode"), str(outside)],
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(self.project / self.agent_dir), str(outside)],
                        check=True, capture_output=True)
         self.run_cli("install", "prepare-work", expected=1)
         self.assertEqual(list(outside.iterdir()), [])

@@ -123,6 +123,10 @@ opencode debug skill
 
 OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本安装器的选定范围，实际发现还可能受用户级、兼容路径、祖先路径及重复副本影响。依据：[OpenCode 技能发现](https://opencode.ai/docs/skills/)。
 
+## DeepSeek Harness
+
+从未发布 `0.2.15` 源码目标提供文件系统安装适配。使用包含 `scripts/deepseek.py` 的独立干净 checkout，以已发布 Tag 或完整审阅 commit 固定源码，再显式 update 已安装子集；旧 `v0.2.1` 不含该入口。版本降级、收据与冲突恢复、DSH_HOME/项目 Git 根及卸载边界见 [DeepSeek 安装维护](deepseek-installer.md#显式更新固定源码及回退)。客户端升级不会更新技能；不同作用域和兼容根需分别检查。
+
 ## ZCode
 
 当前 ZCode 支持属于未发布 `0.2.3` 目标，不将本文 `v0.2.1` 历史命令当作其更新检测或运行验证。固定版本通过已核对 Tag/SHA 的独立本地 checkout 加入市场；不假定 Codex `--ref` 或 Claude `@tag` 输入适用。切换前保存子集与旧来源，卸载旧插件并移除旧市场，添加选定快照后重装、核对真实内容和新会话来源；失败时用旧快照恢复。完整步骤及 GUI 未实测边界见 [ZCode 固定版本与回退](zcode.md#固定版本与回退)。
