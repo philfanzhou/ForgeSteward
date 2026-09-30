@@ -183,10 +183,10 @@ class PlatformBehaviorTests(unittest.TestCase):
                                             "content": [{"type": "text", "text": text}]},
                                   "meta": {"lines": [{"number": n} for n in (lines or [])]}})
 
-        tool("skill", {"name": "forge-steward-work-cycle"}, directory.joinpath("SKILL.md").read_text().split("---", 2)[2].strip())
+        tool("skill", {"name": "forge-steward-work-cycle"}, directory.joinpath("SKILL.md").read_text(encoding="utf-8").split("---", 2)[2].strip())
         for filename in ("startup.md", "cycles.md"):
             file = directory / "references" / filename
-            text = file.read_text()
+            text = file.read_text(encoding="utf-8")
             tool("read", {"file_path": str(file)}, text, lines=range(1, len(text.splitlines()) + 1))
         tool("read", {"file_path": str(self.root / ".dsh/skills/forge-steward-fix-feedback/SKILL.md")}, "File not found", error=True)
         event("assistant/message", {"message": {"content": [{"type": "text", "text": "缺少 forge-steward-fix-feedback；写入前停止。"}]}})
