@@ -1,13 +1,13 @@
 ---
 name: forge-steward-check-workflow
-description: Check repository branch cleanup settings and remove workflow policy rules that duplicate the ForgeSteward skills from agent instructions, contributor docs, and issue or change-request templates, then submit any deletion as a PR or MR without merging. Project conventions remain intact. Explicit check-only requests remain read-only.
+description: Check branch cleanup settings, reconcile release tags, announcements and package feeds read-only, and remove workflow rules that duplicate the ForgeSteward skills from agent instructions, contributor docs and issue or change-request templates. Submit any deletion as a PR or MR without merging. Project conventions remain intact; release findings are reported only. Explicit check-only requests remain read-only.
 ---
 
 # Check Workflow
 
 ## 规则加载
 
-开始检查前，完整读取 [技能管理的规则与删除方式](references/skill-owned-rules.md) 和 [检查、删除与提交步骤](references/procedure.md)，再按本次授权模式执行。只读检查同样需要这些判定和执行规则；不能只凭入口摘要选择删除项。核对其他技能的等价条款时，同时检查该技能入口指向的规则文件。
+开始检查前，完整读取 [技能管理的规则与删除方式](references/skill-owned-rules.md)、[检查、删除与提交步骤](references/procedure.md) 和 [发布管线健康对账](references/release-audit.md)，再按本次授权模式执行。只读检查同样需要这些判定和执行规则；不能只凭入口摘要选择删除项。核对其他技能的等价条款时，同时检查该技能入口指向的规则文件。
 
 引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。工具输出被截断时按行或段补读至文件末尾；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
 
@@ -27,21 +27,10 @@ description: Check repository branch cleanup settings and remove workflow policy
 
 候选位置、判定方法、不删除的情形和删除方式见 [技能管理的规则与删除方式](references/skill-owned-rules.md)。不修改业务代码、依赖、测试、CI、分支保护、全局或用户级 Agent 配置；不修改 `CLAUDE.md` 的 `@AGENTS.md` 等入口导入，除非导入目标因本次删除而不存在；不安装插件，不整理 Issue，不自动运行其他技能，不合并。
 
+### 发布管线健康对账（只读）
+
+每次检查同时按 [发布对账规则](references/release-audit.md) 核对发布标签、发布公告（Release）与包 feed 的一致性、预发布标记、latest 指针及最近发布运行结果。判定基准和范围来自目标仓库自己的发布文档；缺少成文期望记为发现，对应判断为“无法确认”。结果只进最终汇报，与政策删除互不阻塞，沿用现有调用及 work-cycle 低频节奏。
+
 ## 汇报与变更汇总
 
-结束时用目标项目约定的语言向用户汇报：操作模式、合并后自动删除源分支设置及证据或无法确认的原因、检查命令与退出码、Change Request 链接或零修改结论、待决定项、技能缺口、未完成事项和下一步。设置停用本身不产生项目文件变更或空 Change Request。
-
-本次运行修改了任何项目文件时（包括仅本地修改，或提交、推送、创建 Change Request 中途受阻），汇报中必须包含变更汇总。汇总依据实际的 `git status` 和 `git diff`（已提交时对比主线）填写，不按计划推测，不省略任何文件：
-
-| 文件 | 操作 | 变更内容 | 行数 |
-| --- | --- | --- | --- |
-
-- **操作**：修改或删除。
-- **变更内容**：写明删除的区块、章节、条文或引用（标题或首行、删除前行范围、所属政策维度及对应技能）。同一文件有多个动作时逐项列出。
-- **行数**：该文件的新增与删除行数，例如 `+0 / -32`。
-
-表后说明这些修改所处的状态：未提交、已提交（分支与 commit）、已推送，或已创建/更新的 Change Request 链接；再列出待维护者决定的候选，并注明未修改。变更汇总与 Change Request 正文中的变更说明保持一致。
-
-没有修改任何项目文件时，明确说明“未修改项目文件”。仅检查模式下，另列执行删除时将修改的文件和原因，写明尚未修改，不写成已修改。
-
-只宣称“确认的工作流政策条文和旧版区块已删除”；不宣称删除后项目中已不存在任何工作流约束，也不宣称各 Agent 运行时的行为已经改变。
+结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布对账结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。

@@ -1,7 +1,7 @@
 {
   "name": "check-workflow",
   "version": "0.2.17",
-  "description": "Check branch cleanup settings and remove workflow rules that duplicate the ForgeSteward skills, then submit any deletion as a PR or MR without merging.",
+  "description": "Check branch cleanup settings, reconcile releases read-only, and remove duplicate ForgeSteward workflow rules; submit any deletion as a PR or MR without merging. Release findings are reported only.",
   "author": {
     "name": "philfanzhou",
     "url": "https://github.com/philfanzhou"
@@ -17,11 +17,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Check Workflow - ForgeSteward",
-    "shortDescription": "Check branch settings and remove duplicate workflow rules.",
-    "longDescription": "Read the repository setting for automatic source branch deletion after merge, then find and remove workflow policy rules in agent instructions, contributor docs, workflow docs, and issue or change-request templates that duplicate the ForgeSteward skills. Submit any deletion as a PR or MR without merging. Project conventions remain intact; repository settings are not changed; explicit check-only requests remain read-only.",
+    "shortDescription": "Check releases and branch settings; remove duplicate rules.",
+    "longDescription": "Read branch cleanup settings and reconcile release tags, announcements, package feeds, prerelease flags, latest pointers and release runs against the repository release contract. Report release findings only. Remove duplicate ForgeSteward workflow rules and submit any deletion as a PR or MR without merging. Project conventions remain intact; repository settings are not changed; explicit check-only requests remain read-only.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Use $forge-steward-check-workflow to inspect branch cleanup settings and remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including blocks written by earlier check-workflow versions. Validate, then commit, push, and open a PR or MR for any deletion without merging."
+    "defaultPrompt": "Use $forge-steward-check-workflow to inspect branch cleanup settings, reconcile release tags, announcements and package feeds read-only, and remove workflow policy rules in this repository that duplicate the ForgeSteward skills, including blocks written by earlier check-workflow versions. Report release findings only. Validate, then commit, push, and open a PR or MR for any deletion without merging."
   }
 }

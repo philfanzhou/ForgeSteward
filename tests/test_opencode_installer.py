@@ -96,7 +96,9 @@ class InstallerTests(unittest.TestCase):
             for relative, content in self.contents(source).items():
                 with self.subTest(skill=path.name, resource=relative):
                     self.assertEqual((path / relative).read_bytes(), content)
-        for resource in ("references/skill-owned-rules.md", "scripts/remove_workflow_blocks.py"):
+        for resource in ("references/skill-owned-rules.md", "references/procedure.md",
+                         "references/release-audit.md", "references/reporting.md",
+                         "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
         for resource in ("references/startup.md", "references/cycles.md", "scripts/check_workflow_gate.py", "scripts/VERSION"):
             self.assertTrue((self.installed("work-cycle") / resource).is_file())
