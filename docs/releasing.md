@@ -43,10 +43,11 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 
 ## 当前发布输入
 
-当前源码目标为 `0.2.16`，发布输入见 [对应表与说明](releases/v0.2.16.md)。是否已发布以远端同名 Tag 与非 draft Release 为准；修改仓库内容前按[统一版本规则](../AGENTS.md#统一版本)核对发布状态，已发布时才递增 `VERSION` 并同步全部插件清单与共用市场。
+当前源码目标为 `0.2.17`，发布输入见 [对应表与说明](releases/v0.2.17.md)。是否已发布以远端同名 Tag 与非 draft Release 为准；修改仓库内容前按[统一版本规则](../AGENTS.md#统一版本)核对发布状态，已发布时才递增 `VERSION` 并同步全部插件清单与共用市场。
 
 ## 发布记录
 
+- [v0.2.16 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16)；[对应表与说明](releases/v0.2.16.md)
 - [v0.2.15 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.15)；[对应表与说明](releases/v0.2.15.md)
 - [v0.2.14 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.14)；[对应表与说明](releases/v0.2.14.md)
 - [v0.2.13 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.13)；[对应表与说明](releases/v0.2.13.md)
