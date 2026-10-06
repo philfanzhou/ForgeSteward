@@ -1,6 +1,6 @@
 {
   "name": "work-cycle",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Review existing open change requests, then run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {
     "name": "philfanzhou",
