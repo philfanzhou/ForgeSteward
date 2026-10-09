@@ -16,7 +16,8 @@ python3 <本技能目录>/scripts/resource_lock.py --repo <目标仓库> status 
 
 - `port-<端口号>`、`db`、`docker`、`simulator`、`browser-profile`、`path-<简名>`（固定路径或全局配置）、`remote-<环境名>`（共享远端测试环境或测试账号，始终独占）；
 - `local-suite`：查不清资源的整套本地测试；
-- `heavy`：编译、整套测试等重活，容量为本次运行的重活上限（默认 2，且不超过子 Agent 并发上限）。
+- `heavy`：编译、整套测试等重活，容量为本次运行的重活上限（默认 2，且不超过子 Agent 并发上限）；
+- `issue-registry`：新建 Issue 前的检索与登记，见 [已完成项先往下走](concurrency.md)。
 
 任务标识为“阶段-Issue 或 PR 编号”，例如 `implement-123`、`review-pr-45`，每个子 Agent 任务唯一。
 
