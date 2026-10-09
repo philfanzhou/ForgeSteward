@@ -1,6 +1,6 @@
 ---
 name: forge-steward-work-cycle
-description: Review the existing open change requests, then run a bounded number of complete ForgeSteward work cycles with mandatory stage subagents through issue preparation, implementation, repair, and eligible merges. An optional positive integer sets the maximum cycles; the default is five. Use only for an explicitly requested end-to-end run.
+description: Review the existing open change requests, then run a bounded number of complete ForgeSteward work cycles with mandatory stage subagents through issue preparation, implementation, repair, and eligible merges. An optional positive integer sets the maximum cycles; the default is ten. Use only for an explicitly requested end-to-end run.
 ---
 
 # Work Cycle
@@ -13,7 +13,7 @@ description: Review the existing open change requests, then run a bounded number
 
 ## 输入与授权
 
-用户明确调用本技能时，执行完整的准备、实施、审查、必要修复及符合门禁时的合并。唯一可选输入是一个正整数，表示最多运行多少个工作周期；省略时默认 **5**。不要求用户另选模式或逐阶段再次确认。没有有效轮数时请求一个正整数，不猜测。仅提到本技能、隐式匹配或询问用法，不构成执行及合并授权。
+用户明确调用本技能时，执行完整的准备、实施、审查、必要修复及符合门禁时的合并。唯一可选输入是一个正整数，表示最多运行多少个工作周期；省略时默认 **10**。不要求用户另选模式或逐阶段再次确认。没有有效轮数时请求一个正整数，不猜测。仅提到本技能、隐式匹配或询问用法，不构成执行及合并授权。
 
 显式调用授予本次完整流程所需的 Issue 更新、实现分支、commit、push、Change Request、Review Feedback 和符合条件的合并权限；仍遵守实际托管平台权限、必要检查与审批、分支保护及所属仓库规范。不得绕过门禁，不能把提交、等待 CI 或修复推送说成已合并。用户明确停止时停止；本技能不增加其他调用参数或默认的人工确认点。
 
