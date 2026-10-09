@@ -100,7 +100,8 @@ class InstallerTests(unittest.TestCase):
                          "references/release-audit.md", "references/reporting.md",
                          "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
-        for resource in ("references/startup.md", "references/cycles.md", "scripts/check_workflow_gate.py", "scripts/VERSION"):
+        for resource in ("references/startup.md", "references/cycles.md", "references/agents.md",
+                         "references/concurrency.md", "scripts/check_workflow_gate.py", "scripts/VERSION"):
             self.assertTrue((self.installed("work-cycle") / resource).is_file())
         self.assert_no_transactions()
 
