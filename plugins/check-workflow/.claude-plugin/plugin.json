@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "description": "Check branch cleanup settings, reconcile releases read-only, and remove duplicate ForgeSteward workflow rules; submit any deletion as a PR or MR without merging. Release findings are reported only.",
   "author": {
     "name": "philfanzhou",
