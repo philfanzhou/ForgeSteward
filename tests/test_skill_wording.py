@@ -13,7 +13,7 @@ FORBIDDEN_NAME_PART = "triage"
 def find_forbidden_terms(root):
     """返回 root 下所有可按 UTF-8 解码的文件中出现禁用词的位置。"""
     hits = []
-    for path in sorted(root.rglob("*")):
+    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
         if not path.is_file():
             continue
         try:
@@ -31,7 +31,7 @@ def find_forbidden_names(root):
     """返回 root 下文件或目录名含 triage（不区分大小写）的路径。"""
     return [
         path.relative_to(root).as_posix()
-        for path in sorted(root.rglob("*"))
+        for path in sorted(root.rglob("*"), key=lambda item: item.as_posix())
         if FORBIDDEN_NAME_PART in path.name.lower()
     ]
 
