@@ -7,7 +7,7 @@ description: Implement a supplied fixed issue list sequentially, using each issu
 
 ## 规则加载
 
-对冻结队列中的候选进入实现、验证或提交阶段前，完整读取 [实现与提交规则](references/implementation.md)。只读调查和缺失输入按本入口处理；不得仅凭入口摘要实施或发布。
+对冻结队列中的候选进入实现、验证或提交阶段前，完整读取 [实现与提交规则](references/implementation.md)。只读调查和缺失输入按本入口处理；不得仅凭入口摘要实施或发布。汇报前完整读取 [最终报告规则](references/reporting.md)。
 
 引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。工具输出被截断时按行或段补读至文件末尾；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
 
@@ -37,4 +37,4 @@ description: Implement a supplied fixed issue list sequentially, using each issu
 
 ## 最终报告
 
-使用中文按原顺序汇总全部项：原 Issue、实际状态、实现及验证、Change Request 链接、遗留与解除条件。区分已提交、已验收、已合并交付，不因提交 PR 关闭原 task 或重置清理周期。期初任务完成/剩余、新增分诊、返工和父级结项分列，未知计数不猜测；无关联项写不适用。最后说明保留的分支/工作区及恢复动作。
+按 [最终报告规则](references/reporting.md) 汇总全部项。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 写作构建输出，不用“制品”。
