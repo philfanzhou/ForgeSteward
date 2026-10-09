@@ -29,7 +29,7 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 4. 通过仓库保护合并，禁止向 main 直接推送或绕过检查。记录审查 head、实际 main 合并提交和 CI 链接；等待该 main 提交的四个检查通过，若合并后源码不同则补验。
 5. 使用只读查询核对目标 Tag/Release 不存在；已存在时核对目标而非覆盖。只对上一步确切的已验证提交创建附注 Tag，推送这一条 Tag，不执行批量 `--tags` 推送。发布命令应使用已解析的明确 SHA，不能在 main 后续移动后重新猜测目标。
 6. 推送后回读远端 Tag：附注对象与其指向的 commit 是两个不同 SHA，需解引用到 commit 并与审查记录核对。使用 `gh release create <tag> --verify-tag` 关联已有 Tag，不让平台静默从最新 main 创建标签。
-7. Release 正文使用中文，列出确切 commit SHA、对应表、安装链接、CI、兼容性和迁移。当前只发布 Git 快照及 GitHub 自动源码归档，不宣称提供独立构建包或全 Agent 端到端行为认证。
+7. Release 标题只写 Tag 名，例如 `v0.2.18`，不加项目名或其他文字。Release 正文使用中文，列出确切 commit SHA、对应表、安装链接、CI、兼容性和迁移。当前只发布 Git 快照及 GitHub 自动源码归档，不宣称提供独立构建包或全 Agent 端到端行为认证。
 8. 复核远端 Tag、Release 的 tagName/draft/prerelease 状态及链接；在 PR 留存交接。仅清理本任务已合并且无独有工作的分支/临时目录，不触及用户安装。
 
 以上 `<tag>` 是参数占位符，不是可直接执行的 shell 文本。维护者执行前须填入经过核对的值。
@@ -43,10 +43,11 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 
 ## 当前发布输入
 
-当前源码目标为 `0.2.17`，发布输入见 [对应表与说明](releases/v0.2.17.md)。是否已发布以远端同名 Tag 与非 draft Release 为准；修改仓库内容前按[统一版本规则](../AGENTS.md#统一版本)核对发布状态，已发布时才递增 `VERSION` 并同步全部插件清单与共用市场。
+当前源码目标为 `0.2.18`，发布输入见 [对应表与说明](releases/v0.2.18.md)。是否已发布以远端同名 Tag 与非 draft Release 为准。版本号只在用户明确要求时修改，见[统一版本规则](../AGENTS.md#统一版本)。
 
 ## 发布记录
 
+- [v0.2.17 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.17)；[对应表与说明](releases/v0.2.17.md)
 - [v0.2.16 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16)；[对应表与说明](releases/v0.2.16.md)
 - [v0.2.15 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.15)；[对应表与说明](releases/v0.2.15.md)
 - [v0.2.14 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.14)；[对应表与说明](releases/v0.2.14.md)
