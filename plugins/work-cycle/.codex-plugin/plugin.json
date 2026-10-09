@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Work Cycle - ForgeSteward",
     "shortDescription": "Run complete work cycles through stage subagents.",
-    "longDescription": "Review the existing open change request queue first, then run up to five complete issue work cycles by default. Each stage uses its own subagent. Eligible changes are merged and their source branches cleaned up; items still blocked after a third repair round are paused individually.",
+    "longDescription": "Review the existing open change request queue first, then run up to ten complete issue work cycles by default. Each stage uses its own subagent. Eligible changes are merged and their source branches cleaned up; items still blocked after a third repair round are paused individually.",
     "developerName": "philfanzhou",
     "category": "Productivity",
     "capabilities": [],
