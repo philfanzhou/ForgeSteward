@@ -7,7 +7,7 @@ description: Review the existing open change requests, then run a bounded number
 
 ## 规则加载
 
-开始前完整读取 [启动与低频检查](references/startup.md)、[子 Agent 生命周期与恢复](references/agents.md) 、[轮次、交接与终止](references/cycles.md) 和 [已完成项先往下走](references/concurrency.md)。这些文件是本技能必需规则，路径以本 `SKILL.md` 所在目录为基准。读取结果截断时分段补读到末尾；文件缺失或不可读时说明路径并停止受影响操作。上下文压缩后重新读取缺失的当前阶段规则。
+开始前完整读取 [启动与低频检查](references/startup.md)、[子 Agent 生命周期与恢复](references/agents.md) 、[轮次、交接与终止](references/cycles.md) 、[已完成项先往下走](references/concurrency.md) 和 [并发时的本地验证](references/verification.md)。这些文件是本技能必需规则，路径以本 `SKILL.md` 所在目录为基准。读取结果截断时分段补读到末尾；文件缺失或不可读时说明路径并停止受影响操作。上下文压缩后重新读取缺失的当前阶段规则。
 
 各阶段子 Agent 必须从自己实际安装的技能目录完整读取对应 `SKILL.md` 及该入口要求的引用文件；本编排技能不复制或替代五个技能的业务规则。
 

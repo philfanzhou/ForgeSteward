@@ -7,7 +7,7 @@ description: Freeze and review the current open change requests, merge only thos
 
 ## 规则加载
 
-冻结队列及逐项审查前，完整读取 [冻结与审查步骤](references/review.md)；执行任何合并前，完整读取 [合并后结项与清理](references/post-merge.md)，确认合并后的核验和清理边界。未合并项也须按本入口交接并继续队列。
+冻结队列及逐项审查前，完整读取 [冻结与审查步骤](references/review.md)；执行任何合并前，完整读取 [合并后结项与清理](references/post-merge.md)，确认合并后的核验和清理边界。调用方说明本次为并发调用（提供任务标识、锁命令等）时，审查前另读 [被并发调用时的规则](references/concurrent.md)。未合并项也须按本入口交接并继续队列。
 
 引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。工具输出被截断时按行或段补读至文件末尾；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
 
