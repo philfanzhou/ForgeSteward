@@ -9,7 +9,7 @@ description: Prepare repository issues for implementation by investigating block
 
 本文件是入口，详细规则保存在同一技能目录的 `references/` 中。相对路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。使用可用文件读取工具，按下列阶段完整读取对应文件后再执行该阶段；这些文件是必需规则，不是可选示例，不能仅凭本入口摘要判定 ready。
 
-1. 开始准备前，读取 [队列与分诊](references/queue-and-triage.md)、[Ready 门禁](references/readiness.md) 和 [批内关系与验证资源](references/batch-relations.md)：冻结队列与审计基线，按完整门禁分诊和排序；默认最多 10 项，用户数量要求优先，先存量后周期新增。
+1. 开始准备前，读取 [队列与初筛](references/queue-and-screening.md)、[Ready 门禁](references/readiness.md) 和 [批内关系与验证资源](references/batch-relations.md)：冻结队列与审计基线，按完整门禁初筛和排序；默认最多 10 项，用户数量要求优先，先存量后周期新增。
 2. 遇到准备缺口、主线阻塞或带有阻塞标记的存量候选时，先读取 [阻塞推进与复查](references/blockers.md)，持续完成可自主推进的调查与实验，不沿用旧阻塞结论跳过存量。
 3. 首次更新 Issue、保存中间证据或切换任务前，读取 [交接与恢复](references/handoff.md)；最终输出前也须读取该文件，结合队列文件的复核要求确认交接完整。
 
@@ -29,4 +29,4 @@ Issue ready 门禁、任务粒度和准备交接以本技能为准，不采用�
 
 没有符合门禁的项输出 `[]`。此前须已完成可执行的准备行动，并在 Issue 或过程中交代真实阻塞、无权限、空队列或全部完成的事实；不能以 `[]` 代替尚可继续的准备。进度说明和必要问题放在工作过程中，最终不重复。准备完成不等于功能交付，不因 ready 就关闭 task。
 
-过程中写入 Issue 的说明和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 写作构建输出，不用“制品”。此要求只约束写入 Issue 的内容，不改变上述一行列表的最终输出。
+过程中写入 Issue 的说明和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。此要求只约束写入 Issue 的内容，不改变上述一行列表的最终输出。

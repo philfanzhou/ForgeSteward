@@ -37,4 +37,4 @@ description: Implement a supplied fixed issue list sequentially, using each issu
 
 ## 最终报告
 
-按 [最终报告规则](references/reporting.md) 汇总全部项。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 写作构建输出，不用“制品”。
+按 [最终报告规则](references/reporting.md) 汇总全部项。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
