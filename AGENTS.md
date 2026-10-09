@@ -59,3 +59,10 @@ ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维
 - Issue 和 Change Request 的正文必须使用简体中文。
 - Issue、Change Request 和 Review 中的 Comment、Discussion 与 Review Thread 必须使用简体中文。
 - 引用代码、日志或外部原文时可以保留其原始语言，但分析、结论和行动说明必须使用简体中文。
+
+## 面向用户的输出用语
+
+- Skill 中凡是规定写给用户或托管平台的内容，包括最终回复和汇报、Issue 与 Change Request 正文、Comment 及 Review Feedback 回复，都须要求使用日常中文。
+- 规则正文可以保留精炼的内部术语（如分诊、门禁、对账），但输出契约不得要求把它们原样输出；确需出现时，首次出现处用一句话解释。
+- artifact 写作「构建输出」等日常说法，不用「制品」。
+- 本仓库自身的 Issue、Change Request 正文和 Comment 同样适用本节。
