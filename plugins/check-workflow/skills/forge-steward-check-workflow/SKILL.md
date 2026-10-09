@@ -13,7 +13,7 @@ description: Check branch cleanup settings, reconcile release tags, announcement
 
 ## 目标与授权
 
-工作流政策只在 ForgeSteward 的 prepare-work、execute-work、review-and-merge 和 fix-feedback 技能正文中维护，包括：Issue ready 门禁、任务粒度、Change Request 范围、Review 分类与轮次、修复范围、合并后结项、交接和授权。项目里另写一套同类规则，无论与技能措辞相同、更严格还是更宽松，都会形成第二个规则来源：技能执行时出现冲突，技能升级后项目规则又会过时。本技能删除这些规则，使工作流政策只以技能为准。
+工作流政策只在 ForgeSteward 的 prepare-work、execute-work、review-and-merge 和 fix-feedback 技能正文中维护，包括：Issue 开工前的条件、任务大小、Change Request 范围、审查意见分类与轮数、修复范围、合并与关闭任务、交接和授权。项目里另写一套同类规则，无论与技能措辞相同、更严格还是更宽松，都会形成第二个规则来源：技能执行时出现冲突，技能升级后项目规则又会过时。本技能删除这些规则，使工作流政策只以技能为准。
 
 本技能对受版本控制的项目文件只删除、不写入：不向项目添加规则、标记区块、读取指示或 Agent 入口，也不代写替代条款。项目仍需要、但技能明确交由仓库决定的约定（见[项目约定](references/skill-owned-rules.md#项目约定保留)）予以保留。另以只读方式检查托管平台的合并后自动删除源分支设置，记录启用、停用或无法确认；不修改仓库设置。合并后的实际分支清理由 `review-and-merge` 执行，本技能不合并或删除分支。
 
@@ -33,4 +33,4 @@ description: Check branch cleanup settings, reconcile release tags, announcement
 
 ## 汇报与变更汇总
 
-结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布核对结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布核对结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。

@@ -28,4 +28,4 @@ description: Review the existing open change requests, then run a bounded number
 1. 按 [启动与低频检查](references/startup.md) 对目标仓库判定是否启动一次 `check-workflow` 子 Agent。普通提交、候选文件变化、Change Request 的创建或合并都不触发它。它不占工作周期。
 2. 启动时先冻结并处理已有的开放 Change Request 队列，按 [轮次、交接与终止](references/cycles.md) 派发审查、必要修复和复审子 Agent；这一步不占工作周期，也不依赖 `prepare-work` 是否返回 Issue。没有开放项时跳过。
 3. 最多运行指定周期数。每周期依次派发准备、执行、审查，存在范围内必修反馈时派发修复，再派发必要的复审。详细阶段交接、第三轮终审和停止条件见 [轮次、交接与终止](references/cycles.md)。
-4. `prepare-work` 返回 `[]` 时立即停止新增周期，即使尚未达到上限；一个 Issue/Change Request 暂停不阻止同轮其他项及后续独立工作。最后按实际远端状态报告已合并、待审查、等待外部检查或审批及暂停项，不按轮数推定交付。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+4. `prepare-work` 返回 `[]` 时立即停止新增周期，即使尚未达到上限；一个 Issue/Change Request 暂停不阻止同轮其他项及后续独立工作。最后按实际远端状态报告已合并、待审查、等待外部检查或审批及暂停项，不按轮数推定交付。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。转述子 Agent 的结果时改写成日常说法，不原样照搬。

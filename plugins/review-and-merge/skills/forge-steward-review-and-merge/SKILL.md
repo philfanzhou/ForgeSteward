@@ -47,4 +47,4 @@ description: Freeze and review the current open change requests, merge only thos
 - 本次清理开始前已有任务的完成及剩余、本次清理期间新建的任务、返工、关闭的上级任务和已解除的阻塞；“本次清理”从 tracker 或交接记录中的清理起点算起，多次运行之间不重置，不是这一次运行开始的时间；已关闭任务漏掉的验收项关联回原任务及原 Change Request，记为返工。
 - 尚存阻塞、已接受边界和下一步。
 
-不要自动纳入新增 Change Request，不以 CI 全绿冒充验收成立，也不要把未成功的合并写成已交付。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+不要自动纳入新增 Change Request，不以 CI 全绿冒充验收成立，也不要把未成功的合并写成已交付。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。

@@ -33,7 +33,7 @@ description: Freeze the current repairable change-request queue, resolve only re
 
 ## 交接记录
 
-沿用已有 tracker、任务或仓库指定记录位置，保留一份当前状态；仅在授权范围内写入，没有可写位置时在输出中提供可直接交接的完整记录，不自行创建 tracker。字段按实际填写：清理周期基线与主线；task/Change Request 完整链接、实现仓库及主线；审计基线、覆盖范围与证据位置；当前 head、逐条验收证据；意见分类、Review 轮次、已解决意见与已接受边界；阻塞、下一步及解除条件。缺失项标明未知或不适用，不推定验收通过或将轮次归零。另记录提交、推送结果及可复审状态，不把已推送计作 task 完成；新增、返工和原清理目标的剩余范围分开，拆分或迁移不算交付，未知计数不推测。
+读取上轮交接并冻结待修清单前，以及写入交接记录或最终输出前，完整读取 [交接记录规则](references/handoff.md)。
 
 ## 完成条件
 
@@ -56,4 +56,4 @@ description: Freeze the current repairable change-request queue, resolve only re
 - 未解决阻塞、并发变化、权限问题和下一步。
 - 新发现问题的去重和归类处理结果。
 
-明确区分“已修改并推送”“等待复审”“验收成立”和“已合并”；本 Skill 不得产生最后一种状态。汇报及 Issue、Change Request 的正文和评论使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+明确区分“已修改并推送”“等待复审”“验收成立”和“已合并”；本 Skill 不得产生最后一种状态。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
