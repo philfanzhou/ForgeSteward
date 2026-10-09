@@ -9,7 +9,7 @@ description: Prepare repository issues for implementation by investigating block
 
 本文件是入口，详细规则保存在同一技能目录的 `references/` 中。相对路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。使用可用文件读取工具，按下列阶段完整读取对应文件后再执行该阶段；这些文件是必需规则，不是可选示例，不能仅凭本入口摘要判定 ready。
 
-1. 开始准备前，读取 [队列与分诊](references/queue-and-triage.md) 和 [Ready 门禁](references/readiness.md)：冻结队列与审计基线，按完整门禁分诊和排序；默认最多 10 项，用户数量要求优先，先存量后周期新增。
+1. 开始准备前，读取 [队列与分诊](references/queue-and-triage.md)、[Ready 门禁](references/readiness.md) 和 [批内关系与验证资源](references/batch-relations.md)：冻结队列与审计基线，按完整门禁分诊和排序；默认最多 10 项，用户数量要求优先，先存量后周期新增。
 2. 遇到准备缺口、主线阻塞或带有阻塞标记的存量候选时，先读取 [阻塞推进与复查](references/blockers.md)，持续完成可自主推进的调查与实验，不沿用旧阻塞结论跳过存量。
 3. 首次更新 Issue、保存中间证据或切换任务前，读取 [交接与恢复](references/handoff.md)；最终输出前也须读取该文件，结合队列文件的复核要求确认交接完整。
 
