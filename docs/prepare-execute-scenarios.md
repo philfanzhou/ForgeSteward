@@ -50,7 +50,7 @@
 
 ## 自动化安全告警走查（0.2.17）
 
-2026-10-06，按[只读告警规则](../plugins/prepare-work/skills/forge-steward-prepare-work/references/security-alerts.md)、[冻结与分诊](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-triage.md)及[登记门禁](../plugins/prepare-work/skills/forge-steward-prepare-work/references/readiness.md)逐项人工演算。结果模型沿用 [Issue #49](https://github.com/philfanzhou/ForgeSteward/issues/49)的唯一结果表，不另设调度状态。共用输入为授权仓库 R、主线 M、冻结时间 t0、可独立 ready 的存量 A/B（本轮清单 `[A, B]`）；告警查询快照为 t1，除行内说明外允许必要 Issue 更新。以下“产物”是规则推演得到的记录与操作清单，未真实调用扫描平台、发布模拟 Issue、读取敏感值或评测模型行为。
+2026-10-06，按[只读告警规则](../plugins/prepare-work/skills/forge-steward-prepare-work/references/security-alerts.md)、[冻结与初筛](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-screening.md)及[登记门禁](../plugins/prepare-work/skills/forge-steward-prepare-work/references/readiness.md)逐项人工演算。结果模型沿用 [Issue #49](https://github.com/philfanzhou/ForgeSteward/issues/49)的唯一结果表，不另设调度状态。共用输入为授权仓库 R、主线 M、冻结时间 t0、可独立 ready 的存量 A/B（本轮清单 `[A, B]`）；告警查询快照为 t1，除行内说明外允许必要 Issue 更新。以下“产物”是规则推演得到的记录与操作清单，未真实调用扫描平台、发布模拟 Issue、读取敏感值或评测模型行为。
 
 | 编号 | 输入与事件 | 人工演算的产物与结果 |
 | --- | --- | --- |
