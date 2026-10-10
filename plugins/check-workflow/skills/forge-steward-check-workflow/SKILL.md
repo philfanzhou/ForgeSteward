@@ -33,4 +33,4 @@ description: Check branch cleanup settings, reconcile release tags, announcement
 
 ## 汇报与变更汇总
 
-结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布核对结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布核对结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。

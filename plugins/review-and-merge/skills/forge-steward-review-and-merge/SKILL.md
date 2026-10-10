@@ -7,7 +7,7 @@ description: Freeze and review the current open change requests, merge only thos
 
 ## 规则加载
 
-冻结队列及逐项审查前，完整读取 [冻结与审查步骤](references/review.md)；执行任何合并前，完整读取 [合并后结项与清理](references/post-merge.md)，确认合并后的核验和清理边界。调用方说明本次为并发调用（提供任务标识、锁命令等）时，审查前另读 [被并发调用时的规则](references/concurrent.md)。未合并项也须按本入口交接并继续队列。处理完冻结清单后、汇总输出前，完整读取 [遗留分支清理](references/branch-cleanup.md) 并执行。
+冻结队列及逐项审查前，完整读取 [冻结与审查步骤](references/review.md)；执行任何合并前，完整读取 [合并后结项与清理](references/post-merge.md)，确认合并后的核验和清理边界；写入交接前读取 [交接记录规则](references/handoff.md)。调用方说明本次为并发调用（提供任务标识、锁命令等）时，审查前另读 [被并发调用时的规则](references/concurrent.md)。未合并项也须按本入口交接并继续队列。处理完冻结清单后、汇总输出前，完整读取 [遗留分支清理](references/branch-cleanup.md) 并执行。
 
 引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。工具输出被截断时按行或段补读至文件末尾；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
 
@@ -31,7 +31,7 @@ description: Freeze and review the current open change requests, merge only thos
 
 ## 交接记录
 
-沿用已有 tracker、任务或仓库指定记录位置，保留一份当前状态；仅在授权范围内写入，没有可写位置时在输出中提供可直接交接的完整记录，不自行创建 tracker。字段按实际填写：清理周期基线与主线；task/Change Request 完整链接、实现仓库及主线；审计基线、覆盖范围与证据位置；当前 head、逐条验收证据；意见分类、Review 轮次、已解决意见与已接受边界；阻塞、下一步及解除条件。缺失项标明未知或不适用，不推定验收通过或将轮次归零。记录实际合并和 task/父级结项状态；期初 task 实际交付及剩余、新增、返工和父级结项分开计数，拆分、迁移、重复或不计划关闭不冒充功能交付，未知计数不推测。
+每项结束后，包括未合并或受阻项，按 [交接记录规则](references/handoff.md) 交接后再继续队列。
 
 ## 输出
 
@@ -47,4 +47,4 @@ description: Freeze and review the current open change requests, merge only thos
 - 本次清理开始前已有任务的完成及剩余、本次清理期间新建的任务、返工、关闭的上级任务和已解除的阻塞；“本次清理”从 tracker 或交接记录中的清理起点算起，多次运行之间不重置，不是这一次运行开始的时间；已关闭任务漏掉的验收项关联回原任务及原 Change Request，记为返工。
 - 尚存阻塞、已接受边界和下一步。
 
-不要自动纳入新增 Change Request，不以 CI 全绿冒充验收成立，也不要把未成功的合并写成已交付。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+不要自动纳入新增 Change Request，不以 CI 全绿冒充验收成立，也不要把未成功的合并写成已交付。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
