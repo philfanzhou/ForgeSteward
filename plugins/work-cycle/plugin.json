@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "work-cycle",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "Review existing open change requests, then run bounded ForgeSteward work cycles through mandatory stage subagents and merge eligible changes.",
   "author": {
     "name": "philfanzhou",
