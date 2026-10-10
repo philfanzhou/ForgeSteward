@@ -56,4 +56,4 @@ description: Freeze the current repairable change-request queue, resolve only re
 - 未解决阻塞、并发变化、权限问题和下一步。
 - 新发现问题的去重和归类处理结果。
 
-明确区分“已修改并推送”“等待复审”“验收成立”和“已合并”；本 Skill 不得产生最后一种状态。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文，不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+明确区分“已修改并推送”“等待复审”“验收成立”和“已合并”；本 Skill 不得产生最后一种状态。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
