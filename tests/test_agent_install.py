@@ -683,6 +683,166 @@ class ApplyRefusalTests(ApplySandbox):
         self.assertFalse(skills.exists())
 
 
+# 在子进程里加载脚本、替换其中一个函数制造文件错误，再照常运行 main；环境变量（HOME、PATH、TMPDIR）与其他测试相同。
+FAULT_RUNNER = r"""
+import importlib.util, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("agent_install_with_fault", %r)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+%s
+sys.exit(m.main(sys.argv[1:]))
+"""
+
+FAIL_REMOVE = """
+real_remove = m.remove_tree
+def remove_tree(path):
+    if Path(str(path)).name.startswith(%r):
+        raise PermissionError(13, "Permission denied", str(path))
+    real_remove(path)
+m.remove_tree = remove_tree
+"""
+
+
+class ApplyFileErrorTests(ApplySandbox):
+    """开始改动后的意外文件错误：不再返回 2，逐个 Agent 的结果照常输出。"""
+
+    def apply_with(self, fault, *extra, agents="deepseek-harness"):
+        runner = self.root / "fault-runner" / "run.py"
+        runner.parent.mkdir(exist_ok=True)
+        runner.write_text(FAULT_RUNNER % (str(SCRIPT), fault), encoding="utf-8")
+        arguments = [sys.executable, "-B", "-I", str(runner), "apply", "--catalog", str(self.catalog),
+                     "--release-api", self.release, "--commit-api", self.commit_api,
+                     "--source-url", self.src.as_uri(), "--command-timeout", "20", "--version", LATEST,
+                     "--agents", agents]
+        result = subprocess.run(arguments + list(extra), env=self.env, capture_output=True)
+        return result.returncode, result.stdout.decode("utf-8"), result.stderr.decode("utf-8", "replace")
+
+    def test_work_directory_not_removed_keeps_results_and_returns_one(self):
+        skills = self.harness()
+        code, out, err = self.apply_with(FAIL_REMOVE % "forge-steward-apply-")
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(self.installed(skills), {"forge-steward-" + name: LATEST for name in PLUGINS})
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "- DeepSeek Harness：已安装 v%s" % LATEST)
+        work = [path for path in self.tmp.iterdir() if path.name.startswith("forge-steward-apply-")]
+        self.assertEqual(len(work), 1)
+        self.assertEqual(lines[1], "- 临时目录 %s 没能删除：Permission denied（%s），可以手动删除" % (work[0], work[0]))
+        self.assertEqual(lines[2], "- 新版本要在各 Agent 的下一个新会话里才生效。")
+        self.assertFalse((self.tmp / install.LOCK_NAME).exists())
+        code, out, err = self.apply_with(FAIL_REMOVE % "forge-steward-apply-", "--json")
+        self.assertEqual(code, 1, out + err)
+        result = json.loads(out)
+        self.assertEqual(result["outcome"], "done")
+        self.assertEqual(result["agents"][0]["skipped"], "已是最新")
+        [item] = result["cleanup"]
+        self.assertEqual(item["kind"], "work")
+        self.assertTrue(Path(item["path"]).name.startswith("forge-steward-apply-"), item)
+        self.assertTrue(item["reason"].startswith("Permission denied"), item)
+
+    def test_lock_not_removed_asks_to_check_before_deleting_it(self):
+        skills = self.harness()
+        lock = self.tmp / install.LOCK_NAME
+        code, out, err = self.apply_with(FAIL_REMOVE % install.LOCK_NAME)
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(len(self.installed(skills)), len(PLUGINS))
+        self.assertEqual(out.splitlines(), [
+            "- DeepSeek Harness：已安装 v%s" % LATEST,
+            "- 锁目录 %s 没能删除：Permission denied（%s）。确认没有安装在运行后手动删除它，"
+            "否则下次会提示“另一个安装正在进行”" % (lock, lock),
+            "- 新版本要在各 Agent 的下一个新会话里才生效。"])
+        self.assertTrue(lock.is_dir())
+        shutil.rmtree(str(lock))
+        result = json.loads(self.apply_with(FAIL_REMOVE % install.LOCK_NAME, "--json")[1])
+        self.assertEqual(result["cleanup"], [{"kind": "lock", "path": str(lock),
+                                              "reason": "Permission denied（%s）" % lock}])
+        self.assertEqual(result["agents"][0]["skipped"], "已是最新")
+
+    def test_file_error_while_handling_one_agent_stays_in_its_entry(self):
+        fault = """
+real_run = m.run_step
+count = [0]
+def run_step(argv, cwd, timeout):
+    if argv[0] == "codex":
+        count[0] += 1
+        if count[0] == 2:
+            raise PermissionError(13, "Permission denied", "/denied/output")
+    return real_run(argv, cwd, timeout)
+m.run_step = run_step
+"""
+        codex = self.agent("codex", "codex", every("1.2.2"))
+        claude = self.agent("claude", "claude", every("1.2.2"))
+        code, out, err = self.apply_with(fault, "--json", agents="codex,claude-code")
+        self.assertEqual(code, 1, out + err)
+        result = json.loads(out)
+        entries = {entry["id"]: entry for entry in result["agents"]}
+        problem = ("运行 `codex plugin remove execute-work@forge-steward` 时出现意外的文件错误："
+                   "Permission denied（/denied/output）")
+        self.assertEqual(entries["codex"]["problems"], [problem])
+        self.assertEqual(len(entries["codex"]["steps"]), 1)
+        self.assertEqual(entries["codex"]["after"]["status"], "落后")
+        self.assertFalse(entries["codex"]["done"])
+        self.assertTrue(entries["claude-code"]["done"])
+        self.assertEqual(self.plugins_of(claude), every(LATEST))
+        self.assertEqual(self.plugins_of(codex), {name: "1.2.2" for name in PLUGINS if name != "check-workflow"})
+        self.assertEqual(result["cleanup"], [])
+        code, out, _ = self.apply_with(fault, agents="codex")
+        self.assertEqual(code, 1)
+        self.assertTrue(out.startswith("- Codex：没有装好，复查结果：落后（v1.2.2）；运行 `codex plugin remove "
+                                       "fix-feedback@forge-steward` 时出现意外的文件错误："), out)
+
+    def test_file_error_after_the_last_step_is_still_reported_when_installed(self):
+        fault = """
+real_run = m.run_step
+def run_step(argv, cwd, timeout):
+    result = real_run(argv, cwd, timeout)
+    if argv[0] == "codex" and argv[-1] == "work-cycle@forge-steward" and "add" in argv:
+        raise PermissionError(13, "Permission denied", "/denied/output")
+    return result
+m.run_step = run_step
+"""
+        codex = self.agent("codex", "codex", every("1.2.2"))
+        code, out, err = self.apply_with(fault, agents="codex")
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.plugins_of(codex), every(LATEST))
+        self.assertEqual(out.splitlines()[0], "- Codex：已从 v1.2.2 升到 v%s；但运行 `codex plugin add "
+                         "work-cycle@forge-steward` 时出现意外的文件错误：Permission denied（/denied/output）" % LATEST)
+
+    def test_source_removal_error_is_reported_for_that_agent(self):
+        skills = self.harness()
+        fault = """
+real_remove = m.remove_tree
+def remove_tree(path):
+    if Path(str(path)).name == "source":
+        raise PermissionError(13, "Permission denied", str(path))
+    real_remove(path)
+m.remove_tree = remove_tree
+"""
+        code, out, err = self.apply_with(fault, "--json", "--commit-api", self.write("other.json", {"sha": "0" * 40}))
+        self.assertEqual(code, 1, out + err)
+        entry = json.loads(out)["agents"][0]
+        self.assertEqual(len(entry["problems"]), 1)
+        self.assertTrue(entry["problems"][0].startswith("准备源码时出现意外的文件错误：Permission denied（"), entry)
+        self.assertEqual(entry["after"]["status"], "缺少")
+        self.assertFalse(skills.exists() and any(skills.iterdir()))
+
+    def test_work_directory_cannot_be_created_stops_before_any_change(self):
+        codex = self.agent("codex", "codex", every("1.2.2"))
+        fault = """
+def mkdtemp(*args, **kwargs):
+    raise PermissionError(13, "Permission denied", "/denied/tmp")
+m.tempfile.mkdtemp = mkdtemp
+"""
+        code, out, err = self.apply_with(fault, agents="codex")
+        self.assertEqual(code, 3, out + err)
+        self.assertEqual(out, "- 没有做任何改动：无法建立临时目录（%s）：Permission denied（/denied/tmp）\n" % self.tmp)
+        self.assertEqual(self.changing_calls(), [])
+        self.assertEqual(self.plugins_of(codex), every("1.2.2"))
+        self.assertEqual(list(self.tmp.iterdir()), [])
+        result = json.loads(self.apply_with(fault, "--json", agents="codex")[1])
+        self.assertEqual((result["outcome"], result["agents"], result["cleanup"]), ("stopped", [], []))
+
+
 class ReportLineTests(unittest.TestCase):
     def setUp(self):
         self.spec = record.load_report_spec()
