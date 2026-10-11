@@ -273,13 +273,16 @@ class UsageAndSingleSourceTests(Sandbox):
             texts = list(where.get("commands", [])) + list(where.get("config_dirs", []))
             texts += [p for paths in where.get("paths", {}).values() for p in paths]
             texts += [" ".join(method.get("argv", []))] + [r.get("path", r.get("env")) for r in method.get("user_roots", [])]
+            texts.append(" ".join(agent.get("detect_marketplace", {}).get("argv", [])))
             for text in filter(None, texts):
                 self.assertFalse(text in source, "%s: %s" % (agent["id"], text))
 
 
-# 有状态的假 Agent 命令：记录每次调用的参数，按调用更新插件状态，list 时按各 Agent 的格式输出。
+# 有状态的假 Agent 命令：记录每次调用的参数，按调用更新插件和市场状态，list 时按各 Agent 的格式输出。
+# 与实测一致：Claude Code、Codex 已有来源不同的市场时添加失败，ZCode 直接换来源；删除不存在的市场失败。
+# 状态里的 market_list 为 "bad" 时列出市场输出无法识别，为 "slow" 时 30 秒才返回。
 AGENT_FAKE = r"""
-import json, re, sys
+import json, re, sys, time
 STATE, LOG, NAME, KIND, FAIL = %r, %r, %r, %r, %r
 args = [a for a in sys.argv[1:] if not a.endswith(".cjs")]
 with open(LOG, "a", encoding="utf-8") as log:
@@ -291,6 +294,21 @@ if any(pattern in joined for pattern in FAIL):
     sys.stderr.write("network is unreachable\n")
     sys.exit(1)
 plugins = state["plugins"]
+if "marketplace" in args and "list" in args:
+    if state.get("market_list") == "bad":
+        sys.stdout.write("not json")
+        sys.exit(0)
+    if state.get("market_list") == "slow":
+        time.sleep(30)
+    names = ["other-market"] + (["forge-steward"] if state["market"] else [])
+    if KIND == "codex":
+        out = {"marketplaces": [{"name": n, "root": "/x/" + n} for n in names]}
+    elif KIND == "zcode":
+        out = [{"id": n, "name": n, "official": n == "other-market"} for n in names]
+    else:
+        out = [{"name": n, "source": "github"} for n in names]
+    sys.stdout.write(json.dumps(out))
+    sys.exit(0)
 if "list" in args:
     if KIND == "codex":
         out = {"installed": [{"pluginId": n + "@forge-steward", "version": v} for n, v in plugins.items()]}
@@ -300,7 +318,11 @@ if "list" in args:
     sys.exit(0)
 if "marketplace" in args:
     if "add" in args:
-        state["market"] = re.search(r"v(\d+\.\d+\.\d+)", joined).group(1)
+        target = re.search(r"v(\d+\.\d+\.\d+)", joined).group(1)
+        if state["market"] not in (None, target) and KIND != "zcode":
+            sys.stderr.write("marketplace forge-steward already exists with a different source\n")
+            sys.exit(1)
+        state["market"] = target
     elif "remove" in args:
         if state["market"] is None:
             sys.exit(1)
@@ -367,11 +389,13 @@ class ApplySandbox(Sandbox):
         path.write_text(json.dumps(data), encoding="utf-8")
         return path.as_uri()
 
-    def agent(self, command, kind, plugins, fail=()):
-        """放一个有状态的假 Agent 命令；plugins 是已装插件与版本，市场按已装版本设置。"""
+    def agent(self, command, kind, plugins, fail=(), market="installed", market_list=None):
+        """放一个有状态的假 Agent 命令；plugins 是已装插件与版本，市场缺省按已装版本设置，None 表示没有市场。"""
         state = self.root / (command + "-state.json")
-        market = next(iter(plugins.values()), None)
-        state.write_text(json.dumps({"plugins": plugins, "market": market}), encoding="utf-8")
+        if market == "installed":
+            market = next(iter(plugins.values()), None)
+        state.write_text(json.dumps({"plugins": plugins, "market": market, "market_list": market_list}),
+                         encoding="utf-8")
         body = AGENT_FAKE % (str(state), str(self.log), command, kind, list(fail))
         script = self.impl / (command + ".py")
         script.write_text(body, encoding="utf-8")
@@ -394,6 +418,13 @@ class ApplySandbox(Sandbox):
     def changing_calls(self):
         return [row for row in self.calls() if "list" not in row]
 
+    def market_lists(self, name):
+        return [row for row in self.calls(name) if "marketplace" in row and "list" in row]
+
+    def without_plugin_list(self, name):
+        """该假命令被调用的参数，去掉检查和复查时的列出插件。"""
+        return [row for row in self.calls(name) if not ("list" in row and "marketplace" not in row)]
+
     def harness(self):
         (self.home / ".dsh").mkdir(exist_ok=True)
         self.env["DSH_HOME"] = str(self.root / "dsh")
@@ -410,8 +441,8 @@ class ApplySandbox(Sandbox):
         result = subprocess.run(arguments + list(extra), env=self.env, capture_output=True)
         return result.returncode, result.stdout.decode("utf-8"), result.stderr.decode("utf-8", "replace")
 
-    def apply_json(self, expect, **options):
-        code, out, err = self.apply("--json", **options)
+    def apply_json(self, expect, extra=(), **options):
+        code, out, err = self.apply("--json", *extra, **options)
         self.assertEqual(code, expect, out + err)
         return json.loads(out)
 
@@ -518,10 +549,11 @@ class ApplyPluginAgentTests(ApplySandbox):
                        ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v" + LATEST]]
                     + [["plugin", "add", name + "@forge-steward"] for name in PLUGINS])
         self.assertEqual([row for row in self.calls("codex") if "list" not in row], expected)
+        self.assertEqual(self.market_lists("codex"), [["plugin", "marketplace", "list", "--json"]])
         code, out, _ = self.apply(agents="codex")
         self.assertEqual(out, "- Codex：没有处理，已是最新\n")
 
-    def test_missing_agent_uses_install_commands(self):
+    def test_missing_agent_uses_upgrade_steps_without_uninstall_or_market_removal(self):
         claude = self.agent("claude", "claude", {})
         code, out, _ = self.apply(agents="claude-code")
         self.assertEqual(code, 0, out)
@@ -529,6 +561,77 @@ class ApplyPluginAgentTests(ApplySandbox):
         self.assertEqual(self.changing_calls()[0],
                          ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v" + LATEST, "--scope", "user"])
         self.assertTrue(out.startswith("- Claude Code：已安装 v%s\n" % LATEST), out)
+
+    def test_leftover_old_marketplace_is_replaced_before_installing(self):
+        for command, kind, agent_id, remove, add, put in (
+                ("claude", "claude", "claude-code",
+                 ["plugin", "marketplace", "remove", "forge-steward", "--scope", "user"],
+                 ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v" + LATEST, "--scope", "user"],
+                 ["plugin", "install", "{}@forge-steward", "--scope", "user"]),
+                ("codex", "codex", "codex",
+                 ["plugin", "marketplace", "remove", "forge-steward"],
+                 ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v" + LATEST],
+                 ["plugin", "add", "{}@forge-steward"])):
+            with self.subTest(agent=agent_id):
+                self.log.write_text("", encoding="utf-8")
+                state = self.agent(command, kind, {}, market="1.2.2")
+                code, out, _ = self.apply(agents=agent_id)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.plugins_of(state), every(LATEST))
+                self.assertEqual(self.without_plugin_list(command),
+                                 [["plugin", "marketplace", "list", "--json"], remove, add]
+                                 + [[arg.format(name) for arg in put] for name in PLUGINS])
+                self.assertTrue(out.startswith("- %s：已安装 v%s\n" % (
+                    "Claude Code" if command == "claude" else "Codex", LATEST)), out)
+
+    def test_missing_marketplace_is_not_removed(self):
+        codex = self.agent("codex", "codex", every("1.2.2"), market=None)
+        result = self.apply_json(0, agents="codex")
+        entry = result["agents"][0]
+        self.assertTrue(entry["done"], entry)
+        self.assertEqual(entry["after"]["status"], "最新")
+        self.assertEqual(self.plugins_of(codex), every(LATEST))
+        self.assertFalse(any(row[:3] == ["plugin", "marketplace", "remove"] for row in self.calls("codex")))
+        self.assertEqual(self.changing_calls(),
+                         [["plugin", "remove", name + "@forge-steward"] for name in PLUGINS]
+                         + [["plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v" + LATEST]]
+                         + [["plugin", "add", name + "@forge-steward"] for name in PLUGINS])
+
+    def test_unreadable_marketplace_list_leaves_that_agent_untouched(self):
+        for market_list, fail, reason in ((None, ["marketplace list"], "命令返回 1"),
+                                          ("bad", [], "输出格式无法识别"),
+                                          ("slow", [], "命令超时（2 秒）")):
+            with self.subTest(market_list=market_list or "fail"):
+                self.log.write_text("", encoding="utf-8")
+                claude = self.agent("claude", "claude", every("1.2.2"), fail=fail, market_list=market_list)
+                codex = self.agent("codex", "codex", every("1.2.2"))
+                result = self.apply_json(1, agents="claude-code,codex", extra=("--command-timeout", "2"))
+                entries = {entry["id"]: entry for entry in result["agents"]}
+                claude_entry = entries["claude-code"]
+                self.assertEqual(claude_entry["problems"], ["查不到市场是否存在：" + reason])
+                self.assertEqual(claude_entry["steps"], [])
+                self.assertEqual(claude_entry["after"]["status"], "落后")
+                self.assertTrue(all("list" in row for row in self.calls("claude")))
+                self.assertEqual(self.plugins_of(claude), every("1.2.2"))
+                self.assertTrue(entries["codex"]["done"])
+                self.assertEqual(self.plugins_of(codex), every(LATEST))
+        code, out, _ = self.apply("--command-timeout", "2", agents="claude-code")
+        self.assertEqual(code, 1)
+        self.assertTrue(out.startswith("- Claude Code：没有装好，复查结果：落后（v1.2.2）；"
+                                       "查不到市场是否存在：命令超时（2 秒）。"), out)
+
+    def test_check_does_not_list_marketplaces(self):
+        self.agent("claude", "claude", every("1.2.2"))
+        self.agent("codex", "codex", {}, market="1.2.2")
+        self.zcode([])
+        self.agent("node", "zcode", every(LATEST))
+        self.gh()
+        result = self.run_check(api=self.release)
+        self.assertEqual({key: agent["status"] for key, agent in self.by_id(result).items()
+                          if key in ("claude-code", "codex", "zcode")},
+                         {"claude-code": "落后", "codex": "缺少", "zcode": "最新"})
+        self.assertTrue(self.calls())
+        self.assertFalse(any("marketplace" in row for row in self.calls()))
 
     def test_newer_install_is_not_downgraded(self):
         codex = self.agent("codex", "codex", every("1.3.0"))

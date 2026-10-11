@@ -177,10 +177,12 @@ work-cycle 开始时运行一次技能包内的 `scripts/agent_install.py check`
 | --- | --- | --- |
 | 只缺 Harness，同意 | 汇报末行“DeepSeek Harness 可以安装或升级到 v0.2.21。要现在安装或升级吗？”，用户同意 | 查到 `v0.2.21` 的提交，没有可用的本地副本时下载 Tag 到临时目录并核对提交；用其中的 `scripts/deepseek.py install forge-steward-<插件> --user` 逐个安装 6 个技能到 `DSH_HOME/skills`（未设置时为 `~/.dsh/skills`），各带安装记录、版本 `0.2.21`；复查为“最新”；临时源码和锁目录删除；输出“DeepSeek Harness：已安装 v0.2.21”和“新版本要在各 Agent 的下一个新会话里才生效。” |
 | 拒绝或没回答 | 同上，用户说不用或没回应 | 不运行 `apply`，任何文件不变；不记住拒绝，下次运行照样检查和询问 |
-| 只有 Codex 落后 | Codex 全部为 0.2.20，其他 Agent 最新，用户同意了全部 | Claude Code、Harness 跳过（“已是最新”）；Codex 依次逐个 `codex plugin remove`、`marketplace remove`、`marketplace add philfanzhou/ForgeSteward --ref v0.2.21`、逐个 `codex plugin add`；其他 Agent 只被调用过 `list`，文件不变 |
+| 只有 Codex 落后 | Codex 全部为 0.2.20，其他 Agent 最新，用户同意了全部 | Claude Code、Harness 跳过（“已是最新”）；Codex 先只读地运行 `marketplace list --json`（查到市场在），再依次逐个 `codex plugin remove`、`marketplace remove`、`marketplace add philfanzhou/ForgeSteward --ref v0.2.21`、逐个 `codex plugin add`；其他 Agent 只被调用过 `list`，文件不变 |
 | 部分同意 | 汇报列出 Codex 和 Harness，用户只同意 Codex | 只传 `--agents codex`，Harness 不动 |
-| 一个插件都没装 | Claude Code 存在但没装 ForgeSteward | 用数据文件的安装命令：先 `marketplace add ...@v0.2.21 --scope user`，再逐个 `plugin install --scope user` |
-| 没装插件但留着市场 | Claude Code 卸载过全部插件，`forge-steward` 市场还在 | 安装命令的“添加市场”一步可能失败；按某一步失败处理并报告，用户可先按 README 的卸载步骤移除市场，再同意一次 |
+| 一个插件都没装 | Claude Code 存在但没装 ForgeSteward，也没有 `forge-steward` 市场 | 同样用升级命令：没有可卸载的插件，列出市场后发现没有，跳过删除；先 `marketplace add ...@v0.2.21 --scope user`，再逐个 `plugin install --scope user`；输出“Claude Code：已安装 v0.2.21” |
+| 没装插件但留着市场 | Claude Code 或 Codex 卸载过全部插件，`forge-steward` 市场还指向旧版本 v0.2.20（实测此时直接添加 v0.2.21 会因来源不同失败） | 列出市场查到它在，先 `marketplace remove forge-steward`，再添加 v0.2.21 来源并逐个安装；复查为“最新”，退出码 `0` |
+| 插件在但市场已删 | Codex 还装着 0.2.20 的插件，`forge-steward` 市场已被删除 | 先列出市场，没有它；逐个卸载后跳过删除市场这一步（不去删不存在的市场），再添加 v0.2.21 来源并逐个安装；复查为“最新”，退出码 `0` |
+| 查不到市场列表 | `claude plugin marketplace list --json` 返回非零、超过 20 秒或输出无法识别 | 这个 Agent 不执行任何改动命令，结果写“查不到市场是否存在：原因”，复查状态不变；同一次同意的其他 Agent 照常处理；退出码 `1` |
 | 有已停用的旧插件 | Codex 还装着 `find-work` | 升级时一并卸载，不再装回；OpenCode、Harness 用安装器的 `uninstall` 卸载有安装记录的旧技能 |
 | 有非用户级安装 | Claude Code 另有项目级插件 | 只处理用户级，结果句末注明“另有非用户级安装，没有改动” |
 | 本地副本可用 | Claude Code 的市场副本 `~/.claude/plugins/marketplaces/forge-steward` 是 Git 仓库，`HEAD` 等于 Tag 提交且没有改动 | 直接用它运行安装器，不下载，用完不删除 |

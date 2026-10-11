@@ -502,12 +502,36 @@ def last_line(text):
     return lines[-1][-300:] if lines else ""
 
 
-def plugin_steps(agent, record, version, values):
-    """Commands for an agent that installs plugins one by one (Claude Code, Codex, ZCode)."""
+def has_marketplace(agent, name, values, timeout):
+    """Whether the agent lists the marketplace; raise Unknown when the list cannot be read."""
+    method = agent["detect_marketplace"]
+    argv, field = fill(method["argv"], values), method["name_field"]
+    try:
+        data = run_json(argv, timeout)
+        items = data if method["items"] is None else data.get(method["items"]) if isinstance(data, dict) else None
+        if not isinstance(items, list) or not all(isinstance(item, dict) and isinstance(item.get(field), str)
+                                                  for item in items):
+            raise Unknown("输出格式无法识别")
+    except Unknown as error:
+        raise Unknown("查不到市场是否存在：%s" % error)
+    return any(item[field] == name for item in items)
+
+
+def plugin_steps(agent, record, version, values, marketplace, timeout):
+    """Commands for an agent that installs plugins one by one (Claude Code, Codex, ZCode).
+
+    The upgrade steps serve a first install too: with nothing installed the uninstall step is empty, and a
+    marketplace left behind (perhaps from an older release) is removed before the target one is added. Whether
+    it exists is asked before any change, so an unreadable list leaves this agent untouched.
+    """
     installed = sorted(set(record.get("plugins", {})) | set(record.get("retired", {})))
     values = dict(values, version=version)
+    steps = agent["commands"]["upgrade"]
+    if any(step.get("only_if_marketplace") for step in steps):
+        if not has_marketplace(agent, marketplace, values, timeout):
+            steps = [step for step in steps if not step.get("only_if_marketplace")]
     planned = []
-    for step in agent["commands"]["upgrade" if installed else "install"]:
+    for step in steps:
         ok = step.get("ok_exit_codes", [0])
         if step.get("per_plugin"):
             names = installed if step.get("only_installed") else list(PLUGINS)
@@ -546,7 +570,7 @@ def skip_reason(record):
     return "无法判断：" + record.get("reason", "")
 
 
-def apply_agent(agent, record, version, retired, platform, options, sources, work):
+def apply_agent(agent, record, version, retired, platform, options, sources, work, marketplace):
     """Handle one agent; any failure stays inside this agent's entry."""
     entry = {"id": agent["id"], "name": agent["name"], "before": record["status"], "steps": [], "problems": []}
     if record.get("versions"):
@@ -562,7 +586,8 @@ def apply_agent(agent, record, version, retired, platform, options, sources, wor
             source, entry["source"] = sources.get(agent)
             steps = skill_steps(agent, record, version, source)
         else:
-            steps = plugin_steps(agent, record, version, command_values(agent, platform))
+            steps = plugin_steps(agent, record, version, command_values(agent, platform), marketplace,
+                                 options.command_timeout)
     except Unknown as error:
         entry["problems"].append(str(error))
         steps = []
@@ -618,7 +643,8 @@ def apply(catalog, version, ids, options, platform=sys.platform):
             try:
                 sources = Sources(catalog, version, work, options)
                 entries = [apply_agent(agent, records[agent["id"]], version, retired, platform, options, sources,
-                                       work) for agent in catalog["agents"] if agent["id"] in ids]
+                                       work, catalog["marketplace"])
+                           for agent in catalog["agents"] if agent["id"] in ids]
             finally:
                 remove_tree(work)
     except Stop as error:

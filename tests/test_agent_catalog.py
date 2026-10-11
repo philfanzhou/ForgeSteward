@@ -176,6 +176,30 @@ class AgentCatalogTests(unittest.TestCase):
                         self.assertTrue(any(step["per_plugin"] for step in steps), key)
                 self.assertEqual(uses_source, agent["needs_local_source"])
 
+    def test_plugin_agents_list_marketplaces_and_remove_only_existing_one(self):
+        catalog = load_catalog(REPO)
+        self.assertIn("only_if_marketplace", catalog["step_fields"])
+        expected = {
+            "claude-code": (["claude", "plugin", "marketplace", "list", "--json"], None),
+            "codex": (["codex", "plugin", "marketplace", "list", "--json"], "marketplaces"),
+            "zcode": (["node", "{zcode_cli}", "plugins", "marketplace", "list", "--json"], None),
+        }
+        for agent in catalog["agents"]:
+            with self.subTest(agent=agent["id"]):
+                if agent["install_mode"] != "per-plugin":
+                    self.assertNotIn("detect_marketplace", agent)
+                    continue
+                argv, items = expected[agent["id"]]
+                method = agent["detect_marketplace"]
+                self.assertEqual((method["argv"], method["items"], method["name_field"]), (argv, items, "name"))
+                for key, steps in agent["commands"].items():
+                    for step in steps:
+                        removes = "marketplace" in step["argv"] and "remove" in step["argv"]
+                        self.assertEqual(step.get("only_if_marketplace", False), key == "upgrade" and removes,
+                                         (key, step["argv"]))
+        self.assertEqual({agent["id"] for agent in catalog["agents"] if agent["install_mode"] == "per-plugin"},
+                         set(expected))
+
     def test_readme_matches_catalog_version_and_plugins(self):
         self.assertEqual(check_readme(REPO), [])
 

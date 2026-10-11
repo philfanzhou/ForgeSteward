@@ -2,7 +2,7 @@
   "schema": 1,
   "repository": "philfanzhou/ForgeSteward",
   "marketplace": "forge-steward",
-  "description": "ForgeSteward 支持的 Agent、检测方式及安装、升级、卸载命令。README 与自动安装脚本共用本文件；README 的一致性由 tests/test_agent_catalog.py 校验。",
+  "description": "ForgeSteward 支持的 Agent、检测方式及安装、升级、卸载命令。README 与自动安装脚本共用本文件；README 的一致性由 tests/test_agent_catalog.py 校验。逐个插件安装的 Agent（install_mode 为 per-plugin），自动安装脚本 apply 一律用 upgrade 步骤，没装插件时卸载一步自然为空；install 步骤只给 README 的首次安装用。",
   "placeholders": {
     "version": "统一版本号，不带 v，例如 0.2.21。仓库内取根目录 VERSION，技能包内取同目录的 VERSION。",
     "plugin": "插件短名，例如 prepare-work。取当前版本 plugins/ 下的全部插件。",
@@ -15,7 +15,8 @@
     "per_plugin": "true 时对每个插件各执行一次。",
     "only_installed": "true 时只对已经安装的 ForgeSteward 插件执行（包括 retired_plugins 中的旧名称）；README 列出全部插件。",
     "skip_if_exists": "目录已存在时跳过这一步。",
-    "ok_exit_codes": "视为成功的退出码，缺省为 [0]。"
+    "ok_exit_codes": "视为成功的退出码，缺省为 [0]。",
+    "only_if_marketplace": "true 时 apply 在开始任何改动前先用该 Agent 的 detect_marketplace 列出市场，列表里有 marketplace（即 forge-steward）才执行这一步；查不了市场列表时这个 Agent 不做任何改动。README 照常列出这一步。"
   },
   "agents": [
     {
@@ -37,6 +38,12 @@
         "version_field": "version",
         "notes": "输出为数组，每项含 id、version、scope；只看 scope 为 user 的项。"
       },
+      "detect_marketplace": {
+        "argv": ["claude", "plugin", "marketplace", "list", "--json"],
+        "items": null,
+        "name_field": "name",
+        "notes": "输出为数组，每项含 name。"
+      },
       "install_mode": "per-plugin",
       "needs_local_source": false,
       "commands": {
@@ -46,7 +53,7 @@
         ],
         "upgrade": [
           {"argv": ["claude", "plugin", "uninstall", "{plugin}@forge-steward", "--scope", "user", "--keep-data"], "per_plugin": true, "only_installed": true},
-          {"argv": ["claude", "plugin", "marketplace", "remove", "forge-steward", "--scope", "user"], "per_plugin": false},
+          {"argv": ["claude", "plugin", "marketplace", "remove", "forge-steward", "--scope", "user"], "per_plugin": false, "only_if_marketplace": true},
           {"argv": ["claude", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}", "--scope", "user"], "per_plugin": false},
           {"argv": ["claude", "plugin", "install", "{plugin}@forge-steward", "--scope", "user"], "per_plugin": true}
         ],
@@ -75,6 +82,12 @@
         "version_field": "version",
         "notes": "输出为对象，已安装插件在 installed 数组中。"
       },
+      "detect_marketplace": {
+        "argv": ["codex", "plugin", "marketplace", "list", "--json"],
+        "items": "marketplaces",
+        "name_field": "name",
+        "notes": "输出为对象，市场在 marketplaces 数组中，每项含 name。"
+      },
       "install_mode": "per-plugin",
       "needs_local_source": false,
       "commands": {
@@ -84,7 +97,7 @@
         ],
         "upgrade": [
           {"argv": ["codex", "plugin", "remove", "{plugin}@forge-steward"], "per_plugin": true, "only_installed": true},
-          {"argv": ["codex", "plugin", "marketplace", "remove", "forge-steward"], "per_plugin": false},
+          {"argv": ["codex", "plugin", "marketplace", "remove", "forge-steward"], "per_plugin": false, "only_if_marketplace": true},
           {"argv": ["codex", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v{version}"], "per_plugin": false},
           {"argv": ["codex", "plugin", "add", "{plugin}@forge-steward"], "per_plugin": true}
         ],
@@ -120,6 +133,12 @@
         "version_field": "version",
         "notes": "输出为数组，每项含 id、version、enabled。"
       },
+      "detect_marketplace": {
+        "argv": ["node", "{zcode_cli}", "plugins", "marketplace", "list", "--json"],
+        "items": null,
+        "name_field": "name",
+        "notes": "输出为数组，每项含 id、name，还会列出官方市场。"
+      },
       "install_mode": "per-plugin",
       "needs_local_source": false,
       "commands": {
@@ -129,7 +148,7 @@
         ],
         "upgrade": [
           {"argv": ["node", "{zcode_cli}", "plugins", "uninstall", "{plugin}@forge-steward", "--force", "--keep-data"], "per_plugin": true, "only_installed": true},
-          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "remove", "forge-steward"], "per_plugin": false},
+          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "remove", "forge-steward"], "per_plugin": false, "only_if_marketplace": true},
           {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}"], "per_plugin": false},
           {"argv": ["node", "{zcode_cli}", "plugins", "install", "{plugin}@forge-steward"], "per_plugin": true}
         ],
