@@ -95,11 +95,46 @@ class RunReportTests(unittest.TestCase):
         self.assertIn("### 耗时\n- 无记录\n", text)
 
     def test_sections_always_appear_in_spec_order(self):
-        for golden in ("full.md", "empty-zero.md", "empty-no-events.md"):
+        for golden in ("full.md", "empty-zero.md", "empty-no-events.md", "empty-agents.md"):
             lines = expected(golden).decode("utf-8").splitlines()
             headings = [line[4:] for line in lines if line.startswith("### ")]
             self.assertEqual(headings, self.spec["sections"][1:])
             self.assertTrue(lines[2].startswith(self.spec["sections"][0] + "："))
+
+    def test_agent_check_result_fills_last_section(self):
+        data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+        data["agent_check"] = {"file": "agent-check.json"}
+        path = self.make_run(data)
+        shutil.copyfile(str(FIXTURES / "agent-check.json"), str(path / "agent-check.json"))
+        first = self.report(path)
+        self.assertEqual(first.returncode, 0, first.stderr.decode("utf-8", "replace"))
+        self.assertEqual(first.stdout, expected("empty-agents.md"))
+        self.assertEqual(self.report(path).stdout, first.stdout)
+        self.assertEqual((path / "report.md").read_bytes(), first.stdout)
+
+    def test_agent_check_problems_only_change_last_section(self):
+        cases = ({"unavailable": "超时。"}, "- 无法检查：超时\n"), \
+                ({"file": "agent-check.json"}, "- 无法检查：找不到检查结果文件 agent-check.json\n"), \
+                ({"file": "broken.json"}, "- 无法检查：检查结果格式无法识别\n")
+        base = expected("empty-no-events.md").decode("utf-8")
+        for check, line in cases:
+            with self.subTest(check=check):
+                data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+                data["agent_check"] = check
+                path = self.make_run(data)
+                (path / "broken.json").write_text("{", encoding="utf-8")
+                result = self.report(path)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.decode("utf-8"), base.replace("- 未检查\n", line))
+
+    def test_agent_check_field_must_name_one_file_or_reason(self):
+        data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+        for check, problem in (([], "agent_check 应为对象"),
+                               ({"file": "a.json", "unavailable": "x"}, "agent_check 只能有 file 或 unavailable 其中一个"),
+                               ({"file": "../a.json"}, "agent_check.file 只能是运行目录下的文件名"),
+                               ({"unavailable": " "}, "agent_check.unavailable 应为非空文本")):
+            with self.subTest(check=check):
+                self.assertEqual(record.check_handoff(dict(data, agent_check=check), self.spec), [problem])
 
     def test_bad_data_lists_each_field_and_writes_nothing(self):
         data = json.loads((FIXTURES / "full.json").read_text(encoding="utf-8"))
@@ -176,7 +211,7 @@ class SingleDefinitionTests(unittest.TestCase):
         self.assertEqual(template[0], "## " + self.spec["title"])
         self.assertEqual([line[4:] for line in template if line.startswith("### ")], self.spec["sections"][1:])
         self.assertTrue(template[2].startswith(self.spec["sections"][0] + "："))
-        self.assertIn("- " + self.spec["agents"], template)
+        self.assertIn("- " + self.spec["agents"]["unchecked"], template)
         for word in self.spec["results"]:
             self.assertIn("- " + word, text)
 

@@ -5,8 +5,8 @@ Each run gets runs/<run id>/ under <git common dir>/forge-steward/: run.json,
 an append-only events.jsonl and one evidence directory per task. Records
 never touch version-controlled files; prune only removes run directories
 this script created. The report command renders the final summary from
-handoff.json and the events; its sections and wording come only from
-references/report.md.
+handoff.json, the events and, when recorded, the agent_install.py check
+result; its sections and wording come only from references/report.md.
 """
 
 import argparse
@@ -206,12 +206,28 @@ def load_report_spec(path=REPORT_RULES):
                  and set(spec["issue_only"]) <= set(results)
                  and all(isinstance(k, str) and isinstance(v, str) for k, v in spec["stages"].items())
                  and set(spec["waits"]) == {"ci", "lock"} and isinstance(spec["title"], str)
-                 and isinstance(spec["agents"], str))
+                 and valid_agent_spec(spec["agents"]))
     except (KeyError, TypeError, AttributeError):
         valid = False
     if not valid:
         raise ValueError("Malformed report-spec block in " + str(path))
     return spec
+
+
+AGENT_TEXTS = ("unchecked", "unavailable", "absent", "current", "none", "all_latest", "latest_unknown",
+               "other_scopes")
+AGENT_WITHOUT_LATEST = 3
+
+
+def valid_agent_spec(agents):
+    """The agents block names every check status and the wording of each report line."""
+    texts = [agents[key] for key in AGENT_TEXTS]
+    texts += list(agents["statuses"].values()) + list(agents["without_latest"].values())
+    return (all(isinstance(text, str) and text for text in texts)
+            and len(agents["statuses"]) == 6 and agents["absent"] not in agents["statuses"]
+            and agents["current"] in agents["statuses"]
+            and len(agents["without_latest"]) == AGENT_WITHOUT_LATEST
+            and len(set(agents["without_latest"]) - set(agents["statuses"])) == 1)
 
 
 def is_int(value):
@@ -296,6 +312,16 @@ def check_handoff(data, spec):
                 need(item, "recovery", where, "text")
     for where, text in entries("needs_you", optional=True):
         need({"": text}, "", where, "text")
+    check = need(data, "agent_check", "", "object", optional=True)
+    if check is not None:
+        if len(check) != 1 or not set(check) <= {"file", "unavailable"}:
+            problems.append("agent_check 只能有 file 或 unavailable 其中一个")
+        elif "unavailable" in check:
+            need(check, "unavailable", "agent_check", "text")
+        else:
+            name = need(check, "file", "agent_check", "text")
+            if name is not None and (name in (".", "..") or "/" in name or "\\" in name):
+                problems.append("agent_check.file 只能是运行目录下的文件名")
     return problems
 
 
@@ -329,7 +355,73 @@ def duration(seconds):
     return "%d 小时 %d 分" % (total // 60, total % 60)
 
 
-def render_report(data, summary, spec):
+def agent_lines(check, spec):
+    """Turn an agent_install.py check result into report lines; raise ValueError if it is unusable."""
+    words = spec["agents"]
+    latest = check.get("latest") if isinstance(check, dict) else None
+    if (not isinstance(check, dict) or check.get("schema") != 1 or not isinstance(check.get("agents"), list)
+            or not isinstance(latest, dict)):
+        raise ValueError("format")
+    version = latest.get("version")
+    if version is not None and not (isinstance(version, str) and version):
+        raise ValueError("format")
+    agents = []
+    for agent in check["agents"]:
+        if not isinstance(agent, dict) or not isinstance(agent.get("name"), str):
+            raise ValueError("format")
+        if agent.get("status") == words["absent"]:
+            continue
+        if agent.get("status") not in words["statuses"]:
+            raise ValueError("format")
+        for key in ("versions", "missing", "other_scopes"):
+            items = agent.get(key, [])
+            if not (isinstance(items, list) and all(isinstance(item, str) for item in items)):
+                raise ValueError("format")
+        agents.append(agent)
+    lines = []
+    if version is None:
+        lines.append(words["latest_unknown"].format(reason=trim(str(latest.get("error") or ""))))
+    elif not agents:
+        return [words["none"]]
+    elif all(agent["status"] == words["current"] and not agent.get("other_scopes") for agent in agents):
+        return [words["all_latest"].format(latest=flat(version))]
+    installed = next(key for key in words["without_latest"] if key not in words["statuses"])
+    for agent in agents:
+        versions = agent.get("versions", [])
+        values = {"name": flat(agent["name"]), "latest": flat(version or ""),
+                  "versions": "、".join("v" + flat(item) for item in versions),
+                  "missing": "、".join(flat(item) for item in agent.get("missing", [])),
+                  "reason": trim(str(agent.get("reason") or ""))}
+        template = words["statuses"][agent["status"]]
+        if version is None and agent["status"] in words["without_latest"]:
+            template = words["without_latest"][agent["status"]]
+        elif version is None and versions:
+            template = words["without_latest"][installed]
+        lines.append(template.format(**values) + (words["other_scopes"] if agent.get("other_scopes") else ""))
+    return lines
+
+
+def load_agent_lines(path, data, spec):
+    """Report lines for the agent check recorded in handoff.json; problems only affect this section."""
+    words = spec["agents"]
+    check = data.get("agent_check")
+    if check is None:
+        return [words["unchecked"]]
+    if "unavailable" in check:
+        return [words["unavailable"].format(reason=trim(check["unavailable"]))]
+    try:
+        result = json.loads((path / check["file"]).read_text(encoding="utf-8"))
+    except OSError:
+        return [words["unavailable"].format(reason="找不到检查结果文件 " + flat(check["file"]))]
+    except ValueError:
+        result = None
+    try:
+        return agent_lines(result, spec)
+    except ValueError:
+        return [words["unavailable"].format(reason="检查结果格式无法识别")]
+
+
+def render_report(data, summary, spec, agents=None):
     """Render the fixed seven-section report; output depends only on the inputs."""
     titles, empty = spec["sections"], "- 无"
     requests = data["change_requests"]
@@ -393,7 +485,8 @@ def render_report(data, summary, spec):
     lines += ["", "### " + titles[5]]
     lines.extend(["- %s。处理：%s" % (trim(item["what"]), trim(item["recovery"]))
                   for item in data["exceptions"]] or [empty])
-    lines += ["", "### " + titles[6], "- " + spec["agents"]]
+    lines += ["", "### " + titles[6]]
+    lines.extend("- " + line for line in agents or [spec["agents"]["unchecked"]])
     return "\n".join(lines) + "\n"
 
 
@@ -410,7 +503,7 @@ def build_report(path, spec=None):
     problems = check_handoff(data, spec)
     if problems:
         raise ReportDataError(problems)
-    text = render_report(data, summarize(path), spec)
+    text = render_report(data, summarize(path), spec, load_agent_lines(path, data, spec))
     target = path / "report.md"
     temporary = path / ".report.md.tmp"
     temporary.write_bytes(text.encode("utf-8"))

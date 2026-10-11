@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "checked_at": "2026-10-11T02:15:30Z",
+  "plugins": ["check-workflow", "execute-work", "fix-feedback", "prepare-work", "review-and-merge", "work-cycle"],
+  "latest": {"version": "0.2.21", "tag": "v0.2.21", "source": "gh"},
+  "agents": [
+    {"id": "claude-code", "name": "Claude Code", "status": "最新", "versions": ["0.2.21"], "missing": [],
+     "other_scopes": ["prepare-work"]},
+    {"id": "codex", "name": "Codex", "status": "落后", "versions": ["0.2.20"], "missing": []},
+    {"id": "zcode", "name": "ZCode", "status": "无法判断", "reason": "命令超时（20 秒）"},
+    {"id": "opencode", "name": "OpenCode", "status": "未安装 Agent"},
+    {"id": "deepseek-harness", "name": "DeepSeek Harness", "status": "缺少", "versions": [],
+     "missing": ["check-workflow", "execute-work", "fix-feedback", "prepare-work", "review-and-merge", "work-cycle"]}
+  ]
+}
