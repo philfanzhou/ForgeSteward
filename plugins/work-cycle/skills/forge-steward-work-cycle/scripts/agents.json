@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "repository": "philfanzhou/ForgeSteward",
+  "marketplace": "forge-steward",
+  "description": "ForgeSteward 支持的 Agent、检测方式及安装、升级、卸载命令。README 与自动安装脚本共用本文件；README 的一致性由 tests/test_agent_catalog.py 校验。",
+  "placeholders": {
+    "version": "统一版本号，不带 v，例如 0.2.21。仓库内取根目录 VERSION，技能包内取同目录的 VERSION。",
+    "plugin": "插件短名，例如 prepare-work。取当前版本 plugins/ 下的全部插件。",
+    "source": "按 v{version} 克隆的独立源码目录；README 使用 $HOME/code/ForgeSteward-v{version}。安装完成后已装技能不依赖该目录。",
+    "zcode_cli": "ZCode 内置命令行脚本 zcode.cjs 的路径，由 detect_agent.paths 找到，用 node 运行。"
+  },
+  "retired_plugins": ["find-work"],
+  "step_fields": {
+    "argv": "参数数组，按占位符展开后直接执行，不经过 shell。",
+    "per_plugin": "true 时对每个插件各执行一次。",
+    "only_installed": "true 时只对已经安装的 ForgeSteward 插件执行（包括 retired_plugins 中的旧名称）；README 列出全部插件。",
+    "skip_if_exists": "目录已存在时跳过这一步。",
+    "ok_exit_codes": "视为成功的退出码，缺省为 [0]。"
+  },
+  "agents": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "verified": {"version": "2.1.269", "date": "2026-10-11", "platforms": ["darwin"]},
+      "detect_agent": {
+        "commands": ["claude"],
+        "version_argv": ["claude", "--version"],
+        "paths": {},
+        "config_dirs": ["~/.claude"]
+      },
+      "detect_install": {
+        "method": "list-command",
+        "argv": ["claude", "plugin", "list", "--json"],
+        "items": null,
+        "id_field": "id",
+        "id_suffix": "@forge-steward",
+        "version_field": "version",
+        "notes": "输出为数组，每项含 id、version、scope；只看 scope 为 user 的项。"
+      },
+      "install_mode": "per-plugin",
+      "needs_local_source": false,
+      "commands": {
+        "install": [
+          {"argv": ["claude", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}", "--scope", "user"], "per_plugin": false},
+          {"argv": ["claude", "plugin", "install", "{plugin}@forge-steward", "--scope", "user"], "per_plugin": true}
+        ],
+        "upgrade": [
+          {"argv": ["claude", "plugin", "uninstall", "{plugin}@forge-steward", "--scope", "user", "--keep-data"], "per_plugin": true, "only_installed": true},
+          {"argv": ["claude", "plugin", "marketplace", "remove", "forge-steward", "--scope", "user"], "per_plugin": false},
+          {"argv": ["claude", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}", "--scope", "user"], "per_plugin": false},
+          {"argv": ["claude", "plugin", "install", "{plugin}@forge-steward", "--scope", "user"], "per_plugin": true}
+        ],
+        "uninstall": [
+          {"argv": ["claude", "plugin", "uninstall", "{plugin}@forge-steward", "--scope", "user"], "per_plugin": true, "only_installed": true},
+          {"argv": ["claude", "plugin", "marketplace", "remove", "forge-steward", "--scope", "user"], "per_plugin": false}
+        ]
+      }
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "verified": {"version": "0.154.0", "date": "2026-10-11", "platforms": ["darwin"]},
+      "detect_agent": {
+        "commands": ["codex"],
+        "version_argv": ["codex", "--version"],
+        "paths": {},
+        "config_dirs": ["~/.codex"]
+      },
+      "detect_install": {
+        "method": "list-command",
+        "argv": ["codex", "plugin", "list", "--json"],
+        "items": "installed",
+        "id_field": "pluginId",
+        "id_suffix": "@forge-steward",
+        "version_field": "version",
+        "notes": "输出为对象，已安装插件在 installed 数组中。"
+      },
+      "install_mode": "per-plugin",
+      "needs_local_source": false,
+      "commands": {
+        "install": [
+          {"argv": ["codex", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v{version}"], "per_plugin": false},
+          {"argv": ["codex", "plugin", "add", "{plugin}@forge-steward"], "per_plugin": true}
+        ],
+        "upgrade": [
+          {"argv": ["codex", "plugin", "remove", "{plugin}@forge-steward"], "per_plugin": true, "only_installed": true},
+          {"argv": ["codex", "plugin", "marketplace", "remove", "forge-steward"], "per_plugin": false},
+          {"argv": ["codex", "plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v{version}"], "per_plugin": false},
+          {"argv": ["codex", "plugin", "add", "{plugin}@forge-steward"], "per_plugin": true}
+        ],
+        "uninstall": [
+          {"argv": ["codex", "plugin", "remove", "{plugin}@forge-steward"], "per_plugin": true, "only_installed": true},
+          {"argv": ["codex", "plugin", "marketplace", "remove", "forge-steward"], "per_plugin": false}
+        ]
+      }
+    },
+    {
+      "id": "zcode",
+      "name": "ZCode",
+      "verified": {"version": "desktop 3.14.5, CLI 0.16.9", "date": "2026-10-11", "platforms": ["darwin"]},
+      "detect_agent": {
+        "commands": [],
+        "requires_commands": ["node"],
+        "paths": {
+          "darwin": [
+            "/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs",
+            "~/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs"
+          ]
+        },
+        "provides": "zcode_cli",
+        "config_dirs": ["~/.zcode"],
+        "notes": "只核对了 macOS 的应用路径；其他平台需由使用者提供 zcode.cjs 路径。桌面界面与命令行共用 ~/.zcode/cli/plugins。"
+      },
+      "detect_install": {
+        "method": "list-command",
+        "argv": ["node", "{zcode_cli}", "plugins", "list", "--json"],
+        "items": null,
+        "id_field": "id",
+        "id_suffix": "@forge-steward",
+        "version_field": "version",
+        "notes": "输出为数组，每项含 id、version、enabled。"
+      },
+      "install_mode": "per-plugin",
+      "needs_local_source": false,
+      "commands": {
+        "install": [
+          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}"], "per_plugin": false},
+          {"argv": ["node", "{zcode_cli}", "plugins", "install", "{plugin}@forge-steward"], "per_plugin": true}
+        ],
+        "upgrade": [
+          {"argv": ["node", "{zcode_cli}", "plugins", "uninstall", "{plugin}@forge-steward", "--force", "--keep-data"], "per_plugin": true, "only_installed": true},
+          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "remove", "forge-steward"], "per_plugin": false},
+          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "add", "philfanzhou/ForgeSteward@v{version}"], "per_plugin": false},
+          {"argv": ["node", "{zcode_cli}", "plugins", "install", "{plugin}@forge-steward"], "per_plugin": true}
+        ],
+        "uninstall": [
+          {"argv": ["node", "{zcode_cli}", "plugins", "uninstall", "{plugin}@forge-steward", "--force"], "per_plugin": true, "only_installed": true},
+          {"argv": ["node", "{zcode_cli}", "plugins", "marketplace", "remove", "forge-steward"], "per_plugin": false}
+        ]
+      }
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "verified": {"version": "1.18.30", "date": "2026-09-30", "platforms": ["darwin", "linux"]},
+      "detect_agent": {
+        "commands": ["opencode"],
+        "version_argv": ["opencode", "--version"],
+        "paths": {},
+        "config_dirs": ["~/.config/opencode"]
+      },
+      "detect_install": {
+        "method": "receipt",
+        "receipt": ".forge-steward-install.json",
+        "pattern": "forge-steward-*",
+        "version_field": "version",
+        "user_roots": [
+          {"env": "OPENCODE_CONFIG_DIR", "suffix": "skills"},
+          {"env": "XDG_CONFIG_HOME", "suffix": "opencode/skills"},
+          {"path": "~/.config/opencode/skills"}
+        ],
+        "project_root": ".opencode/skills",
+        "notes": "user_roots 按顺序取第一个已设置的环境变量，都未设置时用最后的默认路径。"
+      },
+      "install_mode": "all",
+      "needs_local_source": true,
+      "commands": {
+        "install": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/opencode.py", "install", "--all", "--user"], "per_plugin": false}
+        ],
+        "upgrade": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/opencode.py", "uninstall", "--all", "--user"], "per_plugin": false, "ok_exit_codes": [0, 2]},
+          {"argv": ["python3", "{source}/scripts/opencode.py", "install", "--all", "--user"], "per_plugin": false}
+        ],
+        "uninstall": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/opencode.py", "uninstall", "--all", "--user"], "per_plugin": false, "ok_exit_codes": [0, 2]}
+        ]
+      },
+      "notes": "Windows 用 py -3 代替 python3。uninstall 退出码 2 表示删除完成但目标目录里还有同名候选需要人工检查。"
+    },
+    {
+      "id": "deepseek-harness",
+      "name": "DeepSeek Harness",
+      "verified": {"version": "0.2.0-rc.2", "date": "2026-09-30", "platforms": ["darwin"]},
+      "detect_agent": {
+        "commands": [],
+        "paths": {
+          "darwin": [
+            "/Applications/DeepSeek Harness.app",
+            "~/Applications/DeepSeek Harness.app"
+          ]
+        },
+        "config_dirs": ["~/.dsh"],
+        "notes": "只核对了 macOS 桌面应用；没有已核对的命令行入口。"
+      },
+      "detect_install": {
+        "method": "receipt",
+        "receipt": ".forge-steward-install.json",
+        "pattern": "forge-steward-*",
+        "version_field": "version",
+        "user_roots": [
+          {"env": "DSH_HOME", "suffix": "skills"},
+          {"path": "~/.dsh/skills"}
+        ],
+        "project_root": ".dsh/skills",
+        "notes": "project_root 相对于最近的 Git 根目录。Harness 配置里的 dshHome 若覆盖了环境变量，需用同一路径设置 DSH_HOME。"
+      },
+      "install_mode": "all",
+      "needs_local_source": true,
+      "commands": {
+        "install": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/deepseek.py", "install", "--all", "--user"], "per_plugin": false}
+        ],
+        "upgrade": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/deepseek.py", "uninstall", "--all", "--user"], "per_plugin": false, "ok_exit_codes": [0, 2]},
+          {"argv": ["python3", "{source}/scripts/deepseek.py", "install", "--all", "--user"], "per_plugin": false}
+        ],
+        "uninstall": [
+          {"argv": ["git", "clone", "--branch", "v{version}", "--depth", "1", "https://github.com/philfanzhou/ForgeSteward.git", "{source}"], "per_plugin": false, "skip_if_exists": "{source}"},
+          {"argv": ["python3", "{source}/scripts/deepseek.py", "uninstall", "--all", "--user"], "per_plugin": false, "ok_exit_codes": [0, 2]}
+        ]
+      },
+      "notes": "Windows 用 py -3 代替 python3。uninstall 退出码 2 表示删除完成但目标目录里还有同名候选需要人工检查。"
+    }
+  ]
+}

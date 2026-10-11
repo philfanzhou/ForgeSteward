@@ -23,7 +23,7 @@ ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不
 
 ## 发布步骤与门禁
 
-1. 维护者确定版本及授权。在工作分支准备变更，新增 `docs/releases/<tag>.md` 的版本对应表、变更、迁移、验证边界，区分 README 的未发布目标与已发布推荐版本，发布确认后才更新固定安装推荐。历史表不随当前插件升版而改写。
+1. 维护者确定版本及授权。在工作分支准备变更，新增 `docs/releases/<tag>.md` 的版本对应表、变更、迁移、验证边界；同一 PR 把 README 开头、安装总表和各 Agent 安装/升级/卸载命令里的版本号改成新的 `VERSION`。新增、改名插件或某个 Agent 的命令变化时，先改 work-cycle 技能包内的 `scripts/agents.json`，再按它同步 README。`tests/test_agent_catalog.py` 校验 README 与 `VERSION`、插件目录和 `agents.json` 一致，漏改时测试失败并指出缺少的插件或不一致的版本。该 PR 合并后立即按下面的步骤打 Tag、发 Release；README 已说明以 Releases 页面为准、Tag 发布前的短暂时间里该版本可能还看不到。由于 `VERSION` 只在发版时修改，README 不会长期指向未发布的版本。历史表不随当前插件升版而改写。
 2. 核对 `VERSION`、全部插件的三份 manifest、共用市场的派生版本及完整资源，全部包版本必须相同且等于 `VERSION`，执行 `python3 scripts/sync_marketplace.py --check`。人工核对目标 Tag 恰为 `v` 加 `VERSION`，本次 Release 对应表全部插件版本相同；同时对照上次发布记录确认使用新版本。CI 的元数据测试校验源码中的版本一致性，不代替远端 Tag 和 Release 对应表的发布核对。
 3. 提交并审查 PR。执行 `python3 scripts/check_skill_limits.py --check`、`python3 -m unittest discover -s tests -v`、`git diff --check`、相对文档链接和版本表核对；执行可用的 Agent 校验。PR 的三个 OS 安装器检查及固定 OpenCode 发现检查必须通过。若 Agent 包有变化，补充受影响 Agent 的安装验证；明确未做模型行为验证。
 4. 通过仓库保护合并，禁止向 main 直接推送或绕过检查。记录审查 head、实际 main 合并提交和 CI 链接；等待该 main 提交的四个检查通过，若合并后源码不同则补验。
