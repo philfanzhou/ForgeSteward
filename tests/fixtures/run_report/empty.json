@@ -1,0 +1,12 @@
+{
+  "requested_cycles": 3,
+  "completed_cycles": 0,
+  "stop_reason": "准备阶段没有找到可做的 Issue",
+  "startup_check": "首次运行，已检查",
+  "startup_queue": {"count": 0, "note": ""},
+  "concurrency": {"enabled": false, "serial_reason": "运行环境不能在后台运行子 Agent"},
+  "branch_cleanup": "没有需要清理的分支",
+  "change_requests": [],
+  "issues_without_change_request": [],
+  "exceptions": []
+}

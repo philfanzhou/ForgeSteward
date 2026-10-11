@@ -4,7 +4,9 @@
 Each run gets runs/<run id>/ under <git common dir>/forge-steward/: run.json,
 an append-only events.jsonl and one evidence directory per task. Records
 never touch version-controlled files; prune only removes run directories
-this script created.
+this script created. The report command renders the final summary from
+handoff.json and the events; its sections and wording come only from
+references/report.md.
 """
 
 import argparse
@@ -26,6 +28,16 @@ TASK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 STATUSES = ("started", "finished", "failed", "wait-start", "wait-end")
 WAITS = ("ci", "lock", "review", "external", "other")
 MAX_DETAIL = 1000
+REPORT_RULES = Path(__file__).resolve().parent.parent / "references" / "report.md"
+SPEC_FENCE = "```json report-spec"
+
+
+class ReportDataError(Exception):
+    """handoff.json does not match the report fields; carries one message per field."""
+
+    def __init__(self, problems):
+        super().__init__("; ".join(problems))
+        self.problems = problems
 
 
 def runs_root(repo):
@@ -171,6 +183,252 @@ def summarize(path):
             "wait_seconds": waits, "tasks": report}
 
 
+def load_report_spec(path=REPORT_RULES):
+    """Read the single shared report spec block from references/report.md."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ValueError("Cannot read report rules: %s" % error)
+    try:
+        begin = lines.index(SPEC_FENCE)
+        end = lines.index("```", begin + 1)
+    except ValueError:
+        raise ValueError("No report-spec block in " + str(path))
+    try:
+        spec = json.loads("\n".join(lines[begin + 1:end]))
+    except ValueError as error:
+        raise ValueError("Invalid report-spec JSON: %s" % error)
+    try:
+        results = spec["results"]
+        valid = (len(spec["sections"]) == 7 and all(isinstance(x, str) and x for x in spec["sections"])
+                 and len(results) == 7 and len(set(results)) == 7 and all(isinstance(x, str) and x for x in results)
+                 and spec["merged"] in results and set(spec["needs_you"]) <= set(results)
+                 and set(spec["issue_only"]) <= set(results)
+                 and all(isinstance(k, str) and isinstance(v, str) for k, v in spec["stages"].items())
+                 and set(spec["waits"]) == {"ci", "lock"} and isinstance(spec["title"], str)
+                 and isinstance(spec["agents"], str))
+    except (KeyError, TypeError, AttributeError):
+        valid = False
+    if not valid:
+        raise ValueError("Malformed report-spec block in " + str(path))
+    return spec
+
+
+def is_int(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+KINDS = {
+    "text": (lambda v: isinstance(v, str) and v.strip() != "", "应为非空文本"),
+    "free": (lambda v: isinstance(v, str), "应为文本"),
+    "count": (lambda v: is_int(v) and v >= 0, "应为不小于 0 的整数"),
+    "positive": (lambda v: is_int(v) and v >= 1, "应为正整数"),
+    "bool": (lambda v: isinstance(v, bool), "应为 true 或 false"),
+    "list": (lambda v: isinstance(v, list), "应为列表"),
+    "object": (lambda v: isinstance(v, dict), "应为对象"),
+    "issue": (lambda v: (is_int(v) and v >= 1) or (isinstance(v, str) and v.strip() != ""),
+              "应为 Issue 编号或非空文本"),
+}
+
+
+def check_handoff(data, spec):
+    """Return one message per invalid field; empty when the data can be rendered."""
+    if not isinstance(data, dict):
+        return ["handoff.json 顶层应为对象"]
+    problems = []
+
+    def need(obj, key, path, kind, optional=False):
+        where = ".".join(part for part in (path, key) if part)
+        if key not in obj:
+            if not optional:
+                problems.append(where + " 缺少必填字段")
+            return None
+        accept, message = KINDS[kind]
+        if not accept(obj[key]):
+            problems.append(where + " " + message)
+            return None
+        return obj[key]
+
+    def entries(key, optional=False):
+        for index, item in enumerate(need(data, key, "", "list", optional) or []):
+            yield "%s[%d]" % (key, index), item
+
+    def outcome(item, where, allowed, message):
+        result = need(item, "result", where, "free")
+        if result is not None and result not in allowed:
+            problems.append("%s.result %s：%s" % (where, message, json.dumps(result, ensure_ascii=False)))
+        reason = need(item, "reason", where, "free")
+        need(item, "next", where, "free")
+        if result in spec["needs_you"] and reason is not None and not reason.strip():
+            problems.append("%s.reason 结果为%s时不能为空" % (where, result))
+
+    need(data, "requested_cycles", "", "positive")
+    need(data, "completed_cycles", "", "count")
+    for key in ("stop_reason", "startup_check", "branch_cleanup"):
+        need(data, key, "", "text")
+    queue = need(data, "startup_queue", "", "object")
+    if queue is not None:
+        need(queue, "count", "startup_queue", "count")
+        need(queue, "note", "startup_queue", "free")
+    mode = need(data, "concurrency", "", "object")
+    if mode is not None:
+        enabled = need(mode, "enabled", "concurrency", "bool")
+        if enabled is True:
+            need(mode, "agent_limit", "concurrency", "positive")
+        elif enabled is False:
+            need(mode, "serial_reason", "concurrency", "text")
+        need(mode, "note", "concurrency", "free", optional=True)
+    for key in ("change_requests", "issues_without_change_request", "exceptions"):
+        for where, item in entries(key):
+            if not isinstance(item, dict):
+                problems.append(where + " 应为对象")
+            elif key == "change_requests":
+                need(item, "url", where, "text")
+                need(item, "number", where, "positive")
+                for spot, issue in enumerate(need(item, "issues", where, "list") or []):
+                    need({"": issue}, "", "%s.issues[%d]" % (where, spot), "issue")
+                outcome(item, where, spec["results"], "不在结果词表中")
+            elif key == "issues_without_change_request":
+                need(item, "issue", where, "issue")
+                outcome(item, where, spec["issue_only"], "只能是" + "、".join(spec["issue_only"]))
+            else:
+                need(item, "what", where, "text")
+                need(item, "recovery", where, "text")
+    for where, text in entries("needs_you", optional=True):
+        need({"": text}, "", where, "text")
+    return problems
+
+
+def flat(text):
+    return " ".join(text.split())
+
+
+def trim(text):
+    return flat(text).rstrip("。；;，,、 ")
+
+
+def detail(item):
+    parts = [trim(item["reason"])] if trim(item["reason"]) else []
+    if trim(item["next"]):
+        parts.append("下一步：" + trim(item["next"]))
+    return "；".join(parts)
+
+
+def issue_label(issue):
+    return "#%d" % issue if is_int(issue) else flat(issue)
+
+
+def minutes(seconds):
+    return int(seconds / 60 + 0.5)
+
+
+def duration(seconds):
+    total = minutes(seconds)
+    if total < 60:
+        return "%d 分" % total
+    return "%d 小时 %d 分" % (total // 60, total % 60)
+
+
+def render_report(data, summary, spec):
+    """Render the fixed seven-section report; output depends only on the inputs."""
+    titles, empty = spec["sections"], "- 无"
+    requests = data["change_requests"]
+    paused = data["issues_without_change_request"]
+    needs = []
+    for item in requests:
+        if item["result"] in spec["needs_you"]:
+            needs.append("PR [#%d](%s) %s：%s。" % (item["number"], flat(item["url"]), item["result"], detail(item)))
+    for item in paused:
+        if item["result"] in spec["needs_you"]:
+            needs.append("Issue %s %s：%s。" % (issue_label(item["issue"]), item["result"], detail(item)))
+    needs.extend(trim(text) + "。" for text in data.get("needs_you", []))
+    merged = sum(1 for item in requests if item["result"] == spec["merged"])
+    lines = ["## " + spec["title"], "",
+             "%s：合并 %d 个 PR，%d 项需要你处理。共跑 %d 轮（上限 %d），%s。" % (
+                 titles[0], merged, len(needs), data["completed_cycles"], data["requested_cycles"],
+                 trim(data["stop_reason"])), "", "### " + titles[1]]
+    lines.extend(["%d. %s" % (index, text) for index, text in enumerate(needs, 1)] or [empty])
+
+    def cell(text):
+        return flat(text).replace("|", "\\|")
+
+    lines += ["", "### " + titles[2]]
+    rows = []
+    for item in requests:
+        issues = "、".join(issue_label(issue) for issue in item["issues"]) or "无"
+        rows.append("| [#%d](%s) | %s | %s | %s |" % (item["number"], cell(item["url"]), cell(issues),
+                                                     item["result"], cell(detail(item))))
+    for item in paused:
+        rows.append("| 无 | %s | %s | %s |" % (cell(issue_label(item["issue"])), item["result"], cell(detail(item))))
+    lines.extend(["| PR | 对应 Issue | 结果 | 说明 |", "|---|---|---|---|"] + rows if rows else [empty])
+
+    queue, mode = data["startup_queue"], data["concurrency"]
+    queued = "%d 个" % queue["count"] + ("，" + trim(queue["note"]) if trim(queue["note"]) else "")
+    if mode["enabled"]:
+        parallel = "开启，最多 %d 个" % mode["agent_limit"]
+    else:
+        parallel = "未开启，原因：" + trim(mode["serial_reason"])
+    if trim(mode.get("note", "")):
+        parallel += "；" + trim(mode["note"])
+    lines += ["", "### " + titles[3], "- 启动检查：" + trim(data["startup_check"]),
+              "- 开始前已有的 PR：" + queued,
+              "- 轮数：%d / %d，停止原因：%s" % (data["completed_cycles"], data["requested_cycles"],
+                                          trim(data["stop_reason"])),
+              "- 同时进行：" + parallel, "- 分支清理：" + trim(data["branch_cleanup"])]
+
+    lines += ["", "### " + titles[4]]
+    if summary["wall_seconds"] is None:
+        lines.append("- 无记录")
+    else:
+        stage_seconds = summary["stage_seconds"]
+        order = [name for name in spec["stages"] if name in stage_seconds]
+        order += sorted(name for name in stage_seconds if name not in spec["stages"])
+        stages = "、".join("%s %d" % (spec["stages"].get(name, name), minutes(stage_seconds[name]))
+                          for name in order)
+        lines.append("- 总计 " + duration(summary["wall_seconds"]) + ("：%s（分钟）" % stages if stages else ""))
+        waits = summary["wait_seconds"]
+        lines.append("- 其中" + "，".join("%s %s" % (spec["waits"][kind], duration(waits.get(kind, 0)))
+                                        for kind in ("ci", "lock")))
+
+    lines += ["", "### " + titles[5]]
+    lines.extend(["- %s。处理：%s" % (trim(item["what"]), trim(item["recovery"]))
+                  for item in data["exceptions"]] or [empty])
+    lines += ["", "### " + titles[6], "- " + spec["agents"]]
+    return "\n".join(lines) + "\n"
+
+
+def build_report(path, spec=None):
+    """Validate handoff.json, render the report and atomically save it as report.md."""
+    spec = spec or load_report_spec()
+    source = path / "handoff.json"
+    try:
+        data = json.loads(source.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError("Cannot read %s: %s" % (source, error))
+    except ValueError as error:
+        raise ValueError("%s is not valid JSON: %s" % (source, error))
+    problems = check_handoff(data, spec)
+    if problems:
+        raise ReportDataError(problems)
+    text = render_report(data, summarize(path), spec)
+    target = path / "report.md"
+    temporary = path / ".report.md.tmp"
+    temporary.write_bytes(text.encode("utf-8"))
+    os.replace(str(temporary), str(target))
+    return text
+
+
+def write_utf8(stream, text):
+    """Write UTF-8 bytes without newline translation, whatever the console encoding."""
+    stream.flush()
+    buffer = getattr(stream, "buffer", None)
+    if buffer is None:
+        stream.write(text)
+    else:
+        buffer.write(text.encode("utf-8"))
+        buffer.flush()
+
+
 def prune(root, keep, current=None):
     runs = []
     for path in root.glob("*"):
@@ -211,6 +469,8 @@ def main(argv=None):
     where.add_argument("--task", required=True)
     show = commands.add_parser("summary")
     show.add_argument("--run", required=True)
+    render = commands.add_parser("report")
+    render.add_argument("--run", required=True)
     trim = commands.add_parser("prune")
     trim.add_argument("--keep", type=int, default=20)
     args = parser.parse_args(argv)
@@ -232,6 +492,13 @@ def main(argv=None):
             print(task_dir(run_dir(root, args.run), args.task))
         elif args.command == "summary":
             print(json.dumps(summarize(run_dir(root, args.run)), ensure_ascii=False, indent=2))
+        elif args.command == "report":
+            try:
+                write_utf8(sys.stdout, build_report(run_dir(root, args.run)))
+            except ReportDataError as error:
+                write_utf8(sys.stderr, "ERROR: handoff.json 数据有问题，改正后重试：\n"
+                           + "".join("- " + problem + "\n" for problem in error.problems))
+                return 1
         else:
             if args.keep < 1:
                 parser.error("--keep must be positive")
