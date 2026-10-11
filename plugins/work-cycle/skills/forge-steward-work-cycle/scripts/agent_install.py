@@ -17,7 +17,10 @@ time at user level only, and judges each agent by checking it again
 afterwards. OpenCode and DeepSeek Harness use the installers of a source tree
 whose commit matches the release tag; a temporary clone is deleted at the end.
 One apply runs at a time, guarded by a lock directory in the system temporary
-directory that is never removed on someone else's behalf.
+directory that is never removed on someone else's behalf. Once changes start,
+an unexpected file error only marks the agent being handled, and a temporary
+or lock directory that cannot be deleted is reported under "cleanup"; the
+result is always the per-agent outcome, never a usage error.
 """
 
 import argparse
@@ -364,6 +367,12 @@ class Stop(Exception):
     """apply stops before changing anything; the message is an everyday-Chinese reason."""
 
 
+def file_error(error):
+    """Short reason for an OSError, with the path it concerns when known."""
+    reason = error.strerror or str(error)
+    return "%s（%s）" % (reason, error.filename) if error.filename else reason
+
+
 def remove_tree(path):
     """Delete a directory this script created, including read-only Git objects on Windows."""
     def writable(function, name, _):
@@ -464,6 +473,8 @@ class Sources:
                 self.result = self.prepare(agent)
             except Unknown as error:
                 self.result = error
+            except OSError as error:
+                self.result = Unknown("准备源码时出现意外的文件错误：" + file_error(error))
         if isinstance(self.result, Unknown):
             raise self.result
         return self.result
@@ -571,7 +582,7 @@ def skip_reason(record):
 
 
 def apply_agent(agent, record, version, retired, platform, options, sources, work, marketplace):
-    """Handle one agent; any failure stays inside this agent's entry."""
+    """Handle one agent; any failure, including an unexpected file error, stays inside this agent's entry."""
     entry = {"id": agent["id"], "name": agent["name"], "before": record["status"], "steps": [], "problems": []}
     if record.get("versions"):
         entry["before_versions"] = record["versions"]
@@ -581,37 +592,51 @@ def apply_agent(agent, record, version, retired, platform, options, sources, wor
         entry["skipped"] = skip_reason(record)
         return entry
     per_skill = agent["detect_install"]["method"] == "receipt"
+    stage = "准备安装步骤"
     try:
-        if per_skill:
-            source, entry["source"] = sources.get(agent)
-            steps = skill_steps(agent, record, version, source)
-        else:
-            steps = plugin_steps(agent, record, version, command_values(agent, platform), marketplace,
-                                 options.command_timeout)
-    except Unknown as error:
-        entry["problems"].append(str(error))
-        steps = []
-    except (KeyError, IndexError, TypeError, StopIteration):
-        entry["problems"].append("数据文件中的安装命令无法识别")
-        steps = []
-    for argv, ok in steps:
-        code, text = run_step(argv, work, options.step_timeout)
-        step = {"argv": argv, "code": code, "ok": code in ok}
-        if not step["ok"]:
-            step["output"] = text
-        entry["steps"].append(step)
-        # One skill refused by an installer does not stop the others; a failed plugin command stops this agent.
-        if not step["ok"] and not per_skill:
-            break
+        try:
+            if per_skill:
+                source, entry["source"] = sources.get(agent)
+                steps = skill_steps(agent, record, version, source)
+            else:
+                steps = plugin_steps(agent, record, version, command_values(agent, platform), marketplace,
+                                     options.command_timeout)
+        except Unknown as error:
+            entry["problems"].append(str(error))
+            steps = []
+        except (KeyError, IndexError, TypeError, StopIteration):
+            entry["problems"].append("数据文件中的安装命令无法识别")
+            steps = []
+        for argv, ok in steps:
+            stage = "运行 `%s` " % shown(argv)
+            code, text = run_step(argv, work, options.step_timeout)
+            step = {"argv": argv, "code": code, "ok": code in ok}
+            if not step["ok"]:
+                step["output"] = text
+            entry["steps"].append(step)
+            # One skill refused by an installer does not stop the others; a failed plugin command stops this agent.
+            if not step["ok"] and not per_skill:
+                break
+    except OSError as error:
+        # The rest of this agent's steps are skipped; the check below still decides whether it is done.
+        entry["problems"].append("%s时出现意外的文件错误：%s" % (stage, file_error(error)))
     after = classify(inspect(agent, retired, platform, options.command_timeout), version)
     entry["after"] = {key: after[key] for key in ("status", "versions", "missing", "reason") if key in after}
     entry["done"] = after["status"] == CURRENT
     return entry
 
 
+def tidy(path, kind, cleanup):
+    """Delete a directory this apply created; a failure is added to cleanup instead of raised."""
+    try:
+        remove_tree(path)
+    except OSError as error:
+        cleanup.append({"kind": kind, "path": str(path), "reason": file_error(error)})
+
+
 @contextmanager
-def apply_lock():
-    """Only one apply at a time; an existing lock is reported, never removed."""
+def apply_lock(cleanup):
+    """Only one apply at a time; an existing lock is reported, never removed. A failed removal goes to cleanup."""
     lock = Path(tempfile.gettempdir()) / LOCK_NAME
     try:
         os.mkdir(str(lock))
@@ -620,18 +645,25 @@ def apply_lock():
     except OSError as error:
         raise Stop("无法建立锁目录 %s：%s" % (lock, error.strerror or error))
     try:
-        (lock / "owner").write_text("pid=%d\n" % os.getpid(), encoding="utf-8")
+        try:
+            (lock / "owner").write_text("pid=%d\n" % os.getpid(), encoding="utf-8")
+        except OSError as error:
+            raise Stop("无法写入锁目录：" + file_error(error))
         yield
     finally:
-        remove_tree(lock)
+        tidy(lock, "lock", cleanup)
 
 
 def apply(catalog, version, ids, options, platform=sys.platform):
-    """Check again, then install or upgrade the agreed agents one by one at user level."""
+    """Check again, then install or upgrade the agreed agents one by one at user level; never raises OSError."""
+    cleanup = []
     try:
-        with apply_lock():
+        with apply_lock(cleanup):
             api_url = options.release_api or RELEASE_API.format(repository=catalog["repository"])
-            result = check(catalog, api_url, options.command_timeout, platform)
+            try:
+                result = check(catalog, api_url, options.command_timeout, platform)
+            except OSError as error:
+                raise Stop("重新检查时出现意外的文件错误：" + file_error(error))
             latest = result["latest"]["version"]
             if latest is None:
                 raise Stop("无法确认最新版本：" + result["latest"].get("error", ""))
@@ -639,18 +671,23 @@ def apply(catalog, version, ids, options, platform=sys.platform):
                 raise Stop("最新正式版已变成 v%s，不是同意的 v%s；请按新版本重新询问" % (latest, version))
             records = {record["id"]: record for record in result["agents"]}
             retired = set(catalog.get("retired_plugins", []))
-            work = Path(tempfile.mkdtemp(prefix="forge-steward-apply-"))
+            try:
+                work = Path(tempfile.mkdtemp(prefix="forge-steward-apply-"))
+            except OSError as error:
+                raise Stop("无法建立临时目录（%s）：%s" % (tempfile.gettempdir(), file_error(error)))
+            # Changes start here: from now on every agreed agent gets an entry, whatever goes wrong.
             try:
                 sources = Sources(catalog, version, work, options)
                 entries = [apply_agent(agent, records[agent["id"]], version, retired, platform, options, sources,
                                        work, catalog["marketplace"])
                            for agent in catalog["agents"] if agent["id"] in ids]
             finally:
-                remove_tree(work)
+                tidy(work, "work", cleanup)
     except Stop as error:
         return {"schema": 1, "command": "apply", "version": version, "outcome": "stopped", "reason": str(error),
-                "agents": []}
-    return {"schema": 1, "command": "apply", "version": version, "outcome": "done", "agents": entries}
+                "agents": [], "cleanup": cleanup}
+    return {"schema": 1, "command": "apply", "version": version, "outcome": "done", "agents": entries,
+            "cleanup": cleanup}
 
 
 def shown(argv):
@@ -668,10 +705,18 @@ def state_text(after):
     return status
 
 
+def cleanup_line(item):
+    if item["kind"] == "lock":
+        return ("锁目录 %s 没能删除：%s。确认没有安装在运行后手动删除它，否则下次会提示“另一个安装正在进行”"
+                % (item["path"], item["reason"]))
+    return "临时目录 %s 没能删除：%s，可以手动删除" % (item["path"], item["reason"])
+
+
 def apply_lines(result):
     """Everyday-Chinese lines telling the user what actually happened."""
+    cleanup = [cleanup_line(item) for item in result.get("cleanup", [])]
     if result["outcome"] == "stopped":
-        return ["没有做任何改动：" + result["reason"]]
+        return ["没有做任何改动：" + result["reason"]] + cleanup
     lines = []
     version = result["version"]
     for entry in result["agents"]:
@@ -690,6 +735,8 @@ def apply_lines(result):
             if refused:
                 line += "；但有步骤没成功：" + "；".join("%s（%s）" % (shown(step["argv"]), last_line(step.get("output"))
                                                                    or "返回 %s" % step["code"]) for step in refused)
+            if entry["problems"]:
+                line += "；但" + "；".join(entry["problems"])
         else:
             parts = ["复查结果：" + state_text(entry["after"])] + entry["problems"]
             parts += ["`%s` 没成功：%s" % (shown(step["argv"]), last_line(step.get("output")) or "返回 %s" % step["code"])
@@ -698,6 +745,7 @@ def apply_lines(result):
         if entry.get("other_scopes"):
             line += "（另有非用户级安装，没有改动）"
         lines.append(line)
+    lines += cleanup
     if any(entry.get("done") for entry in result["agents"]):
         lines.append("新版本要在各 Agent 的下一个新会话里才生效。")
     return lines
@@ -737,8 +785,9 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     probe = commands.add_parser("check", help="read-only check; exit 0 whatever the result, 2 on usage errors")
     change = commands.add_parser(
-        "apply", help="install or upgrade the agents the user agreed to; exit 0 all done, 1 some agent not done, "
-                      "2 usage error (nothing changed), 3 stopped before any change")
+        "apply", help="install or upgrade the agents the user agreed to; exit 0 all done and cleaned up, "
+                      "1 some agent not done or some cleanup not done (one line each), 2 usage or environment error "
+                      "before any change (nothing changed), 3 stopped before any change")
     change.add_argument("--version", required=True, help="the X.Y.Z the user saw and agreed to")
     change.add_argument("--agents", required=True, help="comma-separated agent ids the user agreed to")
     change.add_argument("--step-timeout", type=float, default=STEP_TIMEOUT)
@@ -766,7 +815,9 @@ def main(argv=None):
                 parser.error("--step-timeout must be positive")
             result = apply(catalog, args.version, ids, args)
             lines = apply_lines(result)
-            if result["outcome"] == "stopped":
+            if result["cleanup"]:
+                code = 1
+            elif result["outcome"] == "stopped":
                 code = 3
             else:
                 code = 0 if all(entry.get("done", True) for entry in result["agents"]) else 1
@@ -783,6 +834,7 @@ def main(argv=None):
             write_utf8("".join("- " + line + "\n" for line in lines))
         return code
     except (OSError, ValueError) as error:
+        # Only errors before apply starts changing anything reach here; apply itself reports file errors per agent.
         print("ERROR: " + str(error), file=sys.stderr)
         return 2
 
