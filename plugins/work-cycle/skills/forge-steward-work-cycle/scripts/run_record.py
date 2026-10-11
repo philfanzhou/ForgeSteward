@@ -215,7 +215,7 @@ def load_report_spec(path=REPORT_RULES):
 
 
 AGENT_TEXTS = ("unchecked", "unavailable", "absent", "current", "none", "all_latest", "latest_unknown",
-               "other_scopes")
+               "other_scopes", "ask")
 AGENT_WITHOUT_LATEST = 3
 
 
@@ -226,6 +226,7 @@ def valid_agent_spec(agents):
     return (all(isinstance(text, str) and text for text in texts)
             and len(agents["statuses"]) == 6 and agents["absent"] not in agents["statuses"]
             and agents["current"] in agents["statuses"]
+            and bool(agents["ask_for"]) and set(agents["ask_for"]) <= set(agents["statuses"]) - {agents["current"]}
             and len(agents["without_latest"]) == AGENT_WITHOUT_LATEST
             and len(set(agents["without_latest"]) - set(agents["statuses"])) == 1)
 
@@ -398,6 +399,10 @@ def agent_lines(check, spec):
         elif version is None and versions:
             template = words["without_latest"][installed]
         lines.append(template.format(**values) + (words["other_scopes"] if agent.get("other_scopes") else ""))
+    # With a known latest release, end with one question about the agents that can be installed or upgraded.
+    offered = [flat(agent["name"]) for agent in agents if agent["status"] in words["ask_for"]]
+    if version is not None and offered:
+        lines.append(words["ask"].format(names="、".join(offered), latest=flat(version)))
     return lines
 
 

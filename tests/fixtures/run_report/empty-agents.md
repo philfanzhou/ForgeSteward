@@ -26,3 +26,4 @@
 - Codex：v0.2.20，落后于最新 v0.2.21
 - ZCode：无法判断：命令超时（20 秒）
 - DeepSeek Harness：未安装（最新 v0.2.21）
+- Codex、DeepSeek Harness 可以安装或升级到 v0.2.21。要现在安装或升级吗？
