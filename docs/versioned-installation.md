@@ -1,6 +1,6 @@
 # 固定版本安装、升级与回退
 
-README 已提供三种 Agent 的[升级快捷步骤](../README.md#upgrade-and-keep-only-the-selected-version)和[完整卸载步骤](../README.md#uninstall-and-verify)。本页补充固定版本、作用域及回退边界；升级 Agent 程序本身不等于升级固定 Tag 的技能。
+当前版本的安装、升级、卸载以 README 的[支持的 Agent 与安装方式](../README.md#supported-agents-and-installation)为准，五个 Agent 的命令都在那里；选择其他已发布版本见[升级并只保留所选版本](../README.md#upgrade-and-keep-only-the-selected-version)，卸载核对见[卸载与核验](../README.md#uninstall-and-verify)。本页补充固定版本、作用域及回退边界，其中以 `v0.2.1` 为例的命令是历史版本的写法，不是当前推荐的安装方式；升级 Agent 程序本身不等于升级固定 Tag 的技能。
 
 ## 先选择版本
 
@@ -129,13 +129,15 @@ OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本�
 
 ## ZCode
 
-当前 ZCode 支持属于未发布 `0.2.3` 目标，不将本文 `v0.2.1` 历史命令当作其更新检测或运行验证。固定版本通过已核对 Tag/SHA 的独立本地 checkout 加入市场；不假定 Codex `--ref` 或 Claude `@tag` 输入适用。切换前保存子集与旧来源，卸载旧插件并移除旧市场，添加选定快照后重装、核对真实内容和新会话来源；失败时用旧快照恢复。完整步骤及 GUI 未实测边界见 [ZCode 固定版本与回退](zcode.md#固定版本与回退)。
+ZCode 与 Claude Code 一样用 GitHub 地址加版本号固定市场来源：内置 CLI 执行 `node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@vX.Y.Z`，再逐个 `plugins install <插件>@forge-steward`。2026-10-11 已在隔离环境用内置 CLI `0.16.9` 实际验证，Tag 换成旧版本后装到的也是旧版本。当前版本的完整命令见 [README 的 ZCode 一节](../README.md#zcode)。
 
-市场版本仅用于更新检测，由 `VERSION` 派生，不选择另一份源码。未发布同版本内改变源码时可能需要重装；刷新索引不证明已安装内容改变。回退和升级均需处理手工导入副本、退役 `find-work` 及其他作用域，见 [卸载与只保留目标版本](zcode.md#卸载与只保留目标版本)。
+切换或回退：先记录安装子集和旧来源，逐个 `plugins uninstall <插件>@forge-steward --force --keep-data`（`--force` 只是跳过确认提示），再 `plugins marketplace remove forge-steward`（只移除市场不会卸载插件），然后添加所选 Tag 并重装，核对 `plugins list --json` 中的版本和新任务中的来源；失败时按同样步骤装回旧 Tag。早期以本地 checkout 为来源的安装，按此步骤换成 GitHub 来源后不再依赖该目录。桌面界面操作未实测，详见 [ZCode 固定版本与回退](zcode.md#固定版本与回退)。
+
+市场版本仅用于更新检测，由 `VERSION` 派生，不选择另一份源码。`plugins update` 会跟随市场指向的版本，包括降级，但不会补装新增插件。回退和升级均需处理手工导入副本、退役 `find-work` 及其他作用域，见 [卸载与只保留目标版本](zcode.md#卸载与只保留目标版本)。
 
 ## prepare-work 与 execute-work 的改名迁移
 
-当前 `0.2.3` 目标尚未发布，移除旧 `find-work` 并安装 `prepare-work`、`execute-work` 的步骤见 [迁移说明](prepare-execute-migration.md)。本文固定 `v0.2.1` 的示例保留历史名称；选择新版时同时按其名称映射更新安装子集，不能只替换 Tag 后继续安装退役名称。
+`v0.2.3` 起移除旧 `find-work` 并改为 `prepare-work`、`execute-work`，步骤见 [迁移说明](prepare-execute-migration.md)。本文固定 `v0.2.1` 的示例保留历史名称；选择新版时同时按其名称映射更新安装子集，不能只替换 Tag 后继续安装退役名称。
 
 ## 从 v0.2.0 升级
 
@@ -147,4 +149,4 @@ OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本�
 
 “只保留新版”首先要求实际发现来源中不再有旧版副本：逐个核对环境、作用域和手工路径，不能以选择器只显示一个名字证明没有重复。磁盘清理另行核验：Codex 卸载命令声明清理对应本地缓存；Claude Code 旧版缓存有后台清理宽限期；OpenCode update 替换选中的受管目录，但不删除其他作用域、退役名称和手工副本；ZCode 插件卸载与导入副本、缓存及远端同步分别处理。不要把这些行为统一宣传为立即零残留。
 
-需要立即清理磁盘时，停止相关会话，列明确切旧路径，核对 ForgeSteward 归属及所有配置/作用域的引用；受管安装用对应卸载命令，确认无人引用的缓存或手工副本先移出全部发现路径备份，复核后再删除。不得按宽泛通配符删除共享目录。旧源码 clone 与安装副本分开处理；OpenCode 安装器及本地路径市场仍依赖的 checkout 必须保留。详见 README 的[仅保留目标版本核验清单](../README.md#verify-that-only-the-intended-version-remains)。
+需要立即清理磁盘时，停止相关会话，列明确切旧路径，核对 ForgeSteward 归属及所有配置/作用域的引用；受管安装用对应卸载命令，确认无人引用的缓存或手工副本先移出全部发现路径备份，复核后再删除。不得按宽泛通配符删除共享目录。旧源码 clone 与安装副本分开处理：OpenCode、DeepSeek Harness 的已装副本不依赖安装时的 clone，GitHub 来源的市场也不依赖本地目录；仍以本地目录为来源的市场所依赖的 checkout 必须保留，换成 GitHub 来源后才能删除。详见 README 的[仅保留目标版本核验清单](../README.md#verify-that-only-the-intended-version-remains)。
