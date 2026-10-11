@@ -282,11 +282,19 @@ class UsageAndSingleSourceTests(Sandbox):
 # 与实测一致：Claude Code、Codex 已有来源不同的市场时添加失败，ZCode 直接换来源；删除不存在的市场失败。
 # 状态里的 market_list 为 "bad" 时列出市场输出无法识别，为 "slow" 时 30 秒才返回。
 AGENT_FAKE = r"""
-import json, re, sys, time
+import json, os, re, sys, tempfile, time, uuid
 STATE, LOG, NAME, KIND, FAIL = %r, %r, %r, %r, %r
 args = [a for a in sys.argv[1:] if not a.endswith(".cjs")]
-with open(LOG, "a", encoding="utf-8") as log:
-    log.write(json.dumps([NAME] + args) + "\n")
+with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=LOG,
+                                 prefix=".pending-", suffix=".tmp", delete=False) as log:
+    json.dump([NAME] + args, log)
+    log.write("\n")
+    pending = log.name
+# Python 3.9 的 macOS monotonic_ns() 从进程启动计时，不能跨假命令排序。
+tick = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) if hasattr(time, "clock_gettime_ns")
+        else time.monotonic_ns())
+published = os.path.join(LOG, "%%020d-%%s.json" %% (tick, uuid.uuid4().hex))
+os.replace(pending, published)
 with open(STATE, encoding="utf-8") as file:
     state = json.load(file)
 joined = " ".join(args)
@@ -375,8 +383,8 @@ class ApplySandbox(Sandbox):
         self.tmp = self.root / "tmp"
         self.tmp.mkdir()
         self.env.update(TMPDIR=str(self.tmp), TEMP=str(self.tmp), TMP=str(self.tmp))
-        self.log = self.root / "calls.jsonl"
-        self.log.write_text("", encoding="utf-8")
+        self.log = self.root / "calls"
+        self.log.mkdir()
         if os.name == "nt":
             (self.bin / "git.cmd").write_text('@"%s" %%*\r\n' % self.real_git, encoding="utf-8")
         else:
@@ -412,8 +420,12 @@ class ApplySandbox(Sandbox):
         return json.loads(state.read_text(encoding="utf-8"))["plugins"]
 
     def calls(self, name=None):
-        rows = [json.loads(line) for line in self.log.read_text(encoding="utf-8").splitlines()]
+        rows = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.log.glob("*.json"))]
         return [row[1:] for row in rows if name is None or row[0] == name]
+
+    def clear_calls(self):
+        for path in self.log.iterdir():
+            path.unlink()
 
     def changing_calls(self):
         return [row for row in self.calls() if "list" not in row]
@@ -527,6 +539,19 @@ class ApplyHarnessTests(ApplySandbox):
 
 
 class ApplyPluginAgentTests(ApplySandbox):
+    def test_calls_ignore_unpublished_file_but_reject_broken_published_record(self):
+        (self.log / "00000000000000000001-first.json").write_text(
+            json.dumps(["claude", "plugin", "list"]), encoding="utf-8")
+        (self.log / ".pending-interrupted.tmp").write_text('["claude",', encoding="utf-8")
+        (self.log / "00000000000000000002-second.json").write_text(
+            json.dumps(["claude", "plugin", "marketplace", "list"]), encoding="utf-8")
+        self.assertEqual(self.calls("claude"), [["plugin", "list"], ["plugin", "marketplace", "list"]])
+        self.assertEqual(self.market_lists("claude"), [["plugin", "marketplace", "list"]])
+        self.assertEqual(self.changing_calls(), [])
+        (self.log / "00000000000000000003-broken.json").write_text('["claude",', encoding="utf-8")
+        with self.assertRaises(json.JSONDecodeError):
+            self.calls()
+
     def test_only_the_lagging_agent_is_handled(self):
         claude = self.agent("claude", "claude", every(LATEST))
         old = dict(every("1.2.2"), **{"find-work": "1.2.2"})
@@ -573,7 +598,7 @@ class ApplyPluginAgentTests(ApplySandbox):
                  ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward", "--ref", "v" + LATEST],
                  ["plugin", "add", "{}@forge-steward"])):
             with self.subTest(agent=agent_id):
-                self.log.write_text("", encoding="utf-8")
+                self.clear_calls()
                 state = self.agent(command, kind, {}, market="1.2.2")
                 code, out, _ = self.apply(agents=agent_id)
                 self.assertEqual(code, 0, out)
@@ -598,11 +623,17 @@ class ApplyPluginAgentTests(ApplySandbox):
                          + [["plugin", "add", name + "@forge-steward"] for name in PLUGINS])
 
     def test_unreadable_marketplace_list_leaves_that_agent_untouched(self):
+        # Windows CI 每次跑完整套测试时，都把发生过偶发失败的场景连续验证十次。
+        for attempt in range(10 if os.name == "nt" else 1):
+            with self.subTest(attempt=attempt):
+                self.assert_unreadable_marketplace_list_leaves_that_agent_untouched()
+
+    def assert_unreadable_marketplace_list_leaves_that_agent_untouched(self):
         for market_list, fail, reason in ((None, ["marketplace list"], "命令返回 1"),
                                           ("bad", [], "输出格式无法识别"),
                                           ("slow", [], "命令超时（2 秒）")):
             with self.subTest(market_list=market_list or "fail"):
-                self.log.write_text("", encoding="utf-8")
+                self.clear_calls()
                 claude = self.agent("claude", "claude", every("1.2.2"), fail=fail, market_list=market_list)
                 codex = self.agent("codex", "codex", every("1.2.2"))
                 result = self.apply_json(1, agents="claude-code,codex", extra=("--command-timeout", "2"))
@@ -611,6 +642,7 @@ class ApplyPluginAgentTests(ApplySandbox):
                 self.assertEqual(claude_entry["problems"], ["查不到市场是否存在：" + reason])
                 self.assertEqual(claude_entry["steps"], [])
                 self.assertEqual(claude_entry["after"]["status"], "落后")
+                self.assertTrue(self.market_lists("claude"), "市场列表调用必须有完整记录")
                 self.assertTrue(all("list" in row for row in self.calls("claude")))
                 self.assertEqual(self.plugins_of(claude), every("1.2.2"))
                 self.assertTrue(entries["codex"]["done"])
