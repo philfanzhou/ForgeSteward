@@ -151,7 +151,7 @@
 
 ## 其他 Agent 安装检查（#97）
 
-work-cycle 开始时运行一次技能包内的 `scripts/agent_install.py check`，只读查出本机各 Agent 用户级装的 ForgeSteward 版本，与 GitHub 最新正式版比较，结果存为运行目录的 `agent-check.json`，汇报最后一节按它生成。检测方式全部取自同目录的 `agents.json`。本节只列状态；提问和安装、升级由 #98 处理。下表是规则走查；各状态由 `tests/test_agent_install.py` 用临时 HOME、临时 PATH 里的假命令和注入的发布数据验证，不联网。
+work-cycle 开始时运行一次技能包内的 `scripts/agent_install.py check`，只读查出本机各 Agent 用户级装的 ForgeSteward 版本，与 GitHub 最新正式版比较，结果存为运行目录的 `agent-check.json`，汇报最后一节按它生成。检测方式全部取自同目录的 `agents.json`。本节只列状态；结束时的提问和同意后的安装、升级见下一节。下表是规则走查；各状态由 `tests/test_agent_install.py` 用临时 HOME、临时 PATH 里的假命令和注入的发布数据验证，不联网。
 
 | 场景 | 输入和状态 | 预期行为 |
 | --- | --- | --- |
@@ -168,3 +168,33 @@ work-cycle 开始时运行一次技能包内的 `scripts/agent_install.py check`
 | 最新版查不到 | `gh` 不可用且 GitHub 接口失败，或最新发布是预发布、Tag 不是 `vX.Y.Z` | 汇报先写“无法确认最新版本：原因”，各 Agent 只列已装版本 |
 | 检查做不了 | 没有可用的 Python、返回 `2`、超过 60 秒或被中断 | `handoff.json` 记 `unavailable` 原因，汇报写“无法检查：原因”；本次工作照常交付 |
 | 只读 | 检查前后对比临时 HOME 下的全部文件 | 逐字节不变；检查结果只写到运行目录 |
+
+## 结束时询问，同意后安装或升级（#98）
+
+汇报最后一节在最新正式版已知、且有“缺少”“不完整”“落后”的 Agent 时，末行列出这些 Agent 和目标版本，问一句“要现在安装或升级吗？”。用户明确同意后，编排 Agent 运行 `scripts/agent_install.py apply --version X.Y.Z --agents <id,...>`，再把脚本输出的实际结果告诉用户。只有 work-cycle 编排这样做；阶段子 Agent 不检查、不提问、不安装。下表是规则走查；各场景由 `tests/test_agent_install.py` 用临时 HOME、临时目录、临时 PATH 里的有状态假命令、本地临时 Git 仓库和注入的发布数据验证，不联网，不碰本机真实的 Agent 配置。
+
+| 场景 | 输入和状态 | 预期行为 |
+| --- | --- | --- |
+| 只缺 Harness，同意 | 汇报末行“DeepSeek Harness 可以安装或升级到 v0.2.21。要现在安装或升级吗？”，用户同意 | 查到 `v0.2.21` 的提交，没有可用的本地副本时下载 Tag 到临时目录并核对提交；用其中的 `scripts/deepseek.py install forge-steward-<插件> --user` 逐个安装 6 个技能到 `DSH_HOME/skills`（未设置时为 `~/.dsh/skills`），各带安装记录、版本 `0.2.21`；复查为“最新”；临时源码和锁目录删除；输出“DeepSeek Harness：已安装 v0.2.21”和“新版本要在各 Agent 的下一个新会话里才生效。” |
+| 拒绝或没回答 | 同上，用户说不用或没回应 | 不运行 `apply`，任何文件不变；不记住拒绝，下次运行照样检查和询问 |
+| 只有 Codex 落后 | Codex 全部为 0.2.20，其他 Agent 最新，用户同意了全部 | Claude Code、Harness 跳过（“已是最新”）；Codex 依次逐个 `codex plugin remove`、`marketplace remove`、`marketplace add philfanzhou/ForgeSteward --ref v0.2.21`、逐个 `codex plugin add`；其他 Agent 只被调用过 `list`，文件不变 |
+| 部分同意 | 汇报列出 Codex 和 Harness，用户只同意 Codex | 只传 `--agents codex`，Harness 不动 |
+| 一个插件都没装 | Claude Code 存在但没装 ForgeSteward | 用数据文件的安装命令：先 `marketplace add ...@v0.2.21 --scope user`，再逐个 `plugin install --scope user` |
+| 没装插件但留着市场 | Claude Code 卸载过全部插件，`forge-steward` 市场还在 | 安装命令的“添加市场”一步可能失败；按某一步失败处理并报告，用户可先按 README 的卸载步骤移除市场，再同意一次 |
+| 有已停用的旧插件 | Codex 还装着 `find-work` | 升级时一并卸载，不再装回；OpenCode、Harness 用安装器的 `uninstall` 卸载有安装记录的旧技能 |
+| 有非用户级安装 | Claude Code 另有项目级插件 | 只处理用户级，结果句末注明“另有非用户级安装，没有改动” |
+| 本地副本可用 | Claude Code 的市场副本 `~/.claude/plugins/marketplaces/forge-steward` 是 Git 仓库，`HEAD` 等于 Tag 提交且没有改动 | 直接用它运行安装器，不下载，用完不删除 |
+| 本地副本不可用 | 副本有未提交的文件，或 `HEAD` 不是 Tag 提交 | 不用它，改为下载 Tag 并核对 |
+| 下载的提交不一致 | Tag 下载后 `git rev-parse HEAD` 与接口查到的提交不同 | 该 Agent 不安装，报告两个提交；临时源码删除；退出码 `1` |
+| 被修改过的副本 | Harness 的 `forge-steward-prepare-work` 有安装记录但内容被改过，版本较旧 | 安装器拒绝更新，目录逐字节不变；其余技能照常安装；结果写出安装器给的路径和原因，复查仍为“落后”，退出码 `1` |
+| 没有安装记录的副本 | OpenCode 目录里有手工复制的 `forge-steward-review-and-merge` | 检查为“无法判断”，`apply` 跳过该 Agent 并写明原因，目录不变 |
+| 已装版本更高 | Codex 装的是 0.2.22，目标 0.2.21 | 跳过，“比目标版本新，不降级”；没有任何改动命令 |
+| 某一步失败 | ZCode 卸载成功后 `marketplace add` 因断网失败；Codex 也落后 | ZCode 停在这一步，不再执行安装；复查为“缺少”，输出失败的命令、原因和恢复办法（解决后再同意一次重新运行）；Codex 照常升级；退出码 `1` |
+| 用户中途中断 | `apply` 处理到一半被中断 | 已处理完的 Agent 保持新版本；正在处理的可能“已卸载未重装”，下次检查显示为缺少或不完整，再同意一次重跑即可补齐；锁目录和临时源码在退出时删除 |
+| 缺参数 | 没给 `--version` 或 `--agents`，版本不是 `X.Y.Z`，或 Agent 名不认识 | 退出码 `2`，不做任何改动 |
+| 最新版已变 | 同意的是 v0.2.21，此时最新已是 v0.2.22 | 退出码 `3`，不做改动；编排重新检查并按新版本再问 |
+| 另一个安装在进行 | 系统临时目录里已有 `forge-steward-agent-install.lock` | 退出码 `3`，说明另一个安装正在进行，不删除这个锁 |
+| 当前 Agent 被升级 | 在 Claude Code 里运行 work-cycle，同意升级 Claude Code | 照常升级；告诉用户本次会话仍是旧版本，新版本在下一个新会话生效 |
+| 被沙箱拦截 | 运行环境不允许联网或写用户目录 | 如实说明，给出同一条命令让用户自己运行，不换别的安装方式 |
+
+不保证：某一步失败后自动回到旧版本（会如实报告当前状态和恢复办法）；未核对版本的 Agent 命令行仍按同样方式工作。`apply` 只从 GitHub 读取发布信息和 Tag 内容，Tag 名必须是 `vX.Y.Z`，所有命令以参数列表运行、不经过 shell；不读取、不保存、不输出令牌，GitHub 接口请求不带凭据。

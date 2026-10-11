@@ -294,6 +294,18 @@ There are two separate goals: **only the selected version is available in new se
 
 To remove ForgeSteward entirely instead of upgrading, run each agent's **Uninstall** commands and do not reinstall. Rollback does not undo work already performed by a skill.
 
+## Work-cycle agent check and upgrade offer
+
+Only the `work-cycle` orchestration does this; the five stage skills and stage subagents never check, ask or install.
+
+- **When it checks:** once at the start of every run, read-only. `scripts/agent_install.py check` in the work-cycle skill finds which ForgeSteward plugins each supported agent has at user level and compares them with the latest published, non-prerelease GitHub Release. The final report lists the result in its last section.
+- **When it asks:** at the end of the report, only when the latest release is known and some agent is missing ForgeSteward, has only part of it, or has an older version. It asks every run; nothing is remembered from an earlier answer.
+- **What happens if you agree:** the orchestration runs `agent_install.py apply --version X.Y.Z --agents <ids>` for exactly the agents and version you agreed to. It checks again first and stops without changes if the latest release changed or another apply is running. Agents already current or newer are skipped (no downgrade). Each agent is handled separately and judged by checking it again afterwards. The commands come from the same agent data file as the instructions above.
+- **What it may change:** user-level plugins and the `forge-steward` marketplace setting of Claude Code, Codex and ZCode (project or local installs are left alone); the user skill directories of OpenCode and DeepSeek Harness, through the bundled installers, which never overwrite modified, unrecorded or linked copies; and, in the system temporary directory, a lock directory plus a temporary clone of the release tag (its commit is verified against the release; both are removed afterwards). A local Claude Code marketplace clone is reused instead of downloading when it is clean and at the release commit. Nothing is written to the repository being maintained.
+- **How to decline:** say no, or simply do not answer. Nothing is changed.
+
+A failed step stops only that agent and is reported with the state found afterwards; there is no automatic rollback, so agree again after fixing the cause to complete it. An agent upgraded while it is running uses the new version from its next new session. See the Chinese [work-cycle scenarios](docs/work-cycle-scenarios.md) for every case.
+
 ## Skills
 
 | Skill | Purpose |
