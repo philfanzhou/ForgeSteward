@@ -2,7 +2,7 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, ZCode, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-The current release is **0.2.22**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. The [installation commands](#supported-agents-and-installation) install exactly this release; the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases) confirm it is published. See the [v0.2.22 version matrix, changes, and migration notes](docs/releases/v0.2.22.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules. Preparation includes a read-only check of available automated security alerts within the authorized repository scope, with deduplication and the existing frozen-queue boundaries. Check-workflow also reconciles release evidence read-only against each repository's release contract; findings appear only in the final report. Reports and forge comments written by the skills use plain Chinese instead of internal rule terms. Work cycles avoid idle waits and repeated checks: repairs watch their own CI, branch syncs are handled without consuming review rounds, unchanged items keep earlier conclusions, and finished change requests can move to review before the whole batch is done when the agent runtime supports background subagents. With that support, work cycles also implement, review and repair independent issues and change requests concurrently (three stage subagents by default) in worktrees outside the repository, queue local verification on shared resources through Git-metadata locks, and merge one change request at a time. When a repository requires up-to-date branches, approved change requests go through a single merge lane (or the repository's own merge queue when it is already enabled); CI failures unrelated to a change are re-run once; each run keeps per-stage timings in Git metadata; repository language and commit conventions take precedence over the plain-Chinese default. The final work-cycle report is rendered from run records in a fixed format; it includes a read-only check of which ForgeSteward version each local agent has installed and, only after the user agrees, installs or upgrades the agents that are missing or behind.
+The current release is **0.2.23**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. The [installation commands](#supported-agents-and-installation) install exactly this release; the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases) confirm it is published. See the [v0.2.23 version matrix, changes, and migration notes](docs/releases/v0.2.23.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules. Preparation includes a read-only check of available automated security alerts within the authorized repository scope, with deduplication and the existing frozen-queue boundaries. Check-workflow also reconciles release evidence read-only against each repository's release contract; findings appear only in the final report. Reports and forge comments written by the skills use plain Chinese instead of internal rule terms. Work cycles avoid idle waits and repeated checks: repairs watch their own CI, branch syncs are handled without consuming review rounds, unchanged items keep earlier conclusions, and finished change requests can move to review before the whole batch is done when the agent runtime supports background subagents. With that support, work cycles also implement, review and repair independent issues and change requests concurrently (three stage subagents by default) in worktrees outside the repository, queue local verification on shared resources through Git-metadata locks, and merge one change request at a time. When a repository requires up-to-date branches, approved change requests go through a single merge lane (or the repository's own merge queue when it is already enabled); CI failures unrelated to a change are re-run once; each run keeps per-stage timings in Git metadata; repository language and commit conventions take precedence over the plain-Chinese default. The final work-cycle report is rendered from run records in a fixed format; it includes a read-only check of which ForgeSteward version each local agent has installed and, only after the user agrees, installs or upgrades the agents that are missing or behind.
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, uninstall `find-work` as described in the [rename migration](docs/prepare-execute-migration.md); the historical v0.2.1 commands are kept in the [fixed-version guide](docs/versioned-installation.md).
 
@@ -12,11 +12,11 @@ For contributors: run `python3 scripts/check_skill_limits.py --check` after chan
 
 | Agent | Verified with | How the commands install ForgeSteward | Local source checkout |
 | --- | --- | --- | --- |
-| [Claude Code](#claude-code) | 2.1.269 on macOS | Marketplace `philfanzhou/ForgeSteward@v0.2.22`, one command per plugin | Not needed |
-| [Codex](#codex) | CLI 0.154.0 on macOS | Marketplace `philfanzhou/ForgeSteward --ref v0.2.22`, one command per plugin | Not needed |
-| [ZCode](#zcode) | Desktop 3.14.5 with bundled CLI 0.16.9 on macOS | Bundled CLI, marketplace `philfanzhou/ForgeSteward@v0.2.22`, one command per plugin | Not needed |
-| [OpenCode](#opencode) | 1.18.30 on macOS and in Linux CI | Installer script from a `v0.2.22` clone, `--all` | Only while running the installer |
-| [DeepSeek Harness](#deepseek-harness) | 0.2.0-rc.2 on macOS | Installer script from a `v0.2.22` clone, `--all` | Only while running the installer |
+| [Claude Code](#claude-code) | 2.1.269 on macOS | Marketplace `philfanzhou/ForgeSteward@v0.2.23`, one command per plugin | Not needed |
+| [Codex](#codex) | CLI 0.157.1 on macOS | Marketplace `philfanzhou/ForgeSteward --ref v0.2.23`, one command per plugin | Not needed |
+| [ZCode](#zcode) | Desktop 3.14.5 with bundled CLI 0.16.9 on macOS | Bundled CLI, marketplace `philfanzhou/ForgeSteward@v0.2.23`, one command per plugin | Not needed |
+| [OpenCode](#opencode) | 1.18.30 on macOS and in Linux CI | Installer script from a `v0.2.23` clone, `--all` | Only while running the installer |
+| [DeepSeek Harness](#deepseek-harness) | 0.2.0-rc.2 on macOS | Installer script from a `v0.2.23` clone, `--all` | Only while running the installer |
 
 Every command block below installs, upgrades to, or removes **all six plugins of the current release**. Run the blocks in a terminal for the agent you use; each block can be copied as a whole. A release exists once its tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases) are published; right after a version change is merged, the tag can take a short time to appear. To choose another published release, for example to roll back, see [Upgrade and keep only the selected version](#upgrade-and-keep-only-the-selected-version). Upgrading the agent application itself never upgrades ForgeSteward.
 
@@ -31,7 +31,7 @@ These commands use the `user` scope, which makes the skills available in every p
 #### Install
 
 ```bash
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.22 --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.23 --scope user
 claude plugin install check-workflow@forge-steward --scope user
 claude plugin install prepare-work@forge-steward --scope user
 claude plugin install execute-work@forge-steward --scope user
@@ -41,7 +41,7 @@ claude plugin install work-cycle@forge-steward --scope user
 claude plugin list
 ```
 
-Inside a Claude Code conversation, `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.22` and `/plugin install <plugin>@forge-steward` do the same. Restart the session, then invoke a skill with its plugin namespace, for example `/prepare-work:forge-steward-prepare-work`.
+Inside a Claude Code conversation, `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.23` and `/plugin install <plugin>@forge-steward` do the same. Restart the session, then invoke a skill with its plugin namespace, for example `/prepare-work:forge-steward-prepare-work`.
 
 #### Upgrade
 
@@ -55,7 +55,7 @@ claude plugin uninstall review-and-merge@forge-steward --scope user --keep-data
 claude plugin uninstall fix-feedback@forge-steward --scope user --keep-data
 claude plugin uninstall work-cycle@forge-steward --scope user --keep-data
 claude plugin marketplace remove forge-steward --scope user
-claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.22 --scope user
+claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.23 --scope user
 claude plugin install check-workflow@forge-steward --scope user
 claude plugin install prepare-work@forge-steward --scope user
 claude plugin install execute-work@forge-steward --scope user
@@ -89,7 +89,7 @@ The Codex CLI and desktop app share the same environment, so installing from the
 #### Install
 
 ```bash
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.22
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.23
 codex plugin add check-workflow@forge-steward
 codex plugin add prepare-work@forge-steward
 codex plugin add execute-work@forge-steward
@@ -113,7 +113,7 @@ codex plugin remove review-and-merge@forge-steward
 codex plugin remove fix-feedback@forge-steward
 codex plugin remove work-cycle@forge-steward
 codex plugin marketplace remove forge-steward
-codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.22
+codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.23
 codex plugin add check-workflow@forge-steward
 codex plugin add prepare-work@forge-steward
 codex plugin add execute-work@forge-steward
@@ -142,13 +142,13 @@ codex plugin list --json
 
 ### ZCode
 
-ZCode reads the same Claude-compatible marketplace. The commands use ZCode's bundled CLI, run with Node.js; the path below is the default macOS location, so change `ZCODE_CLI` if ZCode is installed elsewhere. The marketplace comes straight from GitHub at the release tag, so no local copy of this repository is needed. This was run in an isolated home directory with the bundled CLI 0.16.9 and installed exactly the tagged files. The desktop **Settings → Plugins → Add marketplace** field writes to the same plugin directory (`~/.zcode/cli/plugins`), and entering `philfanzhou/ForgeSteward@v0.2.22` there should be equivalent, but that desktop flow has not been tested. Restart ZCode after any change. See [ZCode setup and verification](docs/zcode.md).
+ZCode reads the same Claude-compatible marketplace. The commands use ZCode's bundled CLI, run with Node.js; the path below is the default macOS location, so change `ZCODE_CLI` if ZCode is installed elsewhere. The marketplace comes straight from GitHub at the release tag, so no local copy of this repository is needed. This was run in an isolated home directory with the bundled CLI 0.16.9 and installed exactly the tagged files. The desktop **Settings → Plugins → Add marketplace** field writes to the same plugin directory (`~/.zcode/cli/plugins`), and entering `philfanzhou/ForgeSteward@v0.2.23` there should be equivalent, but that desktop flow has not been tested. Restart ZCode after any change. See [ZCode setup and verification](docs/zcode.md).
 
 #### Install
 
 ```bash
 ZCODE_CLI="/Applications/ZCode.app/Contents/Resources/glm/zcode.cjs"
-node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@v0.2.22
+node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@v0.2.23
 node "$ZCODE_CLI" plugins install check-workflow@forge-steward
 node "$ZCODE_CLI" plugins install prepare-work@forge-steward
 node "$ZCODE_CLI" plugins install execute-work@forge-steward
@@ -173,7 +173,7 @@ node "$ZCODE_CLI" plugins uninstall review-and-merge@forge-steward --force --kee
 node "$ZCODE_CLI" plugins uninstall fix-feedback@forge-steward --force --keep-data
 node "$ZCODE_CLI" plugins uninstall work-cycle@forge-steward --force --keep-data
 node "$ZCODE_CLI" plugins marketplace remove forge-steward
-node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@v0.2.22
+node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@v0.2.23
 node "$ZCODE_CLI" plugins install check-workflow@forge-steward
 node "$ZCODE_CLI" plugins install prepare-work@forge-steward
 node "$ZCODE_CLI" plugins install execute-work@forge-steward
@@ -208,9 +208,9 @@ OpenCode does not read the Claude or Codex marketplaces. The commands clone the 
 #### Install
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" install --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" status --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" install --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" status --all --user
 ```
 
 Restart OpenCode and ask, for example: `Load the forge-steward-prepare-work skill and prepare actionable issues in this repository.` `opencode debug skill` lists the discovered skills and their locations.
@@ -220,17 +220,17 @@ Restart OpenCode and ask, for example: `Load the forge-steward-prepare-work skil
 `uninstall --all` removes every skill this installer placed in that directory, including retired names, and then the new release is installed. If an installed copy has local edits, the installer stops without changing anything; back up the edits first. Exit code `2` from uninstall means removal finished but other matching copies remain for you to inspect.
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" uninstall --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" install --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" status --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" uninstall --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" install --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" status --all --user
 ```
 
 #### Uninstall
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/opencode.py" uninstall --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/opencode.py" uninstall --all --user
 ```
 
 Use the same `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME` as when installing. What the uninstall report covers is described in [Uninstall and verify](#uninstall-and-verify); receipts, recovery and partial installs are in [OpenCode installation maintenance](#opencode-installation-maintenance).
@@ -242,9 +242,9 @@ DeepSeek Harness uses the same kind of installer as OpenCode. The commands copy 
 #### Install
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" install --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" status --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" install --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" status --all --user
 ```
 
 Start a new Harness session, check the discovered names and sources, and load `forge-steward-prepare-work`. Native Windows Harness and the desktop interface have not been verified.
@@ -254,24 +254,24 @@ Start a new Harness session, check the discovered names and sources, and load `f
 As with OpenCode, the old managed copies are removed and the new release is installed; copies with local edits stop the installer without changes, and exit code `2` means other matching copies remain for you to inspect.
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" uninstall --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" install --all --user
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" status --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" uninstall --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" install --all --user
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" status --all --user
 ```
 
 #### Uninstall
 
 ```bash
-git clone --branch v0.2.22 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.22"
-python3 "$HOME/code/ForgeSteward-v0.2.22/scripts/deepseek.py" uninstall --all --user
+git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-v0.2.23"
+python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" uninstall --all --user
 ```
 
 Other discovery roots can still hold copies the installer does not manage. See the Chinese [DeepSeek installation, recovery and verification guide](docs/deepseek-installer.md) for exact boundaries.
 
 ## Upgrade and keep only the selected version
 
-The upgrade steps in each agent section move to the current release. To choose a different published release, for example to roll back, pick a **published, non-prerelease** tag from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), read its plugin version matrix and migration notes, replace `0.2.22` in that agent's upgrade commands with the chosen version, and install only the plugins that release contains. A tag selects the whole marketplace snapshot, and every plugin in tag `vX.Y.Z` has package version `X.Y.Z`. Releases before v0.2.3 used `find-work` instead of `prepare-work` and `execute-work`; the historical v0.2.1 commands remain in the [fixed-version installation and rollback guide](docs/versioned-installation.md).
+The upgrade steps in each agent section move to the current release. To choose a different published release, for example to roll back, pick a **published, non-prerelease** tag from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases), read its plugin version matrix and migration notes, replace `0.2.23` in that agent's upgrade commands with the chosen version, and install only the plugins that release contains. A tag selects the whole marketplace snapshot, and every plugin in tag `vX.Y.Z` has package version `X.Y.Z`. Releases before v0.2.3 used `find-work` instead of `prepare-work` and `execute-work`; the historical v0.2.1 commands remain in the [fixed-version installation and rollback guide](docs/versioned-installation.md).
 
 Before upgrading, record the installed plugins, scopes and sources, back up local edits and plugin data you need **outside all agent discovery and cache directories**, and stop active skill-driven work. Run each step only after the previous one succeeds; if reinstallation fails, reinstall the recorded release the same way.
 
