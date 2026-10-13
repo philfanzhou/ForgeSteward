@@ -1,6 +1,6 @@
 ## 其他 Agent 安装检查与升级
 
-只有 work-cycle 编排 Agent 做这件事；五个阶段技能和各阶段子 Agent 都不检查、不提问、不安装。运行开始时只查看、不改动：查出本机各 Agent 在用户级装了哪些 ForgeSteward 插件、各是什么版本，再和 GitHub 上最新的正式发布版比较。结束汇报里列出结果，有能安装或升级的 Agent 时问一句；只有用户明确同意后才安装或升级，而且只改用户级，不向被维护的仓库写入。
+只有 work-cycle 编排 Agent 做这件事；五个阶段技能和各阶段子 Agent 都不检查、不提问、不安装。运行开始时只查看、不改动：查出本机各 Agent 在用户级装了哪些 ForgeSteward 插件、各是什么版本，再和 GitHub 上最新的正式发布版比较。结束汇报只列可安装或升级的 Agent，或提示本次会话技能包较旧，并问一句；只有用户明确同意后才安装或升级，而且只改用户级，不向被维护的仓库写入。
 
 ### 开始时检查
 
@@ -18,12 +18,16 @@
 
 ### 汇报第 7 节的写法
 
-按[最终汇报](report.md)规格中 `agents` 的写法：`absent` 状态不列；全部为 `current` 且没有非用户级安装时只写一行 `all_latest`；查不到最新版时先写 `latest_unknown`，各 Agent 改用 `without_latest`，有版本的“无法判断”写“已装”；有非用户级安装时句末加 `other_scopes`；`{versions}` 是去重后的“vX、vY”，`{missing}` 是“a、b”。最新版已知且有状态属于 `ask_for` 的 Agent 时，最后加一行 `ask`，`{names}` 是这些 Agent 的名称，用“、”连接；全部最新、查不到最新版或检查做不了时不提问。
+按[最终汇报](report.md)规格中 `agents` 的写法：最新版必须是已确认的三段整数版本，只列状态属于 `ask_for`（缺少、不完整、落后）的 Agent；最新、无法判断、开发版、不存在都不列。最新版未知、检查未做、不可用、文件缺失或格式无法识别时省略整节，前 6 节照常生成，检查 JSON 照常保留。
+
+本次会话版本只读运行中的 work-cycle 包 `scripts/VERSION`，与检查文件里的 `latest.version` 按三段整数比较；不能取仓库版本、安装清单或猜当前 Agent 名称。包较旧时先写 `session_old`；版本文件缺失或非法时不猜，但已有可升级 Agent 仍列出。包版本相同或更高时不写会话提示。
+
+被列出的 Agent 有非用户级安装时，句末加 `other_scopes`；`{versions}` 是去重后的“vX、vY”，`{missing}` 是“a、b”。有可升级 Agent 时最后加一行 `ask`，`{names}` 用“、”连接；只有会话旧版提示时加 `ask_session`。两者同时存在也只问一次。没有上述内容时整节省略。
 
 ### 结束时询问，同意后安装或升级
 
 1. 汇报贴出后本次工作即告结束，不等回答。用户之后明确同意（可以只同意其中几个 Agent）才继续；拒绝、没回答或回答含糊时什么都不做，也不记住这次拒绝，下次运行照样检查和询问。不能把没回答当作同意。
-2. 同意后，从 `agent-check.json` 取被同意 Agent 的 `id`，用汇报里的目标版本运行：
+2. 会话旧版提示不代表某个 Agent 的安装状态，不能凭它构造 `apply --agents`。用户只同意升级会话版本但未指定实际 Agent 时，先依据检查记录确认用户要处理的 Agent。同意后，从 `agent-check.json` 取被同意 Agent 的 `id`，用汇报里的目标版本运行：
 
    ```bash
    python3 <本技能目录>/scripts/agent_install.py apply --version <X.Y.Z> --agents <id,id>

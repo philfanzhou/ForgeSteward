@@ -18,7 +18,7 @@ work-cycle 结束时给用户的汇报只按本文件生成，章节、顺序和
 | `issues_without_change_request` | 没有 PR 的 Issue：`issue`、`result`（只能是“已暂停”或“未开始”）、`reason`、`next` |
 | `exceptions` | 每项 `what` 写实际错误；`recovery` 写状态核对、恢复动作及结果、最后确认的远端状态、未完成的阶段和恢复条件 |
 | `needs_you` | 可选，其他需要用户处理的事项，一句一项 |
-| `agent_check` | 可选，其他 Agent 安装检查（见[安装检查](agent-check.md)）：`file` 写运行目录下的结果文件名，检查做不了时只写 `unavailable` 原因；不填时写“未检查” |
+| `agent_check` | 可选，其他 Agent 安装检查（见[安装检查](agent-check.md)）：`file` 写运行目录下的结果文件名，检查做不了时只写 `unavailable` 原因；不填时省略最后一节 |
 
 除 `needs_you` 外都必填，列表可以为空。`reason`、`next` 可以是空字符串，但结果为“等你审批”“已暂停”时 `reason` 必填。Issue 写整数编号，跨仓库时写 `owner/repo#5` 这样的文本。
 
@@ -49,22 +49,27 @@ work-cycle 结束时给用户的汇报只按本文件生成，章节、顺序和
 ```json report-spec
 {
   "title": "work-cycle 运行汇报",
-  "sections": ["结论", "需要你处理", "PR 结果", "本次概况", "耗时", "异常与恢复", "其他 Agent 安装情况"],
+  "sections": ["结论", "需要你处理", "PR 结果", "本次概况", "耗时", "异常与恢复", "有新版本可装"],
   "results": ["已合并", "等你审批", "等待 CI", "等待外部审批", "已暂停", "已关闭未合并", "未开始"],
   "merged": "已合并",
   "needs_you": ["等你审批", "已暂停"],
   "issue_only": ["已暂停", "未开始"],
-  "stages": {"check-workflow": "检查规则", "prepare": "准备", "implement": "实现", "review": "审查",
-             "fix": "修复", "merge": "合并", "cleanup": "清理"},
-  "waits": {"ci": "等 CI", "lock": "等本地资源"},
+  "stages": {
+    "check-workflow": "检查规则",
+    "prepare": "准备",
+    "implement": "实现",
+    "review": "审查",
+    "fix": "修复",
+    "merge": "合并",
+    "cleanup": "清理"
+  },
+  "waits": {
+    "ci": "等 CI",
+    "lock": "等本地资源"
+  },
   "agents": {
-    "unchecked": "未检查",
-    "unavailable": "无法检查：{reason}",
     "absent": "未安装 Agent",
     "current": "最新",
-    "none": "没有找到装了的受支持 Agent",
-    "all_latest": "都已是最新（v{latest}）",
-    "latest_unknown": "无法确认最新版本：{reason}",
     "other_scopes": "（另有非用户级安装）",
     "ask_for": ["缺少", "不完整", "落后"],
     "ask": "{names} 可以安装或升级到 v{latest}。要现在安装或升级吗？",
@@ -76,18 +81,15 @@ work-cycle 结束时给用户的汇报只按本文件生成，章节、顺序和
       "高于最新正式版": "{name}：{versions}，比最新正式版新，不处理",
       "无法判断": "{name}：无法判断：{reason}"
     },
-    "without_latest": {
-      "缺少": "{name}：未安装",
-      "不完整": "{name}：缺 {missing}",
-      "已装": "{name}：已装 {versions}"
-    }
+    "session_old": "本次用的是旧版 v{session}，最新是 v{latest}",
+    "ask_session": "可以升级到 v{latest}。要现在升级吗？"
   }
 }
 ```
 
 ## 模板
 
-7 个章节按顺序每次都出现，没有内容的章节写“- 无”。
+前 6 节按顺序每次都出现，没有内容的章节写“- 无”。只有确认有可安装或升级的 Agent，或本次会话技能包落后于最新正式版时才加第 7 节；没有可处理内容时整节省略，不写占位行。
 
 ```markdown
 ## work-cycle 运行汇报
@@ -119,8 +121,10 @@ work-cycle 结束时给用户的汇报只按本文件生成，章节、顺序和
 ### 异常与恢复
 - <what>。处理：<recovery>
 
-### 其他 Agent 安装情况
-- 未检查
+### 有新版本可装
+- <可选的会话旧版提示，最先出现>
+- <可安装或升级的 Agent>
+- <只问一次是否安装或升级>
 ```
 
 填写说明：
@@ -130,5 +134,5 @@ work-cycle 结束时给用户的汇报只按本文件生成，章节、顺序和
 - PR 结果：先按顺序列 PR，再列没有 PR 的 Issue（PR 列写“无”）；Issue 列表为空写“无”。
 - 说明和需要你处理里，`reason`、`next` 为空的部分连同“下一步：”一起省略；文本中的换行换成空格，句末多余的标点去掉，表格里的 `|` 写成 `\|`。
 - 同时进行：未开启或退回串行时写“同时进行：未开启，原因：<serial_reason>”；`note` 为空时省略分号及其后内容；开始前已有的 PR 的 `note` 为空时同样省略逗号及其后内容。
-- 其他 Agent 安装情况：按[安装检查与升级](agent-check.md)中“汇报第 7 节”的写法。
+- 最后一节：按[安装检查与升级](agent-check.md)中“汇报第 7 节”的写法。
 - 耗时：总耗时是第一条到最后一条事件的间隔，不足 1 小时写“Y 分”，否则写“X 小时 Y 分”；各阶段按规格中的顺序只列有完成记录的阶段（规格外的阶段名按字母顺序排在后面，原样显示），一个都没有时省略冒号及其后内容；分钟四舍五入；等 CI、等本地资源没有记录写“0 分”；没有任何事件时整节只写“- 无记录”。
