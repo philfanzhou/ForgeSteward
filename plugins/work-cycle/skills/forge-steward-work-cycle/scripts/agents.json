@@ -66,7 +66,7 @@
     {
       "id": "codex",
       "name": "Codex",
-      "verified": {"version": "0.154.0", "date": "2026-10-11", "platforms": ["darwin"]},
+      "verified": {"version": "0.157.1", "date": "2026-10-13", "platforms": ["darwin"]},
       "detect_agent": {
         "commands": ["codex"],
         "version_argv": ["codex", "--version"],
@@ -75,12 +75,12 @@
       },
       "detect_install": {
         "method": "list-command",
-        "argv": ["codex", "plugin", "list", "--json"],
+        "argv": ["codex", "plugin", "list", "--marketplace", "forge-steward", "--json"],
         "items": "installed",
         "id_field": "pluginId",
         "id_suffix": "@forge-steward",
         "version_field": "version",
-        "notes": "输出为对象，已安装插件在 installed 数组中。"
+        "notes": "限定 forge-steward 市场以跳过无关远端目录获取；输出为对象，installed 数组每项含 pluginId、version，scope 缺省按 user 处理。依据 rust-v0.157.1 的 run_plugin_list 与 fetch_remote_marketplaces：https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/cli/src/plugin_cmd.rs 。失败不重试、不退回无过滤查询，也不读取内部缓存补结果。"
       },
       "detect_marketplace": {
         "argv": ["codex", "plugin", "marketplace", "list", "--json"],
