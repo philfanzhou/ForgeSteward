@@ -40,13 +40,22 @@ class RunReportTests(unittest.TestCase):
         git("config", "user.email", "test@example.test", cwd=self.repo)
         git("commit", "--allow-empty", "-qm", "initial", cwd=self.repo)
         self.spec = record.load_report_spec()
+        # 控制实际运行包版本，避免仓库版本影响注入的最新版和固定样例。
+        self.skill = Path(self.temporary.name) / "skill"
+        (self.skill / "scripts").mkdir(parents=True)
+        (self.skill / "references").mkdir()
+        self.script = self.skill / "scripts/run_record.py"
+        self.package_version = self.skill / "scripts/VERSION"
+        shutil.copyfile(str(SCRIPT), str(self.script))
+        shutil.copyfile(str(RULES), str(self.skill / "references/report.md"))
+        self.package_version.write_text("0.2.21\n", encoding="utf-8")
 
     def tearDown(self):
         self.temporary.cleanup()
 
-    def run_cli(self, *arguments, script=SCRIPT):
+    def run_cli(self, *arguments, script=None):
         # 按字节读取，避免 Windows 控制台编码影响比对；-B 避免在技能目录生成 __pycache__。
-        return subprocess.run([sys.executable, "-B", str(script), "--repo", str(self.repo), *arguments],
+        return subprocess.run([sys.executable, "-B", str(script or self.script), "--repo", str(self.repo), *arguments],
                               capture_output=True)
 
     def make_run(self, handoff, events=None):
@@ -94,11 +103,11 @@ class RunReportTests(unittest.TestCase):
         text = self.assert_golden("empty.json", None, "empty-no-events.md")
         self.assertIn("### 耗时\n- 无记录\n", text)
 
-    def test_sections_always_appear_in_spec_order(self):
+    def test_required_sections_always_appear_optional_section_is_last(self):
         for golden in ("full.md", "empty-zero.md", "empty-no-events.md", "empty-agents.md"):
             lines = expected(golden).decode("utf-8").splitlines()
             headings = [line[4:] for line in lines if line.startswith("### ")]
-            self.assertEqual(headings, self.spec["sections"][1:])
+            self.assertEqual(headings, self.spec["sections"][1:] if golden == "empty-agents.md" else self.spec["sections"][1:6])
             self.assertTrue(lines[2].startswith(self.spec["sections"][0] + "："))
 
     def test_agent_check_result_fills_last_section(self):
@@ -106,26 +115,85 @@ class RunReportTests(unittest.TestCase):
         data["agent_check"] = {"file": "agent-check.json"}
         path = self.make_run(data)
         shutil.copyfile(str(FIXTURES / "agent-check.json"), str(path / "agent-check.json"))
+        saved_check = (path / "agent-check.json").read_bytes()
         first = self.report(path)
         self.assertEqual(first.returncode, 0, first.stderr.decode("utf-8", "replace"))
         self.assertEqual(first.stdout, expected("empty-agents.md"))
         self.assertEqual(self.report(path).stdout, first.stdout)
         self.assertEqual((path / "report.md").read_bytes(), first.stdout)
+        self.assertEqual((path / "agent-check.json").read_bytes(), saved_check)
 
     def test_agent_check_problems_only_change_last_section(self):
-        cases = ({"unavailable": "超时。"}, "- 无法检查：超时\n"), \
-                ({"file": "agent-check.json"}, "- 无法检查：找不到检查结果文件 agent-check.json\n"), \
-                ({"file": "broken.json"}, "- 无法检查：检查结果格式无法识别\n")
-        base = expected("empty-no-events.md").decode("utf-8")
-        for check, line in cases:
+        cases = [{"unavailable": "超时。"}, {"file": "missing.json"}, {"file": "broken.json"},
+                 {"file": "bad-fields.json"}, {"file": "bad-utf8.json"}]
+        base = expected("empty-no-events.md")
+        for check in cases:
             with self.subTest(check=check):
                 data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
                 data["agent_check"] = check
                 path = self.make_run(data)
-                (path / "broken.json").write_text("{", encoding="utf-8")
+                files = {"broken.json": b"{", "bad-fields.json": b'{"schema": 2}', "bad-utf8.json": b"\xff"}
+                for name, content in files.items():
+                    (path / name).write_bytes(content)
                 result = self.report(path)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout.decode("utf-8"), base.replace("- 未检查\n", line))
+                self.assertEqual(result.stdout, base)
+                for name, content in files.items():
+                    self.assertEqual((path / name).read_bytes(), content)
+
+    def test_upgrade_projection_and_session_version_matrix(self):
+        current = {"name": "A", "status": "最新", "other_scopes": ["project"]}
+        offers = [{"name": "B", "status": "缺少", "other_scopes": ["project"]},
+                  {"name": "C", "status": "不完整", "missing": ["work-cycle"]},
+                  {"name": "D", "status": "落后", "versions": ["0.2.8", "0.2.8"]}]
+        inactive = [current, {"name": "E", "status": "无法判断", "reason": "超时"},
+                    {"name": "F", "status": "高于最新正式版"}, {"name": "G", "status": "未安装 Agent"}]
+        cases = [
+            ("0.2.10", "0.2.10", inactive, False, 0),
+            ("0.2.10", None, offers, False, 0),
+            ("0.2.10", "bad", offers, False, 0),
+            ("0.2.10", "0.2.10", inactive + offers, False, 3),
+            ("0.2.9", "0.2.10", [current], True, 0),
+            ("0.2.9", "0.2.10", [], True, 0),
+            ("0.2.9", "0.2.10", inactive + offers, True, 3),
+            ("0.2.11", "0.2.10", inactive, False, 0),
+            ("0.2.11", "0.2.10", offers, False, 3),
+            (None, "0.2.10", offers, False, 3),
+            ("bad", "0.2.10", offers, False, 3),
+            ("v0.2.9", "0.2.10", [], False, 0),
+        ]
+        for package, latest, agents, old, count in cases:
+            with self.subTest(package=package, latest=latest, agents=agents):
+                if package is None:
+                    self.package_version.unlink(missing_ok=True)
+                else:
+                    self.package_version.write_text(package + "\n", encoding="utf-8")
+                data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+                data["agent_check"] = {"file": "agent-check.json"}
+                path = self.make_run(data)
+                check = path / "agent-check.json"
+                check.write_text(json.dumps({"schema": 1, "latest": {"version": latest}, "agents": agents}), encoding="utf-8")
+                original = check.read_bytes()
+                first = self.report(path)
+                self.assertEqual(first.returncode, 0, first.stderr)
+                text = first.stdout.decode("utf-8")
+                base = expected("empty-no-events.md")
+                self.assertTrue(first.stdout.startswith(base))
+                self.assertEqual(text.count("### 有新版本可装"), int(old or count > 0))
+                self.assertEqual(text.count("本次用的是旧版"), int(old))
+                self.assertEqual(text.count("要现在"), int(old or count > 0))
+                self.assertNotIn("A：", text)
+                for name in ("E", "F", "G"):
+                    self.assertNotIn(name + "：", text)
+                if count:
+                    for name in ("B", "C", "D"):
+                        self.assertEqual(text.count(name + "："), 1)
+                    self.assertIn("B：未安装（最新 v0.2.10）（另有非用户级安装）", text)
+                    self.assertIn("D：v0.2.8，落后于最新 v0.2.10", text)
+                if old:
+                    self.assertIn("### 有新版本可装\n- 本次用的是旧版 v0.2.9，最新是 v0.2.10\n", text)
+                self.assertEqual(self.report(path).stdout, first.stdout)
+                self.assertEqual(check.read_bytes(), original)
 
     def test_agent_check_field_must_name_one_file_or_reason(self):
         data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
@@ -185,7 +253,7 @@ class RunReportTests(unittest.TestCase):
         self.assertFalse((broken / "report.md").exists())
 
     def test_missing_spec_block_returns_two(self):
-        copy = Path(self.temporary.name) / "skill"
+        copy = Path(self.temporary.name) / "broken-skill"
         (copy / "scripts").mkdir(parents=True)
         (copy / "references").mkdir()
         shutil.copyfile(str(SCRIPT), str(copy / "scripts/run_record.py"))
@@ -211,7 +279,8 @@ class SingleDefinitionTests(unittest.TestCase):
         self.assertEqual(template[0], "## " + self.spec["title"])
         self.assertEqual([line[4:] for line in template if line.startswith("### ")], self.spec["sections"][1:])
         self.assertTrue(template[2].startswith(self.spec["sections"][0] + "："))
-        self.assertIn("- " + self.spec["agents"]["unchecked"], template)
+        self.assertIn("前 6 节按顺序每次都出现", text)
+        self.assertIn("没有可处理内容时整节省略", text)
         for word in self.spec["results"]:
             self.assertIn("- " + word, text)
 

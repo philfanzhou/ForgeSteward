@@ -150,7 +150,7 @@ class AgentStatusTests(Sandbox):
         self.gh()
         result = self.run_check()
         self.assertEqual({agent["status"] for agent in result["agents"]}, {"未安装 Agent"})
-        self.assertEqual(self.run_check(as_json=False), "- 没有找到装了的受支持 Agent\n")
+        self.assertEqual(self.run_check(as_json=False), "")
 
     def test_bad_output_and_failures_only_affect_that_agent(self):
         self.gh()
@@ -211,7 +211,21 @@ class AgentStatusTests(Sandbox):
         printed = self.run_check("--output", str(target))
         self.assertEqual(json.loads(target.read_text(encoding="utf-8")), printed)
         self.assertEqual([p.name for p in target.parent.iterdir()], ["agent-check.json"])
-        self.assertEqual(self.run_check(as_json=False), "- 都已是最新（v%s）\n" % LATEST)
+        self.assertEqual(self.run_check(as_json=False), "")
+
+    def test_non_json_check_only_offers_upgrade_and_saves_all_states(self):
+        self.gh()
+        self.fake("claude", claude_list(every("1.2.2")))
+        self.fake("codex", {"installed": [{"pluginId": name + "@forge-steward", "version": LATEST,
+                                           "installed": True} for name in PLUGINS]})
+        target = self.root / "agent-check.json"
+        text = self.run_check("--output", str(target), as_json=False)
+        self.assertEqual(text, "- Claude Code：v1.2.2，落后于最新 v1.2.3\n"
+                               "- Claude Code 可以安装或升级到 v1.2.3。要现在安装或升级吗？\n")
+        saved = json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(self.by_id(saved)["claude-code"]["status"], "落后")
+        self.assertEqual(self.by_id(saved)["codex"]["status"], "最新")
+        self.assertEqual(saved["schema"], 1)
 
 
 class LatestReleaseTests(Sandbox):
@@ -240,14 +254,13 @@ class LatestReleaseTests(Sandbox):
         self.assertEqual(self.run_check(api=api)["latest"]["source"], "api")
         self.assertIsNone(self.run_check(api=self.api({"tag_name": "v2.0.0", "prerelease": True}))["latest"]["version"])
 
-    def test_query_failure_lists_installed_versions_only(self):
+    def test_query_failure_keeps_json_but_omits_text(self):
         self.fake("gh", "", code=1)
         result = self.run_check()
         self.assertIsNone(result["latest"]["version"])
         self.assertTrue(result["latest"]["error"].startswith("gh：命令返回 1；GitHub 接口："), result["latest"])
         lines = self.run_check(as_json=False).splitlines()
-        self.assertTrue(lines[0].startswith("- 无法确认最新版本：gh：命令返回 1"), lines)
-        self.assertEqual(lines[1:], ["- Claude Code：已装 v" + LATEST])
+        self.assertEqual(lines, [])
 
 
 class UsageAndSingleSourceTests(Sandbox):
@@ -895,33 +908,31 @@ class ReportLineTests(unittest.TestCase):
         ]
         self.assertEqual(self.lines(agents), [
             "B：未安装（最新 v1.2.3）", "C：缺 fix-feedback、work-cycle（最新 v1.2.3）",
-            "D：v1.2.1、v1.2.2，落后于最新 v1.2.3", "E：已是最新 v1.2.3（另有非用户级安装）",
-            "F：v1.3.0，比最新正式版新，不处理", "G：无法判断：命令超时（20 秒）",
+            "D：v1.2.1、v1.2.2，落后于最新 v1.2.3",
             "B、C、D 可以安装或升级到 v1.2.3。要现在安装或升级吗？"])
 
     def test_question_only_when_something_can_be_installed_or_upgraded(self):
         newer = {"name": "A", "status": "高于最新正式版", "versions": ["1.3.0"], "missing": []}
         unknown = {"name": "B", "status": "无法判断", "reason": "缺少命令 node"}
         current = {"name": "C", "status": "最新", "versions": [LATEST], "missing": [], "other_scopes": ["x"]}
-        self.assertEqual(self.lines([newer, unknown, current]), [
-            "A：v1.3.0，比最新正式版新，不处理", "B：无法判断：缺少命令 node", "C：已是最新 v1.2.3（另有非用户级安装）"])
+        self.assertEqual(self.lines([newer, unknown, current]), [])
         missing = {"name": "DeepSeek Harness", "status": "缺少", "versions": [], "missing": PLUGINS}
         self.assertEqual(self.lines([missing, current]), [
-            "DeepSeek Harness：未安装（最新 v1.2.3）", "C：已是最新 v1.2.3（另有非用户级安装）",
+            "DeepSeek Harness：未安装（最新 v1.2.3）",
             "DeepSeek Harness 可以安装或升级到 v1.2.3。要现在安装或升级吗？"])
         self.assertEqual(self.lines([dict(missing, status="缺少")], version=None),
-                         ["无法确认最新版本：网络不可用", "DeepSeek Harness：未安装"])
+                         [])
 
     def test_all_latest_none_and_latest_unknown(self):
         current = {"name": "A", "status": "最新", "versions": [LATEST], "missing": []}
-        self.assertEqual(self.lines([current, dict(current, name="B")]), ["都已是最新（v1.2.3）"])
-        self.assertEqual(self.lines([{"name": "A", "status": "未安装 Agent"}]), ["没有找到装了的受支持 Agent"])
+        self.assertEqual(self.lines([current, dict(current, name="B")]), [])
+        self.assertEqual(self.lines([{"name": "A", "status": "未安装 Agent"}]), [])
         self.assertEqual(self.lines([
             {"name": "A", "status": "无法判断", "reason": "无法确认最新版本", "versions": [LATEST], "missing": []},
             {"name": "B", "status": "缺少", "versions": [], "missing": PLUGINS},
             {"name": "C", "status": "不完整", "versions": [LATEST], "missing": ["work-cycle"]},
             {"name": "D", "status": "无法判断", "reason": "缺少命令 node"}], version=None),
-            ["无法确认最新版本：网络不可用", "A：已装 v1.2.3", "B：未安装", "C：缺 work-cycle", "D：无法判断：缺少命令 node"])
+            [])
 
     def test_unusable_results_raise(self):
         for check in (None, {"schema": 2}, {"schema": 1, "latest": {"version": LATEST}, "agents": [{"name": "A"}]},

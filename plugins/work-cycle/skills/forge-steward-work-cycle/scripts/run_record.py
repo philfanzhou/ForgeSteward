@@ -214,21 +214,16 @@ def load_report_spec(path=REPORT_RULES):
     return spec
 
 
-AGENT_TEXTS = ("unchecked", "unavailable", "absent", "current", "none", "all_latest", "latest_unknown",
-               "other_scopes", "ask")
-AGENT_WITHOUT_LATEST = 3
+AGENT_TEXTS = ("absent", "current", "other_scopes", "ask", "session_old", "ask_session")
 
 
 def valid_agent_spec(agents):
     """The agents block names every check status and the wording of each report line."""
-    texts = [agents[key] for key in AGENT_TEXTS]
-    texts += list(agents["statuses"].values()) + list(agents["without_latest"].values())
+    texts = [agents[key] for key in AGENT_TEXTS] + list(agents["statuses"].values())
     return (all(isinstance(text, str) and text for text in texts)
             and len(agents["statuses"]) == 6 and agents["absent"] not in agents["statuses"]
             and agents["current"] in agents["statuses"]
-            and bool(agents["ask_for"]) and set(agents["ask_for"]) <= set(agents["statuses"]) - {agents["current"]}
-            and len(agents["without_latest"]) == AGENT_WITHOUT_LATEST
-            and len(set(agents["without_latest"]) - set(agents["statuses"])) == 1)
+            and bool(agents["ask_for"]) and set(agents["ask_for"]) <= set(agents["statuses"]) - {agents["current"]})
 
 
 def is_int(value):
@@ -356,15 +351,25 @@ def duration(seconds):
     return "%d 小时 %d 分" % (total // 60, total % 60)
 
 
-def agent_lines(check, spec):
-    """Turn an agent_install.py check result into report lines; raise ValueError if it is unusable."""
+def release_version(text):
+    """Only accept a three-part numeric release version; compare components as integers."""
+    if not isinstance(text, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", text):
+        return None
+    try:
+        return tuple(int(part) for part in text.split("."))
+    except ValueError:
+        return None
+
+
+def agent_lines(check, spec, session_version=None):
+    """Project usable check results to upgrade offers; do not change the saved check."""
     words = spec["agents"]
     latest = check.get("latest") if isinstance(check, dict) else None
     if (not isinstance(check, dict) or check.get("schema") != 1 or not isinstance(check.get("agents"), list)
             or not isinstance(latest, dict)):
         raise ValueError("format")
     version = latest.get("version")
-    if version is not None and not (isinstance(version, str) and version):
+    if version is not None and release_version(version) is None:
         raise ValueError("format")
     agents = []
     for agent in check["agents"]:
@@ -378,56 +383,50 @@ def agent_lines(check, spec):
             items = agent.get(key, [])
             if not (isinstance(items, list) and all(isinstance(item, str) for item in items)):
                 raise ValueError("format")
-        agents.append(agent)
-    lines = []
+        if agent["status"] in words["ask_for"]:
+            agents.append(agent)
     if version is None:
-        lines.append(words["latest_unknown"].format(reason=trim(str(latest.get("error") or ""))))
-    elif not agents:
-        return [words["none"]]
-    elif all(agent["status"] == words["current"] and not agent.get("other_scopes") for agent in agents):
-        return [words["all_latest"].format(latest=flat(version))]
-    installed = next(key for key in words["without_latest"] if key not in words["statuses"])
+        return []
+    lines = []
+    session_key = release_version(session_version)
+    session_old = session_key is not None and session_key < release_version(version)
+    if session_old:
+        lines.append(words["session_old"].format(session=session_version, latest=version))
     for agent in agents:
-        versions = agent.get("versions", [])
-        values = {"name": flat(agent["name"]), "latest": flat(version or ""),
-                  "versions": "、".join("v" + flat(item) for item in versions),
+        values = {"name": flat(agent["name"]), "latest": version,
+                  "versions": "、".join("v" + flat(item) for item in dict.fromkeys(agent.get("versions", []))),
                   "missing": "、".join(flat(item) for item in agent.get("missing", [])),
                   "reason": trim(str(agent.get("reason") or ""))}
-        template = words["statuses"][agent["status"]]
-        if version is None and agent["status"] in words["without_latest"]:
-            template = words["without_latest"][agent["status"]]
-        elif version is None and versions:
-            template = words["without_latest"][installed]
-        lines.append(template.format(**values) + (words["other_scopes"] if agent.get("other_scopes") else ""))
-    # With a known latest release, end with one question about the agents that can be installed or upgraded.
-    offered = [flat(agent["name"]) for agent in agents if agent["status"] in words["ask_for"]]
-    if version is not None and offered:
-        lines.append(words["ask"].format(names="、".join(offered), latest=flat(version)))
+        line = words["statuses"][agent["status"]].format(**values)
+        line += words["other_scopes"] if agent.get("other_scopes") else ""
+        if line not in lines:
+            lines.append(line)
+    offered = list(dict.fromkeys(flat(agent["name"]) for agent in agents))
+    if offered:
+        lines.append(words["ask"].format(names="、".join(offered), latest=version))
+    elif session_old:
+        lines.append(words["ask_session"].format(latest=version))
     return lines
 
 
 def load_agent_lines(path, data, spec):
-    """Report lines for the agent check recorded in handoff.json; problems only affect this section."""
-    words = spec["agents"]
+    """Check/package read failures omit the optional section, preserving the rest of the report."""
     check = data.get("agent_check")
-    if check is None:
-        return [words["unchecked"]]
-    if "unavailable" in check:
-        return [words["unavailable"].format(reason=trim(check["unavailable"]))]
+    if check is None or "unavailable" in check:
+        return []
+    try:
+        session_version = (Path(__file__).resolve().parent / "VERSION").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        session_version = None
     try:
         result = json.loads((path / check["file"]).read_text(encoding="utf-8"))
-    except OSError:
-        return [words["unavailable"].format(reason="找不到检查结果文件 " + flat(check["file"]))]
-    except ValueError:
-        result = None
-    try:
-        return agent_lines(result, spec)
-    except ValueError:
-        return [words["unavailable"].format(reason="检查结果格式无法识别")]
+        return agent_lines(result, spec, session_version=session_version)
+    except (OSError, ValueError):
+        return []
 
 
 def render_report(data, summary, spec, agents=None):
-    """Render the fixed seven-section report; output depends only on the inputs."""
+    """Render six required sections and the optional upgrade section."""
     titles, empty = spec["sections"], "- 无"
     requests = data["change_requests"]
     paused = data["issues_without_change_request"]
@@ -490,8 +489,9 @@ def render_report(data, summary, spec, agents=None):
     lines += ["", "### " + titles[5]]
     lines.extend(["- %s。处理：%s" % (trim(item["what"]), trim(item["recovery"]))
                   for item in data["exceptions"]] or [empty])
-    lines += ["", "### " + titles[6]]
-    lines.extend("- " + line for line in agents or [spec["agents"]["unchecked"]])
+    if agents:
+        lines += ["", "### " + titles[6]]
+        lines.extend("- " + line for line in agents)
     return "\n".join(lines) + "\n"
 
 
