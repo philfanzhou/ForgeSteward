@@ -147,6 +147,15 @@ def anchors(path):
 
 
 class AgentCatalogTests(unittest.TestCase):
+    def test_codex_install_query_is_limited_to_verified_marketplace(self):
+        codex = next(agent for agent in load_catalog(REPO)["agents"] if agent["id"] == "codex")
+        self.assertEqual(codex["detect_install"]["argv"],
+                         ["codex", "plugin", "list", "--marketplace", "forge-steward", "--json"])
+        self.assertEqual(codex["verified"],
+                         {"version": "0.157.1", "date": "2026-10-13", "platforms": ["darwin"]})
+        self.assertEqual((codex["detect_install"]["items"], codex["detect_install"]["id_field"],
+                          codex["detect_install"]["version_field"]), ("installed", "pluginId", "version"))
+
     def test_catalog_lists_the_five_agents_with_required_fields(self):
         catalog = load_catalog(REPO)
         self.assertEqual(catalog["schema"], 1)

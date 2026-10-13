@@ -66,6 +66,10 @@ class Sandbox(unittest.TestCase):
         if not isinstance(stdout, str):
             stdout = json.dumps(stdout)
         body = "import sys, time\ntime.sleep(%r)\nsys.stdout.write(%r)\nsys.exit(%d)\n" % (sleep, stdout, code)
+        self.command(name, body)
+
+    def command(self, name, body):
+        """安装假命令脚本；Windows 通过同一 Python 启动，其他平台直接执行。"""
         script = self.impl / (name + ".py")
         script.write_text(body, encoding="utf-8")
         if os.name == "nt":
@@ -228,6 +232,148 @@ class AgentStatusTests(Sandbox):
         self.assertEqual(saved["schema"], 1)
 
 
+class CodexQueryTests(Sandbox):
+    ARGV = ["plugin", "list", "--marketplace", "forge-steward", "--json"]
+
+    def setUp(self):
+        super().setUp()
+        self.gh()
+        self.fake("claude", claude_list(every(LATEST)))
+        self.log = self.root / "codex-calls.jsonl"
+        self.remote_cache = self.root / "remote-cache"
+        self.child_marker = self.root / "child-survived"
+        config = self.home / ".codex"
+        (config / "plugins").mkdir(parents=True)
+        (config / "config.toml").write_text("# keep configuration\n", encoding="utf-8")
+        # 查询失败时即使内部目录有看似可用的数据，也不能据此补结果。
+        (config / "plugins/installed.json").write_text(json.dumps(every(LATEST)), encoding="utf-8")
+
+    def codex(self, stdout, mode="normal"):
+        if not isinstance(stdout, str):
+            stdout = json.dumps(stdout)
+        body = r'''
+import json, pathlib, subprocess, sys, time
+LOG, CACHE, CHILD, OUTPUT, MODE = %r, %r, %r, %r, %r
+args = sys.argv[1:]
+with open(LOG, "a", encoding="utf-8") as log:
+    log.write(json.dumps(args) + "\n")
+limited = args == ["plugin", "list", "--marketplace", "forge-steward", "--json"]
+if not limited and args != ["plugin", "list", "--json"]:
+    sys.exit(99)
+if not limited:
+    cache = pathlib.Path(CACHE)
+    if not cache.exists():
+        time.sleep(2)
+        cache.write_text("remote fetched", encoding="utf-8")
+if MODE == "unsupported" and limited:
+    sys.exit(2)
+if MODE == "exit":
+    sys.exit(7)
+if MODE == "timeout":
+    code = ("import pathlib, time; pathlib.Path(%%r).write_text('started'); "
+            "time.sleep(3); pathlib.Path(%%r).write_text('survived')") %% (CHILD + ".started", CHILD)
+    subprocess.Popen([sys.executable, "-c", code])
+    time.sleep(30)
+if MODE == "normal" and limited:
+    data = json.loads(OUTPUT)
+    data["installed"] = [item for item in data["installed"] if item["pluginId"].endswith("@forge-steward")]
+    OUTPUT = json.dumps(data)
+sys.stdout.write(OUTPUT)
+''' % (str(self.log), str(self.remote_cache), str(self.child_marker), stdout, mode)
+        self.command("codex", body)
+
+    def calls(self):
+        return [json.loads(line) for line in self.log.read_text(encoding="utf-8").splitlines()]
+
+    def output(self, versions):
+        return {"installed": [{"pluginId": name + "@forge-steward", "version": version}
+                              for name, version in versions.items()]
+                + [{"pluginId": name + "@elsewhere", "version": "9.9.9"} for name in PLUGINS],
+                "available": [{"pluginId": "uninstalled@forge-steward", "version": LATEST}]}
+
+    def test_limited_cold_and_warm_queries_skip_remote_and_match_legacy(self):
+        self.codex(self.output(every(LATEST)))
+        before = snapshot(self.home)
+        target = self.root / "run/agent-check.json"
+        target.parent.mkdir()
+        results = []
+        for _ in range(2):
+            began = time.monotonic()
+            result = self.run_check("--output", str(target), timeout="20")
+            self.assertLess(time.monotonic() - began, 60)
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), result)
+            results.append(self.by_id(result)["codex"])
+            self.assertFalse(self.remote_cache.exists())
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[0]["plugins"], every(LATEST))
+        self.assertEqual(self.calls(), [self.ARGV, self.ARGV])
+        # 对照假命令确实区分远端冷/热路径；旧查询只在测试中执行。
+        for cold in (True, False):
+            began = time.monotonic()
+            legacy = subprocess.run([str(self.bin / ("codex.cmd" if os.name == "nt" else "codex")),
+                                     "plugin", "list", "--json"], env=self.env, capture_output=True, check=True)
+            if cold:
+                self.assertGreaterEqual(time.monotonic() - began, 2)
+            self.assertTrue(self.remote_cache.exists())
+            found = {item["pluginId"].split("@")[0]: item["version"]
+                     for item in json.loads(legacy.stdout)["installed"]
+                     if item["pluginId"].endswith("@forge-steward")}
+            self.assertEqual(found, results[0]["plugins"])
+        self.assertEqual(snapshot(self.home), before)
+        self.assertEqual([p.name for p in target.parent.iterdir()], ["agent-check.json"])
+
+    def test_strict_parameters_preserve_four_states_and_ignore_other_market(self):
+        for versions, status in ((every(LATEST), "最新"), (every("1.2.2"), "落后"),
+                                 ({}, "缺少"), ({"prepare-work": LATEST}, "不完整")):
+            with self.subTest(status=status):
+                self.log.unlink(missing_ok=True)
+                self.codex(self.output(versions))
+                before = snapshot(self.home)
+                result = self.run_check()
+                agents = self.by_id(result)
+                self.assertEqual(agents["codex"]["status"], status)
+                self.assertEqual(agents["codex"]["plugins"], versions)
+                self.assertEqual(agents["codex"]["missing"], [p for p in PLUGINS if p not in versions])
+                self.assertEqual(agents["claude-code"]["status"], "最新")
+                self.assertEqual(result["schema"], 1)
+                self.assertEqual(self.calls(), [self.ARGV])
+                self.assertEqual(snapshot(self.home), before)
+
+    def test_failures_only_mark_codex_unknown_without_retry_or_cache_fallback(self):
+        for stdout, mode, reason in (("", "exit", "命令返回 7"),
+                                     ("", "unsupported", "命令返回 2"),
+                                     ("not json", "raw", "输出格式无法识别"),
+                                     ({"installed": {}}, "raw", "输出格式无法识别"),
+                                     ({"installed": [{"id": "prepare-work@forge-steward", "version": LATEST}]},
+                                      "raw", "输出格式无法识别"),
+                                     ({"installed": [{"pluginId": "prepare-work@forge-steward", "release": LATEST}]},
+                                      "raw", "输出格式无法识别"),
+                                     (self.output(every(LATEST)), "timeout", "命令超时（1 秒）")):
+            with self.subTest(mode=mode, stdout=stdout):
+                self.log.unlink(missing_ok=True)
+                self.codex(stdout, mode)
+                before = snapshot(self.home)
+                agents = self.by_id(self.run_check(timeout="1" if mode == "timeout" else "5"))
+                self.assertEqual(agents["codex"], {"id": "codex", "name": "Codex",
+                                                 "status": "无法判断", "reason": reason})
+                self.assertEqual(agents["claude-code"]["status"], "最新")
+                self.assertEqual(self.calls(), [self.ARGV])
+                self.assertFalse(self.remote_cache.exists())
+                self.assertEqual(snapshot(self.home), before)
+                if mode == "timeout":
+                    self.assertTrue(Path(str(self.child_marker) + ".started").exists(), "子进程必须实际开始运行")
+                    time.sleep(3)
+                    self.assertFalse(self.child_marker.exists(), "超时后子进程不能继续写文件")
+
+    def test_missing_cli_does_not_claim_plugins_are_missing(self):
+        shutil.rmtree(self.home / ".codex")
+        self.assertEqual(self.by_id(self.run_check())["codex"]["status"], "未安装 Agent")
+        (self.home / ".codex").mkdir()
+        codex = self.by_id(self.run_check())["codex"]
+        self.assertEqual((codex["status"], codex["reason"]), ("无法判断", "找不到命令 codex"))
+        self.assertFalse(self.log.exists())
+
+
 class LatestReleaseTests(Sandbox):
     def setUp(self):
         super().setUp()
@@ -332,6 +478,8 @@ if "marketplace" in args and "list" in args:
     sys.exit(0)
 if "list" in args:
     if KIND == "codex":
+        if args != ["plugin", "list", "--marketplace", "forge-steward", "--json"]:
+            sys.exit(99)
         out = {"installed": [{"pluginId": n + "@forge-steward", "version": v} for n, v in plugins.items()]}
     else:
         out = [{"id": n + "@forge-steward", "version": v, "scope": "user"} for n, v in plugins.items()]
