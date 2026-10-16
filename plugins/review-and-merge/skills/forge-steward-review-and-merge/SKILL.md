@@ -5,46 +5,46 @@ description: Freeze and review the current open change requests, merge only thos
 
 # Review And Merge
 
-## 规则加载
+## Load the rules
 
-冻结队列及逐项审查前，完整读取 [冻结与审查步骤](references/review.md)；执行任何合并前，完整读取 [合并后结项与清理](references/post-merge.md) 和 [合并车道](references/merge-lane.md)，确认合并后的核验和清理边界；写入交接前读取 [交接记录规则](references/handoff.md)。调用方说明本次为并发调用（提供任务标识、锁命令等）时，审查前另读 [被并发调用时的规则](references/concurrent.md)。未合并项也须按本入口交接并继续队列。处理完冻结清单后、汇总输出前，完整读取 [遗留分支清理](references/branch-cleanup.md) 并执行。
+Before freezing and reviewing the queue, read [Freeze and review](references/review.md) in full. Before any merge, read [Post-merge completion and cleanup](references/post-merge.md) and [Merge lane](references/merge-lane.md) in full to establish post-merge checks and cleanup boundaries. Before writing handoffs, read [Handoff records](references/handoff.md). If the caller identifies a concurrent invocation (task identifier, lock commands, etc.), also read [Concurrent invocation](references/concurrent.md) before reviewing. Hand off unmerged items and continue the queue as this entry requires. After the frozen list and before the final summary, read and execute [Leftover branch cleanup](references/branch-cleanup.md) in full.
 
-引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。本技能规则文件的读取结果被截断时按行或段补读至文件末尾（不适用于 CI 日志、测试输出等其他工具结果）；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
+These references are required rules. Resolve paths relative to this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 
-## 授权与范围
+## Authorization and scope
 
-按主线优先级审查本轮开始时已经开放的 Change Request，并在满足条件时合并。Change Request 是平台无关术语，包括 GitHub Pull Request、GitLab Merge Request 等等价对象。
+Review Change Requests already open at the start of this round in mainline priority order, merging eligible ones. Change Request is platform-neutral and includes GitHub Pull Requests, GitLab Merge Requests, and equivalents.
 
-用户明确调用本技能（包括仅选择技能、不附加 prompt）时，默认任务是：冻结 → 审查 → 对满足合并判定的 Change Request 直接合并 → 结项与清理。审查范围、意见分类、Review 轮次、合并判定和结项以本技能为准，不采用仓库另行规定的同类工作流规则；合并方式、必要检查与审批、分支保护、语言和模板等项目约定仍按仓库执行。明确调用即构成满足条件后合并的授权，审查通过后直接执行合并，不再暂停请求用户逐项确认，也不因切换会话要求重复授权。用户本轮的明确限制优先：要求仅审查、不合并或只处理指定项时遵守该边界。自动选中本技能、引用技能名称或询问用法，不构成合并授权。不要绕过分支保护、必要审批或平台权限，不要为了获得全绿结果修改 Change Request 的代码（合并车道中无冲突地合入主线不算修改）。本轮不自动纳入冻结后新出现的 Change Request。
+Explicit invocation, including selecting the skill without a prompt, authorizes: freeze → review → directly merge requests meeting all conditions → complete tasks and clean up. This skill governs review scope, feedback classification, rounds, merge decisions, and completion, replacing separate repository rules for the same workflow. Follow repository conventions for merge method, required checks/approvals, branch protection, language, and templates. Explicit invocation authorizes eligible merges; merge after approval without another per-item confirmation or repeated authorization across conversations. Current explicit limits take precedence: review-only, no-merge, or named-item scope must be honored. Automatic selection, mentioning the name, or asking about usage does not authorize merging. Never bypass protection, required approvals, or platform permissions, or change request code merely to make checks green (a conflict-free mainline merge in the merge lane is not a code modification). Do not add requests opened after the freeze.
 
-## 合并判定
+## Merge conditions
 
-只有同时满足以下条件才可合并：
+Merge only when all apply:
 
-- 原范围内的验收条件逐条成立。
-- 所有适用的必要检查通过，或仓库规则明确允许的例外已经记录并获授权。
-- 没有尚未解决的范围内阻塞意见。
-- 必要审批、冲突状态和分支保护满足仓库政策。
-- 合并前重新获取的 head 提交与完成审查时一致；若发生变化，先审查新增差异和受影响验证。
+- Every original in-scope acceptance criterion is met.
+- All applicable required checks pass, or an exception expressly permitted by repository rules is recorded and authorized.
+- No unresolved in-scope blocking feedback remains.
+- Required approvals, conflict state, and branch protection satisfy repository policy.
+- The head fetched immediately before merging equals the reviewed head; otherwise review the new diff and affected verification first.
 
-满足以上条件时立即执行合并，不等待用户再次确认；不满足时不合并，并记录未满足的条件。使用仓库规定的合并方式。没有规定时使用平台和仓库默认方式，不主动使用管理员绕过或强制推送，不替仓库开启自动合并或合并队列。仓库已启用合并队列，或要求分支保持最新而审查通过的项仅因落后不能合并时，按 [合并车道](references/merge-lane.md) 合并；其余审查通过后由本技能直接执行合并。权限、保护规则或平台故障阻止合并时，记录具体原因，不将其报告为已合并。
+When these hold, merge immediately without another user confirmation. Otherwise record the unmet conditions and do not merge. Use the repository's required merge method, or its/platform default if unspecified. Do not proactively use admin bypass or force-push, or enable auto-merge or a merge queue. If a merge queue is already enabled, or policy requires an up-to-date branch and being behind is an approved item's only merge blocker, follow [Merge lane](references/merge-lane.md). Otherwise merge directly after approval. Record permission, protection, or platform failures accurately; never report them as successful merges.
 
-## 交接记录
+## Handoff
 
-每项结束后，包括未合并或受阻项，按 [交接记录规则](references/handoff.md) 交接后再继续队列。
+After each item, including unmerged or blocked ones, follow [Handoff records](references/handoff.md) before continuing the queue.
 
-## 输出
+## Output
 
-处理完整个冻结清单后，用中文汇总：
+After processing the entire frozen list, summarize:
 
-- 本轮开始时确定的处理清单、基线和处理顺序。
-- 第 3 轮修复后的终审及合并结果；终审仍有范围内必修问题而暂停的 Change Request，附当前 head、轮次和计数依据。
-- 每个 Change Request 的审查结论及证据。
-- 实际执行的 Review、合并、关闭和清理操作；明确区分已审查、已批准、已合并和未合并。
-- 合并后本地与远端源分支的实际清理结果、自动删除设置，以及因安全条件或权限而保留的分支与原因。
-- 关联任务及上级任务的关闭状态和未完成差额。
-- 新发现问题的去重与归类处理结果。
-- 本次清理开始前已有任务的完成及剩余、本次清理期间新建的任务、返工、关闭的上级任务和已解除的阻塞；“本次清理”从 tracker 或交接记录中的清理起点算起，多次运行之间不重置，不是这一次运行开始的时间；已关闭任务漏掉的验收项关联回原任务及原 Change Request，记为返工。
-- 尚存阻塞、已接受边界和下一步。
+- The initial list, baseline, and processing order.
+- Final review and merge results after repair round 3; requests paused for remaining in-scope required changes, with current head, round count, and evidence.
+- Each request's review conclusion and evidence.
+- Actual reviews, merges, closures, and cleanup; distinguish reviewed, approved, merged, and unmerged.
+- Actual local/remote source-branch cleanup, the automatic-deletion setting, and branches retained for safety or permissions with reasons.
+- Linked tasks/parents closed and remaining scope.
+- Deduplication and classification of newly discovered issues.
+- Completion and remainder of tasks predating this cleanup, tasks created during cleanup, rework, parent closures, and removed blockers. “This cleanup” starts at the tracker/handoff's cleanup baseline, persists across runs, and is not this invocation's start. Link acceptance gaps missed in closed tasks to their original task and Change Request and count them as rework.
+- Remaining blockers, accepted limits, and next steps.
 
-不要自动纳入新增 Change Request，不以 CI 全绿冒充验收成立，也不要把未成功的合并写成已交付。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+Do not add newly opened requests, treat green CI as acceptance, or call failed merges delivery. Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.

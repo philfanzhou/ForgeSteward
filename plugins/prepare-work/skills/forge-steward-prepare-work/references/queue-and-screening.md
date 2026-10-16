@@ -1,30 +1,30 @@
-## 冻结队列与证据基线
+## Freeze the queue and evidence baseline
 
-1. 识别目标仓库、默认分支、远端和工作区状态，刷新远端元数据，以最新远端主线提交为审计基线，不覆盖用户改动。读取仓库规范、已有 tracker、主线、上轮遗留和用户的数量限制。
-2. 冻结当前开放 Issue 及 Change Request 完整清单，记录时间、基线和顺序。调查期间新发现不自动加入候选；本轮按任务粒度规则从冻结候选拆分出的 task 继承该候选的冻结身份，逐项判定门禁，不属于冻结后新出现的 Issue。没有既定主线时，依据用户目标和仓库优先级，从存量中选定本轮主线，不新造永久排期。
-3. 区分存量与周期新增。清理周期基线沿用既有 tracker 或上轮交接记录，不因重跑重置；没有记录时以本轮冻结时间建立基线，按授权写入既有 tracker 的当前调度段落，无可写位置时在过程中说明。周期基线时已开放的 Issue 为存量；从存量拆分出的 task，以及为解除某个存量 task 的真实前置而新建、并已作为其平台依赖关联的 task，继承存量身份。基线之后因审计、Review、CI 或新需求新建的其余 Issue 为周期新增。清理周期继承期初 task、未完成范围和退出条件；新增、返工及父级结项单列，拆分或迁移不冒充存量交付。
-4. 核对原 Issue、历史评论、直接前置、父子关系和关联实现；关闭关键字、平台关联、正文、分支及验收范围重合均需检查。已有开放实现转交审查或修复，不重复准备一份实现。关联不明确时查证，不推定不存在。
-5. 跨仓任务保留原 Issue 身份，识别实现所属仓库并读取其规则和开放实现；不能因本仓没有代码退回公共库巡检，也不复制同范围任务。
-6. 完整阅读将改动的相关成员、测试、公开契约及直接受影响调用路径，按任务检查公开文档、配置、注册、持久化与数据迁移历史、部署路径等边界。已有完整审计时核对基线差异、覆盖范围和未决事项，无相关变化复用证据；相关行为变化补读受影响完整成员及测试，证据缺失则补齐。不因无关提交反复全仓审计，也不把旧绿色结果当作未来实现的验收。
+1. Identify repository, default branch, remotes, and workspace state. Refresh remote metadata and use latest remote mainline as the audit baseline, preserving user changes. Read repository conventions, existing tracker, mainline priorities, previous handoff, and the user's count limit.
+2. Freeze the complete open Issue/Change Request list with time, baseline, and order. New findings do not automatically join. Tasks split from frozen candidates this round under sizing rules inherit their frozen identity, are checked individually, and are not newly arriving Issues. Without established mainline priorities, choose this round's focus from existing work using user goals and repository priorities; create no permanent schedule.
+3. Distinguish baseline backlog from work created during the cleanup cycle. Reuse the tracker/prior handoff's cycle baseline without resetting it on reruns. Without a record, establish the freeze time as baseline and update the existing tracker's current scheduling section when authorized, or explain during progress if unwritable. Issues open at cycle baseline are backlog. Their split tasks, and tasks newly created for a backlog task's genuine prerequisite and linked as platform dependencies, inherit backlog identity. Other Issues created later through audits, review, CI, or new requirements are cycle additions. Preserve initial tasks, unfinished scope, and exit conditions; count additions, rework, and parent closure separately. Splitting/moving work is not backlog delivery.
+4. Check original Issues, historical comments, direct prerequisites, parents/children, and linked implementations. Inspect closing keywords, platform links, prose, branches, and overlapping acceptance. Route open implementations to review/repair without duplicating preparation. Investigate ambiguous links rather than assuming none exist.
+5. Preserve original cross-repository Issue identities. Identify code-owning repositories and read their conventions/open implementations. Missing code in this repository does not justify switching to general library inspection or duplicating scope.
+6. Read affected members, tests, public contracts, and directly affected call paths in full. Inspect applicable documentation, configuration, registration, persistence/migration history, and deployment boundaries. For complete prior audits, compare baseline changes, coverage, and unresolved items; reuse unaffected evidence. Read changed members/tests fully for relevant behavior changes and fill gaps. Unrelated commits do not require repeated full-repository audits. Old green results are not acceptance of future implementation.
 
-## 自动化安全告警只读检查
+## Read-only automated security alerts
 
-冻结清单后、初筛前，完整读取[自动化安全告警规则](security-alerts.md)，对授权内目标仓库执行一次只读检查，记录结果与覆盖边界，再继续下述初筛。告警不是候选清单项；已有冻结 Issue 可补证据，冻结后新登记的 Issue 不自动加入本轮。
+After freezing and before screening, read [Automated security alert rules](security-alerts.md) in full. Perform one authorized read-only check, record results and coverage, then screen below. Alerts are not queue entries: add evidence to frozen Issues, but do not automatically admit newly filed Issues.
 
-同一次连续运行（例如编排技能的后续周期）中，已有本技能写下、注明时间和主线基线的安全告警检查、初筛或存量阻塞复查结果时，只补查此后新增或有变化的告警、Issue、依赖关联及相关主线变化，其余沿用原结论；判定标准不变。记录缺失、覆盖不明或无法确认有无变化时，按完整流程执行。
+Within one continuous run, such as later orchestration cycles, reuse this skill's recorded alert checks, screening, and backlog-blocker rechecks when they include time and mainline baseline. Recheck only new/changed alerts, Issues, dependency links, and relevant mainline changes without changing standards. If records are absent, coverage unclear, or changes cannot be determined, run the full process.
 
-## 批次填充与初筛
+## Fill and screen the batch
 
-默认上限为 10 项，用户数量要求优先。批次优先用存量填满，按以下层级逐层准备；前一层候选全部推进到 ready，或已记录不能入选的具体原因之前，不准备下一层（等待长耗时结果时的例外见下文）：
+Default to at most 10 items; the user's requested count takes precedence. Fill from backlog first, preparing these tiers in order. Do not start the next tier until every previous-tier candidate is ready or has a concrete recorded exclusion reason, except while awaiting long-running results as below:
 
-1. 存量 task：主线在前，其后按可解除的存量阻塞数量、依赖和价值排序。
-2. 周期新增中需立即处置的严重风险。
-3. 其余周期新增：仅当前两层已处理完且批次仍有空位时才准备，并在过程中说明存量未能填满批次的原因。
+1. Backlog tasks: mainline priorities first, then by number of backlog blockers they remove, dependencies, and value.
+2. Cycle additions posing severe risks requiring immediate action.
+3. Other cycle additions: only after both earlier tiers are handled and capacity remains. Explain why backlog did not fill the batch.
 
-深入准备前，先用只读查询对完整冻结清单做初筛，并标注每项属于存量还是周期新增：已有开放实现或属于 tracker 的候选，以及调用方告知正在实现、尚无 Change Request 的 Issue，直接判为本轮不能入选并记录原因；周期新增中依赖未合并前置，或已记录真实外部阻塞且解除条件未变的，同样直接排除。存量候选不因阻塞标记或上轮结论在初筛中排除，须按[存量阻塞复查](blockers.md#存量阻塞复查)逐项核对。其余候选标注已知准备缺口。初筛只用于排序和排除确定不能入选的项，不代替门禁判定，不因预估投入大而排除候选。
+Before deep preparation, screen the entire frozen list read-only and label backlog/addition identity. Exclude trackers, candidates with open implementations, and Issues the caller says are already being implemented without a Change Request; record why. Also exclude cycle additions depending on unmerged prerequisites or documented genuine external blockers with unchanged release conditions. Do not exclude backlog solely for a blocked marker/prior conclusion: individually perform [Backlog blocker recheck](blockers.md#recheck-backlog-blockers). Mark known preparation gaps for others. Screening orders work and excludes clearly ineligible items; it neither replaces readiness checks nor permits exclusion for high estimated effort.
 
-初筛遇到 tracker、epic、workstream 等父项且其子项已全部关闭时，核对父级验收：验收在最新主线上有证据满足时，按授权关闭并单列为父级结项，不计作交付，也不进入列表；仍有差额时写明剩余范围，差额已有开放 Issue 就链接，没有且属于具体可实施范围时，按授权拆为 task，该 task 继承存量身份。不借结项开展全仓审计。
+When a tracker, epic, workstream, or other parent has all children closed, check parent acceptance. If latest-mainline evidence satisfies it, close when authorized and report parent closure separately, without counting delivery or adding it to the list. Otherwise record the remainder and link an existing open Issue, or split concrete implementable remaining scope into an authorized task inheriting backlog identity. Do not use closure as a reason for repository-wide auditing.
 
-按批次填充顺序逐项准备。主线项达到 ready 或真实阻塞后，继续推进其余候选，直到入选数达到上限或用户要求的数量，或剩余候选均已判定不能入选并记录各自原因；此前入选数少不是结束理由。缺少审计、验收、邻近问题归属或模板栏目等可在授权范围内补齐的候选须先补齐再判定，不直接排除。非主线候选需要多轮长耗时调查时，保存证据和下一动作后可先推进同层中排在其后的候选，避免少数长耗时调查占满本轮而使接近 ready 的候选未被处理；延后不等于判定不能入选，批次未满时须回到该项继续推进。等待长耗时结果期间可以推进下一层候选，但结果可用后先回到存量；入选数超过上限时优先保留上层项，最终列表按层级和排序输出。不凑数：不降低门禁，不为增加数量拆分本应单一的 Issue 或新建任务，不扩大审计寻找小修复，也不纳入冻结后新出现的 Issue（本轮从冻结候选拆分出的 task，以及为解除存量真实前置而新建的 task 除外）。入选数少于上限时，在工作过程中说明其余候选的未入选原因，最终输出仍只含列表。
+Prepare each candidate in batch order. Once mainline work is ready or genuinely blocked, continue until the requested/default count is reached or every remaining candidate has a recorded exclusion reason. A small selected count is not a stopping reason. Fill authorized gaps in audit, acceptance, adjacent-finding ownership, or templates before deciding; do not exclude them immediately. If a non-mainline candidate needs repeated lengthy investigation, save evidence/next action and advance later candidates in the same tier so near-ready work is not neglected. Deferral is not exclusion; return if capacity remains. While awaiting lengthy results, next-tier work may proceed, but return to backlog once results arrive. If selection exceeds capacity, retain higher-tier items; final order follows tiers/priorities. Never lower requirements, split a single Issue or create tasks to inflate counts, broaden audits to seek small fixes, or admit post-freeze Issues (except frozen-candidate splits and genuine backlog-prerequisite tasks). If below capacity, explain other exclusions during progress; final output remains only the list.
 
-输出前复核：入选项的相关主线变化、前置和新开放实现；以及因外部决定、权限、环境或前置未关闭而未入选的冻结候选，其解除条件在本轮已满足（例如用户已在过程中回答、权限已补齐、前置已关闭或合并）时恢复准备并重新判定门禁，入选数仍受上限约束。只补查受影响部分，不把新 Issue 扩进冻结清单。
+Before output, recheck selected items' relevant mainline changes, prerequisites, and new open implementations. Also resume excluded frozen candidates whose external-decision, permission, environment, or prerequisite conditions became satisfied during this run (such as a user answer, restored permission, or merged/closed prerequisite). Reassess readiness within the count limit. Inspect only affected portions and add no new Issues to the frozen list.

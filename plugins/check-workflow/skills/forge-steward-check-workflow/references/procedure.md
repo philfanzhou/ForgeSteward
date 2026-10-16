@@ -1,28 +1,28 @@
-## 发布对账与删除独立执行
+## Run the release audit and deletion independently
 
-开始时完整读取 [发布管线健康对账](release-audit.md)，按本次授权先执行只读对账，保存逐维度结果，再进入下面的删除流程；仅发布对账的明确请求完成后转入 [汇报规则](reporting.md)。必须在任何零修改出口前完成可进行的对账，不能因没有删除候选而跳过。对账无权限、查询失败、无法确认或发现问题均不阻止删除交付；删除检查报错只停止其写入，仍可读取的发布证据继续核对。两类结果分别汇报，不为对账修复或登记，不将其发现放入清理 Change Request 正文。用户取消时停止后续查询和删除写入，报告已完成覆盖与未完成项。
+At startup, read [Release pipeline audit](release-audit.md) in full. First perform the authorized read-only audit and save each dimension's result, then follow the deletion flow below. For an explicit release-audit-only request, proceed to [Reporting](reporting.md) after the audit. Complete all possible audit checks before any zero-change exit; no deletion candidates is not a reason to skip them. Missing audit permissions, query failures, unknowns, and findings do not block deletion delivery. A deletion-check error stops its writes only; continue checking readable release evidence. Report the two separately. Do not fix or file audit findings or include them in the cleanup Change Request body. On cancellation, stop further queries and deletion writes and report completed coverage and unfinished items.
 
-## 执行步骤
+## Procedure
 
-1. 定位目标仓库根目录、主线和工作区状态，记录已有改动，不覆盖用户工作。只读查询托管平台的合并后自动删除源分支设置，记录设置值、查询来源和时间；无法读取时记录权限、平台能力或查询错误，不猜测。该设置不替代逐个合并后核对远端分支，停用或未知也不阻止文档检查。默认交付模式下刷新远端主线，查找源分支为 `forge-steward/remove-skill-duplicates` 的开放 Change Request；目标仓库规范另有分支命名要求时，改用一个符合规范的固定分支名，并在后续运行中沿用。存在旧版本遗留的 `forge-steward/workflow-block` 开放 Change Request 时，报告其已被本次变更取代，不自动关闭。
-2. 基于最新主线运行旧版区块检查，`<skill>` 为本技能目录：
+1. Locate the repository root, mainline, and workspace state. Record existing changes and preserve user work. Read the hosting platform's automatic post-merge source-branch deletion setting; record value, source, and time. If unreadable, record the permission, capability, or query failure without guessing. The setting does not replace per-merge remote-branch checks; disabled or unknown settings do not block document checks. In default delivery mode, refresh remote mainline and find an open Change Request from `forge-steward/remove-skill-duplicates`. If repository naming rules differ, choose a compliant fixed branch name and reuse it in later runs. Report any legacy open `forge-steward/workflow-block` request as superseded by this change; do not close it automatically.
+2. Check legacy blocks against the latest mainline, where `<skill>` is this skill's directory:
 
    ```bash
-   python3 <skill>/scripts/remove_workflow_blocks.py --repo <仓库根目录> --check
+   python3 <skill>/scripts/remove_workflow_blocks.py --repo <repository-root> --check
    ```
 
-   - 退出码 `0`：没有旧版区块。
-   - 退出码 `1`：存在需要删除的区块，输出列出文件及原因。
-   - 退出码 `2`：标记不成对或嵌套、代码围栏未闭合、文件不是 UTF-8 普通文件等。报告原因后停止写入，不猜测修复方式。
-3. 基于同一主线识别工作流政策条文：读取全部候选位置，逐项对照参考文档的政策目录，记录文件、行范围、标题或首行、所属政策维度及对应技能、技能中的等价条款、处理方式（整段删除、删除分句、整份删除文档、删除引用），分为“确认删除”和“待维护者决定”。在对应技能正文中找不到等价语义的条文仍按参考文档处理，另记为“技能缺口”并保留原文。没有候选时记录已检查的位置。
-4. 第 2 步退出码为 `0` 且第 3 步没有确认删除项时，零修改结束，不创建分支、commit 或 Change Request；若存在第 1 步的开放 Change Request，报告它已不再需要，不自动关闭。待决定项仍须在汇报中列出。
-5. 需要变更时：已有第 1 步的开放 Change Request，就在其分支上继续，按仓库规范合入最新主线（不允许强推时使用 merge）；否则基于最新主线创建该分支。运行同一命令的 `--write` 删除区块，再按参考文档删除确认的条文，最后运行 `--check`，必须得到退出码 `0`。
-6. 核对 diff：只允许出现删除。按分句删除时，被修改的行除删去的分句外逐字保留，不改写、合并或重新排版保留内容。删除后不得留下指向已删文档或章节的链接、目录项或读取指示，也不得留下只剩标题的空章节或断开的编号列表；需要改写保留内容才能消除时，撤回该项删除并改为待决定。发现其他变化时撤回并报告。
-7. 环境没有 Python 3 时，按脚本的同一规则手工删除标记区块：从开始标记到结束标记整段删除，连同因此多出的一个空行；代码围栏中的标记不算区块。无法保证只删除区块时只报告，不提交。
+   - Exit `0`: no legacy blocks.
+   - Exit `1`: blocks need deletion; output lists files and reasons.
+   - Exit `2`: unmatched/nested markers, unclosed code fences, non-UTF-8 or non-regular files, etc. Report the reason and stop writing; do not guess a repair.
+3. On the same mainline, read all candidate locations and compare each clause against the reference's policy catalog. Record file, line range, heading/first line, policy dimension and owning skill, equivalent skill clause, and action (section, clause, document, or reference deletion). Classify as “confirmed deletion” or “maintainer decision needed.” Handle clauses lacking equivalent skill semantics under the reference rules, separately recording a “skill gap” and retaining the original text. If there are no candidates, record the locations checked.
+4. If step 2 exits `0` and step 3 confirms no deletions, finish without changes, branch, commit, or Change Request. Report any open request from step 1 as no longer needed; do not close it automatically. Still report undecided items.
+5. If changes are needed, continue on the step-1 open request's branch and integrate latest mainline using repository policy (merge when force-push is forbidden). Otherwise create that branch from latest mainline. Run the same command with `--write` to remove blocks, then delete confirmed clauses under the reference rules. Finally run `--check`; it must exit `0`.
+6. Inspect the diff: allow deletions only. For clause deletions, preserve every character outside the deleted clause; do not rewrite, combine, or reformat retained text. Leave no links, contents entries, or reading instructions to removed documents/sections, heading-only empty sections, or broken numbered lists. If preventing these requires rewriting retained content, undo that deletion and mark it undecided. Revert and report other changes.
+7. Without Python 3, manually follow the script's exact block rules: delete start through end marker and the one resulting extra blank line. Markers in code fences are not blocks. If block-only deletion cannot be guaranteed, report without submitting.
 
-## 提交与交接
+## Submit and hand off
 
-1. 默认交付模式下，只暂存本任务修改或删除的文件。按目标仓库规范 commit、push，并创建或更新指向主线的 Change Request，不重复开 PR/MR。标题、正文语言和模板遵守目标仓库约定。
-2. Change Request 正文说明：技能版本、检查命令及退出码；逐项列出删除内容（文件、原行范围、标题或首行、所属政策维度及对应技能、处理方式）和待维护者决定的候选及原因；单列技能缺口（原文、所属技能、缺少的语义）；说明删除后这些工作流约束只在调用 ForgeSteward 技能时生效，维护者可在审查中撤回任一删除。
-3. 创建或推送的响应不明确时，先查询远端分支和同源 Change Request，确认后再重试。权限、认证、网络或仓库门禁阻止继续时，保存本地提交或差异，准确说明停在未提交、已提交未推送、已推送未建 PR/MR 中的哪一步。
-4. 回读实际 Change Request 的链接、base/head 与状态后结束；不等待合并，不自行审查或合并。
+1. In default delivery mode, stage only this task's changed/deleted files. Commit and push under repository conventions, then create/update the Change Request targeting mainline; do not duplicate PRs/MRs. Follow repository title, body-language, and template rules.
+2. Its body records skill version, check command and exit code; each deletion's file, original line range, heading/first line, policy dimension, owning skill, and method; undecided candidates and reasons; and a separate list of skill gaps with original text, owning skill, and missing semantics. Explain that deleted workflow constraints apply only when ForgeSteward skills are invoked and that maintainers may withdraw any deletion during review.
+3. If creation/push responses are ambiguous, query the remote branch and same-source Change Requests before retrying. When permissions, authentication, network, or repository requirements block progress, preserve local commits/diffs and identify the exact stopping point: uncommitted, committed but not pushed, or pushed without a PR/MR.
+4. Read back the actual Change Request link, base/head, and status. Do not wait for merging, review it yourself, or merge.

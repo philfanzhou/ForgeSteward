@@ -1,19 +1,19 @@
-## 被并发调用时的审查与合并
+## Concurrent review and merging
 
-调用方只交给一个 Change Request 时，只审查和处理这一项，在调用方指定的工作区检出其 head；Review 轮次、终审和合并判定照常按本技能。调用方注明该项依赖的其他 Change Request 尚未合并时，前置合并前不合并。
+When given one Change Request, handle only it, checking out its head in the caller's workspace. Apply normal round limits, final review, and merge conditions. Do not merge before prerequisites the caller identifies as unmerged.
 
-满足合并判定后：
+Once merge conditions hold:
 
-1. 获取最新主线，记为 M。主线自本次审查开始以来有新合并，且新合并的改动与本项改动文件相交，或双方都改动依赖锁文件、数据库迁移、注册表、自动生成代码、版本号、更新日志、多语言文案、共享配置时，在本地把 M 合入本项 head 的临时结果上（不推送）重跑受影响的检查；不通过则记为需要同步主线或修改，不合并。仓库已启用合并队列时，按[合并车道](merge-lane.md)加入队列并等待结果，不取 `merge` 锁。仓库要求分支保持最新而本项落后时，不自行同步，记为待合并车道交回调用方。
-2. 用调用方给的命令取 `merge` 锁（可等待）。在锁内重新获取主线和本项 head：head 与审查时不同，释放锁并按复审处理新增差异；主线已不是 M 且新增改动按第 1 步需要复核，释放锁回到第 1 步；否则执行合并。
-3. 合并后在锁内完成[合并后结项与清理](post-merge.md)（只清理本项自己的分支和工作区），然后释放锁；合并失败或中途出错同样释放，并记录原因。逐项审查不做[遗留分支清理](branch-cleanup.md)，由调用方在整次运行收尾时另行安排。
+1. Fetch latest mainline as M. If merges since review began overlap this request's files, or both sides touch dependency lockfiles, migrations, registries, generated code, versions, changelogs, localized strings, or shared configuration, locally merge M into a temporary result of this head (without pushing) and rerun affected checks. Failure means sync/repair needed, not a merge. If a platform queue is enabled, follow [Merge lane](merge-lane.md), enqueue/wait without `merge` locking. If policy requires current branches and this one is behind, do not sync independently; return it to the caller awaiting the merge lane.
+2. Acquire `merge` with supplied commands, waiting if necessary. Inside the lock, refetch mainline and request head. If head differs from reviewed head, release and re-review the new diff. If mainline differs from M and new changes need step-1 inspection, release and return to step 1. Otherwise merge.
+3. While still locked, complete [Post-merge work](post-merge.md), cleaning only this item's branch/workspace, then release. Also release on merge/error failure and record why. Per-item reviews skip [Leftover branch cleanup](branch-cleanup.md); the caller schedules it at run end.
 
-## 被并发调用时的本地验证
+## Concurrent local verification
 
-调用方提供任务标识、取锁与释放锁的命令及本项需排队的资源时，本地验证按以下规则进行；验证标准不变。
+When given a task identifier, acquire/release commands, and queued resources, follow these rules without changing verification standards:
 
-1. 隔离：用任务标识区分临时目录、容器项目名、测试数据库名和端口（端口优先由系统分配）；只用仓库已有配置或环境变量，不为隔离修改仓库文件。
-2. 排队：占用所列资源或属于编译、整套测试等重活（`heavy`）的验证，先用给定命令取锁，结束后无论成败都释放。多把锁按资源名顺序取，等不到时先释放已取得的锁；等锁期间先做不需要该资源的工作，累计等待超过 30 分钟记为等待资源并交回结果。共享远端测试环境始终独占。调用方未给出本项资源时自行判断，查不清的验证取调用方列出的全部共享资源锁和 `local-suite`。
-3. 分辨撞车：并发时失败的检查，先在持有其全部资源锁（不清楚时取 `local-suite`）的情况下单独重跑。单独通过即在结果中报告为与该资源撞车，不作为范围内阻塞或修改要求；单独仍失败才按正常问题处理。
-4. 需要新建 Issue 时，调用方提供了锁命令的，先取 `issue-registry` 锁，在锁内检索开放与关闭记录后再登记或追加证据，完成后释放。
-5. 本地只跑与改动相关的检查，完整套件交给 CI；仓库规范要求本地跑完整套件时照做，并按重活排队。git 报锁冲突时等待几秒后有限重试。
+1. Isolate temporary directories, container project names, test databases, and ports by task identifier; prefer system-assigned ports. Use existing configuration/environment variables, not repository edits for isolation.
+2. Acquire supplied locks before listed-resource checks or heavy work such as compilation/full suites (`heavy`); release regardless of result. Take multiple locks in resource-name order, releasing held locks if another is unavailable. Do independent work while waiting. After over 30 minutes accumulated waiting, return waiting-for-resources status. Shared remote test environments are always exclusive. Determine unspecified resources; if unclear, take all listed shared-resource locks and `local-suite`.
+3. Rerun concurrent failures alone with every relevant lock (`local-suite` if unclear). A solo pass is resource contention: report it, not an in-scope blocker/change request. Handle persistent failures normally.
+4. For a new Issue with supplied lock commands, acquire `issue-registry`, search open/closed records within it, file/append evidence, then release.
+5. Run relevant checks locally and leave full suites to CI unless repository rules require local execution; then queue as heavy work. For git lock conflicts, wait a few seconds and retry a bounded number of times.

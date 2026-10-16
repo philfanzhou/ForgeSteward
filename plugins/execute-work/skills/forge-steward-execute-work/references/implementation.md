@@ -1,26 +1,26 @@
-## 逐项实现与提交
+## Implement and submit each item
 
-运行本地验证、读 CI 结果或等待 CI 前，完整读取 [读日志与等待检查](ci.md)。
+Before local verification, reading CI results, or waiting for CI, read [Read logs and wait for checks](ci.md) in full.
 
-- 为每项独立基于所属仓库刚获取的最新远端主线建立工作分支，并在隔离工作区中实施，不依赖本地主线，不叠加前一项未合并代码；保护用户改动和他人工作。必须依赖未合并实现的项记录等待条件，不能把批量执行解释成堆叠 PR 的授权。原 Issue 标明依赖本批前项且前项已合并时，先按其写明的补查范围核对前项实际合并的改动；与方案不符时更新原 Issue 或记录阻塞，不自行另定方案。
-- 先确认范围内的不变量，再修改最小必要实现及配套测试。Issue 的排除项有约束力；不能顺手重构、改名、升级依赖或吸收第二个独立契约。调用链有多条路径时按同一保证验证适用输入集合，不只修报告中的单一路径。
-- 逐条对应“验收条目 → 实际断言或可检查产物 → 执行结果”，执行与修改风险匹配的本地验证及仓库必需检查。适用的失败、取消、安全和并发行为随实现验证；未覆盖项保留未完成。旧绿色结果、总测试数或 CI 全绿都不能代替逐条验收。复杂协议或状态任务核对原 Issue 的语义模型和端到端场景；实现与模型不一致时回到原 Issue 更新模型，不在实现中另立状态规则。以文档交付的目标设计须记录实际演算的端到端场景和结果，格式、链接、secret 扫描或现有 CI 通过不作为语义正确的证据。
-- 邻近问题先检索开放和关闭记录去重。当前范围内的保证违反在本项闭环；独立既有缺陷另行归类登记并链接，同类缺陷归并到已有或同一个 Issue 追加证据，只有已确认可复现、独立且无同类登记的缺陷才新建；可选改进只在原 Issue 或 Change Request 记录，不新建；在原 Issue/PR 写清本次不修。已关闭 task 的验收遗漏回链原实现与遗漏条目，计为返工，不包装成新需求。只有需立即处置的严重风险可以中断顺序，记录影响和恢复条件。
-- 检查 diff、敏感信息、用户改动及提交范围后，提交并推送本项工作分支，创建独立 Change Request，回链原 Issue。每个 Change Request 只关闭一个原 Issue；标题、正文语言和模板遵守所属仓库约定。正文说明最终实现、逐条验证（实际命令、结果和跳过原因）、已知限制和刻意不修的归属，不能宣称已经合并交付。
-- 发布前复核是否出现等价开放实现，避免重复；推送前再获取远端主线，与之冲突时先在本分支同步并重跑受影响验证。写入或推送返回不确定时先查询远端状态再重试；发布失败保留本地提交与恢复动作。检查已启动的必要 CI，处理确定且在范围内的失败（必要 CI 失败时先判断是否与本次改动有关：失败的测试或任务既不覆盖本次改动，也不依赖被改动的代码，才算无关。无关的失败用平台的“重跑失败任务”功能只重跑一次，并在 Change Request 记录两次运行的链接；重跑通过即按通过处理，同一测试时过时不过的情况检索去重后登记为 Issue（被并发调用时在 `issue-registry` 锁内进行）；重跑仍失败才记为等待外部。与改动有关或无法判断时按原规则处理，不靠重跑放过。）；等待上限取该仓库同一检查最近几次成功运行中最长耗时的 2 倍，查不到历史时为 30 分钟，超过上限或迟迟未开始运行时记为等待外部检查；外部故障或等待保留未完成状态，不扩大成全仓修复或反复审查循环，也不阻断独立后项。若仓库允许先提交草稿等待环境验证，准确标为草稿/未验收，不假报通过。
-- 本项完成验证并处理完 CI 后，在交接记录中标明该 Change Request 已交出给审查。交出后不再向其分支推送，后续修改只经审查与修复流程；调用方据此判断哪些项可以开始审查。
+- Create each independent work branch from its owning repository's freshly fetched remote mainline and implement in an isolated workspace. Do not rely on local mainline or stack the preceding item's unmerged code. Protect user changes and others' work. Record waiting conditions for items that require unmerged implementations; batch execution does not authorize stacked PRs. When the original Issue depends on an earlier batch item that has merged, first check its actual merged changes against the Issue's specified follow-up inspection. If they differ from the plan, update the original Issue or record a blocker rather than inventing a new design.
+- Establish in-scope invariants before the minimum implementation and supporting tests. Issue exclusions are binding: no incidental refactors, renames, dependency upgrades, or second independent contract. With multiple call paths, verify applicable inputs against the same guarantee instead of fixing only the reported path.
+- Map each acceptance criterion to an actual assertion or inspectable output and execution result. Run risk-appropriate local verification and required repository checks, including applicable failure, cancellation, security, and concurrency behavior. Uncovered items remain unfinished. Old green results, total test counts, and green CI do not replace individual acceptance evidence. For complex protocols/state, check the Issue's semantic model and end-to-end scenarios. Resolve implementation/model differences in the original Issue, not a second state model in code. For a design delivered as documentation, record actual end-to-end scenario walkthroughs and outcomes; formatting, links, secret scans, and existing CI do not prove semantic correctness.
+- Search open/closed records to deduplicate adjacent findings. Resolve violations of current guarantees within this item. Classify/file independent pre-existing defects separately and link them; group matching defects in an existing or common Issue with added evidence. Create a new Issue only for a confirmed reproducible, independent defect with no existing match. Record optional improvements only in the original Issue/Change Request, without a new Issue, and explicitly state what is not being fixed. Link missed acceptance in closed tasks back to original implementation and missed criteria; count it as rework, not a new requirement. Only severe risk requiring immediate action may interrupt order; record impact and resumption conditions.
+- Inspect diff, sensitive information, user changes, and commit scope; commit/push this item's work branch and create an independent Change Request linking the original Issue. Each request closes only one original Issue. Follow owning-repository title, body-language, and template conventions. Describe final implementation, individual verification (actual commands, results, skips and reasons), known limits, and ownership of intentionally deferred fixes. Do not claim merged delivery.
+- Before publication, check for equivalent open implementations. Before pushing, fetch remote mainline again; resolve conflicts by syncing this branch and rerunning affected verification. If writes/pushes return ambiguously, query remote state before retrying. Preserve local commits and recovery actions on publication failure. Check triggered required CI and fix deterministic in-scope failures. A failed check is unrelated only if its test/job neither covers this change nor depends on changed code. Retry unrelated failures exactly once using the platform's failed-job rerun, linking both runs in the Change Request. Treat a passing retry as passed; search/deduplicate and file intermittent tests as Issues (under `issue-registry` when concurrent). A still-failing retry waits for external action. For related or uncertain failures, follow normal repair rules, not a passing retry shortcut. Wait at most twice the longest of the same repository check's recent successful runs, or 30 minutes without history. Beyond the limit, or if checks fail to start, record waiting for external checks. External failures/waits remain unfinished; do not broaden into repository-wide repair or repeated review loops, or block independent later items. If repository rules permit a draft pending environment validation, label it draft/unaccepted accurately.
+- After verification and CI handling, record that this Change Request is handed to review. Stop pushing its branch after handoff; later changes use review/repair. The caller uses this record to determine which items can enter review.
 
-## 被并发调用时的实现
+## Concurrent implementation
 
-- 调用方只交给一个 Issue 并指定工作区时，在该工作区建分支实施，不使用其他目录。
-- 调用方提供本批其他正在实现项的预计改动范围时，推送前核对本项实际改动；超出本项预计且与其重叠时停下，保留工作区和本地提交，在结果中报告重叠的文件，不推送。
-- 需要新建 Issue 时，调用方提供了锁命令的，先取 `issue-registry` 锁，在锁内检索开放与关闭记录后再登记或追加证据，完成后释放。
+- If given one Issue and a workspace, create its branch and implement there only.
+- If the caller provides expected changes for other active items, compare this item's actual diff before pushing. If it exceeds its expected scope and overlaps another item, stop, retain workspace/local commits, report overlapping files, and do not push.
+- When creating an Issue and lock commands are provided, acquire `issue-registry`, search open/closed records within the lock, then file or append evidence and release it.
 
-## 被并发调用时的本地验证
+## Concurrent local verification
 
-调用方提供任务标识、取锁与释放锁的命令及本项需排队的资源时，本地验证按以下规则进行；验证标准不变。
+When given a task identifier, lock acquire/release commands, and resources to queue for, follow these rules without changing verification standards:
 
-1. 隔离：用任务标识区分临时目录、容器项目名、测试数据库名和端口（端口优先由系统分配）；只用仓库已有配置或环境变量，不为隔离修改仓库文件。
-2. 排队：占用所列资源或属于编译、整套测试等重活（`heavy`）的验证，先用给定命令取锁，结束后无论成败都释放。多把锁按资源名顺序取，等不到时先释放已取得的锁；等锁期间先做不需要该资源的工作，累计等待超过 30 分钟记为等待资源并交回结果。共享远端测试环境始终独占。调用方未给出本项资源时自行判断，查不清的验证取调用方列出的全部共享资源锁和 `local-suite`。
-3. 分辨撞车：并发时失败的检查，先在持有其全部资源锁（不清楚时取 `local-suite`）的情况下单独重跑。单独通过即在结果中报告为与该资源撞车，不当作代码缺陷修复；单独仍失败才按正常问题处理。
-4. 本地只跑与改动相关的检查，完整套件交给 CI；仓库规范要求本地跑完整套件时照做，并按重活排队。git 报锁冲突时等待几秒后有限重试。
+1. Isolate temporary directories, container project names, test databases, and ports by task identifier; prefer system-assigned ports. Use existing configuration/environment variables only, not repository edits for isolation.
+2. Acquire the supplied locks before checks using listed resources or heavy work such as compilation/full suites (`heavy`), and release on success or failure. Acquire multiple locks in resource-name order; release acquired locks if another is unavailable. While waiting, do independent work. After over 30 minutes accumulated waiting, report waiting for resources and return. Shared remote test environments are always exclusive. If no item-specific resources are provided, determine them; if uncertain, acquire every listed shared-resource lock plus `local-suite`.
+3. For a check failing under concurrency, rerun alone while holding all its resource locks (`local-suite` when uncertain). If it passes alone, report resource contention instead of repairing it as a code defect; only persistent failure follows normal issue handling.
+4. Locally run checks relevant to the change, leaving full suites to CI unless repository rules require them locally; then run them under heavy-work queuing. For git lock conflicts, wait a few seconds and retry a bounded number of times.

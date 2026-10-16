@@ -1,4 +1,4 @@
-"""三个阶段技能各带一份 references/ci.md，内容必须逐字节相同，且被各自的阶段规则链接。"""
+"""The three stage skills carry byte-identical references/ci.md copies linked from their stage rules."""
 
 from pathlib import Path
 import unittest
@@ -24,7 +24,7 @@ class SharedCiRulesTests(unittest.TestCase):
         first = copies[SKILLS[0]]
         for skill, content in copies.items():
             with self.subTest(skill=skill):
-                self.assertEqual(content, first, f"{skill}/references/ci.md 与 {SKILLS[0]} 的副本不一致")
+                self.assertEqual(content, first, f"{skill}/references/ci.md differs from the {SKILLS[0]} copy")
 
     def test_stage_rules_link_to_ci_rules(self):
         for skill, files in LINKING_RULES.items():

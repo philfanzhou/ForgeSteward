@@ -1,31 +1,31 @@
-## 逐项修复
+## Repair each item
 
-运行本地验证、读 CI 结果或等待 CI 前，完整读取 [读日志与等待检查](ci.md)。
+Before local verification, reading CI, or waiting for CI, read [Read logs and wait for checks](ci.md) in full.
 
-调用方说明仍由其他流程处理（例如正在实现）的 Change Request，本轮不修改、不推送，记为跳过。对其余每个入选项：
+Skip Change Requests the caller says another flow still owns, such as implementation; neither edit nor push them. For each other selected item:
 
-1. 读取关联 Issue、原始范围、逐条验收、保证与非保证、历史意见、已接受边界和既有 Review 轮次。跨仓任务保留原 Issue 完整链接，修改在 Change Request 所属仓库进行并遵守该仓规范，不复制任务。核对历史证据的 base/head，仅补查相关变化及未解决项；证据缺失时补查，不因换会话归零轮次或重开已解决意见。
-2. 为每个必修条目记录来源、适用代码、为何属于范围和可验证的完成条件。合并重复意见，忽略被后续决定取代的意见。
-3. 先分类再修改：范围内必修项须对应具体验收或保证；明确的范围外建议、已接受非保证记录依据，移出代码必修清单；真正需要外部裁决的范围争议记录分歧、决策人及解除条件，不擅自扩大实现。可选建议不在本轮实施，轮次不因换会话重算。仍有效的平台审批或保护限制单独报告，不能将“无需改代码”说成“已获准合并”，也不能仅因意见未被采纳就无限修复。
-4. 已完成 2 轮往返（定义见[冻结待修清单](../SKILL.md#冻结待修清单)第 5 步）的 Change Request，本次修复会构成第 3 轮：先暂停写代码，逐 commit 审计范围和语义闭合；不能追溯到原验收的改动从本分支移出，另行登记为后续 Issue，再修复必修项。推送后往返达到 3 轮，交由 review-and-merge 对新 head 作一次终审；满足门禁时合并，仍有范围内必修问题时仅暂停该项，不进行第 4 次自动修复。其他项继续处理。
-5. 在原 Change Request 的源分支上完成满足必修项的最小修改。每个 Change Request 使用独立分支或隔离 worktree，不叠加其他未合并 Change Request 的代码，也不顺手寻找新的改进点。
-6. 运行覆盖修改和原验收缺口的必要验证。确定性 CI 失败应先本地复现或获得等价证据；无法运行时写明限制和剩余验证，不能宣称通过。
-7. 必修项闭环后提交并推送原源分支。提交应只包含该 Change Request 的修复；推送前确认远端 head 没有出现未纳入的并发提交。无推送权限、源自不可写 fork 或发生并发冲突时停止写入并记录恢复步骤，不改推到新的替代 Change Request。
-8. 推送后检查本次推送触发的必要 CI。由本次修改确定性导致、且属于本范围的失败，在本次修复中继续修复、验证并推送，不算新一轮往返；外部故障或与本次修改无关的失败记录事实，不扩大修复范围。必要 CI 失败时先判断是否与本次改动有关：失败的测试或任务既不覆盖本次改动，也不依赖被改动的代码，才算无关。无关的失败用平台的“重跑失败任务”功能只重跑一次，并在 Change Request 记录两次运行的链接；重跑通过即按通过处理，同一测试时过时不过的情况检索去重后登记为 Issue（被并发调用时在 `issue-registry` 锁内进行）；重跑仍失败才记为等待外部。与改动有关或无法判断时按原规则处理，不靠重跑放过。等待上限取该仓库同一检查最近几次成功运行中最长耗时的 2 倍，查不到历史时为 30 分钟；超过上限或迟迟未开始运行时记为等待外部检查并继续下一项，不原地空等。
-9. 在授权范围内逐条记录修复提交与验证，或无需修改的分类依据；解决 Review Thread 还须符合仓库权限和流程，不能以关闭线程代替修复或撤销他人审批。保留仍需复审的状态，不把等待复审当作新的修复任务。
+1. Read linked Issues, original scope, each acceptance criterion, guarantees/non-guarantees, historical feedback, accepted limits, and review-round counts. Preserve full original Issue links across repositories; modify the Change Request's repository under its conventions without duplicating tasks. Check historical evidence's base/head; inspect only relevant changes and unresolved items, filling missing evidence. Never reset rounds across conversations or reopen resolved feedback.
+2. For each required fix, record source, applicable code, why it is in scope, and verifiable completion conditions. Combine duplicate feedback and ignore superseded decisions.
+3. Classify before editing. Required in-scope items must map to specific acceptance or guarantees. Document and remove clear out-of-scope suggestions and accepted non-guarantees from required code work. For scope disputes needing external judgment, record disagreement, decision owner, and release conditions without expanding implementation. Do not implement optional suggestions this round or reset rounds across conversations. Report still-effective approval/protection restrictions separately: “no code change needed” is not “approved to merge.” Declining feedback does not justify endless repair.
+4. At 2 completed review/repair rounds (defined in [Freeze the repair queue](../SKILL.md#freeze-the-repair-queue), step 5), this repair is round 3. Pause code writing and audit scope and semantic completeness commit by commit. Remove changes untraceable to original acceptance from this branch and file them as follow-up Issues, then fix required items. After the third-round push, send the new head to review-and-merge for one final review. Merge when all conditions pass; otherwise pause only that item for remaining required in-scope issues. No fourth automatic repair. Continue other items.
+5. Make the minimum required changes on the original Change Request's source branch. Use an independent branch or isolated worktree per request, without stacking other unmerged work or seeking new improvements.
+6. Run necessary verification covering edits and original acceptance gaps. Reproduce deterministic CI failures locally first or obtain equivalent evidence. If checks cannot run, record limitations and remaining verification without claiming a pass.
+7. Once required fixes are complete, commit/push the original source branch. Include only that request's repairs. Before pushing, check for unaccounted concurrent remote commits. Without push permission, with an unwritable fork, or on concurrent conflict, stop writing and record recovery; do not push a replacement Change Request.
+8. Check required CI triggered by the push. Continue fixing, verifying, and pushing deterministic in-scope failures caused by the change within this repair; that is not another review round. Record external/unrelated failures without expanding scope. A failure is unrelated only if the test/job neither covers the change nor depends on changed code. Retry unrelated failures exactly once through failed-job rerun and link both runs. A passing retry counts as passed; deduplicate and file intermittent tests as Issues (under `issue-registry` when concurrent). Only a still-failing retry waits for external action. Related or uncertain failures follow normal rules; retries cannot waive them. Wait at most twice the longest of this repository check's recent successful runs, or 30 minutes without history. If exceeded or checks fail to start, mark waiting for external checks and continue the next item instead of waiting idly.
+9. Within authorization, record each fix commit and verification, or classification explaining why no change is needed. Resolve Review Threads only under repository permissions/process; closing a thread cannot replace repair or revoke another person's approval. Retain awaiting-re-review status; it is not a new repair task.
 
-新发现的问题先检索去重并按仓库规范归类。当前任务验收遗漏在原任务闭环，已关闭任务的遗漏回链原任务、Change Request 及验收条目并记为返工；独立既有缺陷登记或提出建议，同类缺陷归并到已有或同一个 Issue 追加证据，只有已确认可复现、独立且无同类登记的缺陷才新建；可选改进只在原 Issue 或 Change Request 记录，不新建；已接受的非保证没有新证据或范围变化时不反复登记为 bug。严重风险记录触发条件、实际影响、处置及恢复主线的条件；其他发现不自动扩充冻结清单。完成当前项后按入口的[交接记录](../SKILL.md#交接记录)交接，再安全清理由本轮创建且确认无未提交改动或未保存独有提交的临时环境，继续下一项。
+Search and deduplicate new findings, classifying under repository conventions. Resolve current acceptance gaps in the original task. Link gaps in closed tasks to the original task, Change Request, and criterion as rework. File or suggest independent pre-existing defects; group matching defects in an existing/common Issue with more evidence. Create only confirmed reproducible, independent defects without an existing match. Record optional improvements only in the original Issue/Change Request, without a new Issue. Do not repeatedly file accepted non-guarantees as bugs without new evidence or scope changes. For serious risks, record triggers, actual impact, response, and conditions to resume mainline work. Other findings do not enlarge the frozen list. After each item, follow [Handoff](../SKILL.md#handoff), then safely clean only temporary environments created this round with no uncommitted changes or unsaved unique commits, and continue.
 
-## 同步主线
+## Sync with mainline
 
-与主线冲突，或仓库要求分支保持最新而已落后的 Change Request，在原源分支上按仓库规则同步最新主线：不允许强推时使用 merge，冲突按原范围和双方意图解决，不借机改动范围外代码。同步后重跑受冲突或主线变化影响的验证，再按“逐项修复”第 7、8 步推送并检查 CI。只为同步主线的推送不算 Review 往返，不增加轮次；同步时一并修复的必修项仍按正常往返计数。已到 3 轮、等待终审的项只做同步，不改其他代码；终审未通过、已暂停待人工的项不同步。同步需要改写原实现语义才能解决冲突时，停止并记录分歧，交由审查或人工判断。
+For conflicts, or outdated branches that repository policy requires current, sync latest mainline into the original source branch under repository rules. Use merge when force-push is forbidden; resolve conflicts within original scope and both sides' intent, without unrelated edits. Rerun verification affected by conflicts/mainline changes, then push/check CI under steps 7–8 above. Mainline-only pushes do not count as review rounds; required fixes included in the sync count normally. At 3 rounds awaiting final review, only sync, with no other code edits. Do not sync items paused for human action after failed final review. If conflict resolution requires changing original implementation semantics, stop, record disagreement, and refer to review or human judgment.
 
-## 被并发调用时的本地验证
+## Concurrent local verification
 
-调用方只交给一个 Change Request 并指定工作区时，只修复这一项，在该工作区进行，同步主线也在此完成。调用方提供任务标识、取锁与释放锁的命令及本项需排队的资源时，本地验证按以下规则进行；验证标准不变。
+If given one Change Request and a workspace, repair only that item there, including mainline sync. When given task identifier, lock commands, and queued resources, follow these rules without changing verification standards:
 
-1. 隔离：用任务标识区分临时目录、容器项目名、测试数据库名和端口（端口优先由系统分配）；只用仓库已有配置或环境变量，不为隔离修改仓库文件。
-2. 排队：占用所列资源或属于编译、整套测试等重活（`heavy`）的验证，先用给定命令取锁，结束后无论成败都释放。多把锁按资源名顺序取，等不到时先释放已取得的锁；等锁期间先做不需要该资源的工作，累计等待超过 30 分钟记为等待资源并交回结果。共享远端测试环境始终独占。调用方未给出本项资源时自行判断，查不清的验证取调用方列出的全部共享资源锁和 `local-suite`。
-3. 分辨撞车：并发时失败的检查，先在持有其全部资源锁（不清楚时取 `local-suite`）的情况下单独重跑。单独通过即在结果中报告为与该资源撞车，不当作代码缺陷修复，也不计入 Review 往返；单独仍失败才按正常问题处理。
-4. 需要新建 Issue 时，调用方提供了锁命令的，先取 `issue-registry` 锁，在锁内检索开放与关闭记录后再登记或追加证据，完成后释放。
-5. 本地只跑与改动相关的检查，完整套件交给 CI；仓库规范要求本地跑完整套件时照做，并按重活排队。git 报锁冲突时等待几秒后有限重试。
+1. Isolate temporary directories, container project names, test databases, and ports by task identifier; prefer system-assigned ports. Use existing configuration/environment variables only, not repository edits for isolation.
+2. Acquire supplied locks before listed-resource checks or heavy work such as compilation/full suites (`heavy`); release regardless of outcome. Take multiple locks in resource-name order and release held locks if another is unavailable. Do independent work while waiting. After over 30 minutes accumulated waiting, return waiting-for-resources status. Shared remote test environments are always exclusive. Determine unspecified item resources; if uncertain, take all listed shared-resource locks and `local-suite`.
+3. Rerun concurrent failures alone with all relevant locks (`local-suite` if uncertain). A solo pass is resource contention: report it, do not fix it as a code defect or count it as a review round. Persistent failures follow normal handling.
+4. When creating an Issue and supplied with lock commands, acquire `issue-registry`, search open/closed records inside the lock, file/append evidence, and release.
+5. Run relevant checks locally, leaving full suites to CI unless repository rules require local execution; then queue as heavy work. On git lock conflicts, wait a few seconds and retry a bounded number of times.

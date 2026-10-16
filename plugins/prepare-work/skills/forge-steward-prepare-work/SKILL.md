@@ -5,28 +5,28 @@ description: Prepare repository issues for implementation by investigating block
 
 # Prepare Work
 
-## 规则加载（先于准备操作）
+## Load the rules before preparation
 
-本文件是入口，详细规则保存在同一技能目录的 `references/` 中。相对路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。使用可用文件读取工具，按下列阶段完整读取对应文件后再执行该阶段；这些文件是必需规则，不是可选示例，不能仅凭本入口摘要判定 ready。
+This file is the entry; detailed rules live in its skill directory's `references/`. Resolve relative paths from this `SKILL.md`, not the target repository or working directory. Use available file-reading tools to read each stage's files in full before acting. These are required rules, not optional examples; the entry summary alone cannot establish readiness.
 
-1. 开始准备前，读取 [队列与初筛](references/queue-and-screening.md)、[Ready 门禁](references/readiness.md) 和 [批内关系与验证资源](references/batch-relations.md)：冻结队列与审计基线，按完整门禁初筛和排序；默认最多 10 项，用户数量要求优先，先存量后周期新增。
-2. 遇到准备缺口、主线阻塞或带有阻塞标记的存量候选时，先读取 [阻塞推进与复查](references/blockers.md)，持续完成可自主推进的调查与实验，不沿用旧阻塞结论跳过存量。
-3. 首次更新 Issue、保存中间证据或切换任务前，读取 [交接与恢复](references/handoff.md)；最终输出前也须读取该文件，结合队列文件的复核要求确认交接完整。
+1. Before preparation, read [Queue and initial screening](references/queue-and-screening.md), [Readiness requirements](references/readiness.md), and [Batch relationships and verification resources](references/batch-relations.md). Freeze the queue and audit baseline, then screen and order against all requirements. Default to at most 10 items, unless the user requests another count; prioritize existing backlog before work added during the cycle.
+2. Before handling preparation gaps, mainline blockers, or existing candidates marked blocked, read [Advance and recheck blockers](references/blockers.md). Continue all investigation and experiments that can proceed autonomously; do not skip backlog based on stale blockers.
+3. Before the first Issue update, saving intermediate evidence, or switching tasks, read [Handoff and recovery](references/handoff.md). Read it again before final output, together with the queue file's recheck requirements, to confirm a complete handoff.
 
-每次读取本技能规则文件都检查是否完整；读取结果若被截断，按行或段分批补读到文件末尾，不能将被截断的输出当作已读全文（不适用于 CI 日志、测试输出等其他工具结果）。引用文件缺失或不可读时，说明具体路径和影响，不依据不完整规则继续受影响的准备或入选判定。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
+Check every rule-file read for completeness. If truncated, read further by line or section through the end; a truncated result does not count as a full read (this does not apply to CI logs, test output, or other tool results). If a reference is missing or unreadable, identify its path and impact; do not continue affected preparation or selection with incomplete rules. After context compaction, reload missing current-stage rules.
 
-## 目标与授权
+## Purpose and authorization
 
-把原 Issue 推进到下一位执行者只凭 Issue 就能开工的状态。发现候选、技术调查、最小实验、方案收敛和 Issue 整理属于同一准备流程；不要只跑一轮调查就把仍可自主完成的下一步交给用户。不要实施生产改动、创建实现分支或 Change Request，也不要生成或执行实现 prompt。
+Advance original Issues until the next implementer can start from the Issue alone. Candidate discovery, technical investigation, minimal experiments, narrowing the design, and Issue updates form one preparation flow. Do not hand the user an independently actionable next step after just one investigation pass. Do not implement production changes, create implementation branches or Change Requests, or generate/execute an implementation prompt.
 
-用户明确调用本技能且未限制范围时，默认包含必要调查和原 Issue 更新；用户要求只读、只讨论或限定写入位置时遵守该边界。隐式匹配技能或在讨论中提及名称不新增授权。依据实际远端选择连接器、CLI 或托管平台 API，不要求特定平台。读取、实验及写入遵守用户授权、实际所属仓库规范和环境权限。
+Explicit invocation without scope limits includes necessary investigation and original Issue updates. Respect read-only, discussion-only, and write-location limits. Implicit matching or mentioning the skill grants no new authorization. Select the connector, CLI, or hosting API from the actual remote; do not require a platform. Reads, experiments, and writes must respect user authorization, owning-repository conventions, and environment permissions.
 
-Issue ready 门禁、任务粒度和准备交接以本技能为准，不采用目标仓库另行规定的同类工作流规则；语言、标题格式、Issue 模板结构、平台权限等项目约定仍按所属仓库执行。
+This skill governs Issue readiness, task size, and preparation handoff, replacing separate repository rules for the same workflow. Follow repository conventions for language, title format, Issue template structure, and platform permissions.
 
-## 最终输出契约
+## Final output contract
 
-最终回复只能是一行有序 Issue 列表，项间使用英文逗号加空格；没有标题、解释、摘要、Markdown 链接、代码块、prompt 或手动换行。同一跟踪仓库且上下文明确时使用 `#123, #145, #167`。跨跟踪仓库时使用平台支持的完整限定标识；无法唯一定位平台或仓库时使用原 Issue 完整 URL，仍在同一行。实现跨仓本身不改变原 Issue 身份，所属仓库写在 Issue 内。
+The final reply must be one ordered Issue list on a single line, separated by comma and space, with no heading, explanation, summary, Markdown links, code fence, prompt, or manual line break. For one unambiguous tracking repository, use `#123, #145, #167`. Across tracking repositories, use platform-supported fully qualified identifiers. If these do not uniquely identify platform/repository, use original Issue full URLs on the same line. Cross-repository implementation does not change the original Issue identity; record the owning repository inside the Issue.
 
-没有符合门禁的项输出 `[]`。此前须已完成可执行的准备行动，并在 Issue 或过程中交代真实阻塞、无权限、空队列或全部完成的事实；不能以 `[]` 代替尚可继续的准备。进度说明和必要问题放在工作过程中，最终不重复。准备完成不等于功能交付，不因 ready 就关闭 task。
+Output `[]` when none meet the requirements. First finish actionable preparation and explain genuine blockers, missing permissions, an empty queue, or all work being complete in the Issue or progress updates. `[]` is no substitute for preparation that can still proceed. Give progress and necessary questions during the work, not again in the final line. Preparation is not feature delivery; do not close a task merely because it is ready.
 
-除上述一行列表的格式外，进度说明和提问、子 Agent 交回的结果及写入 Issue 的说明和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+Apart from this one-line format, use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.

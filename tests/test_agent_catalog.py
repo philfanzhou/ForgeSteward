@@ -1,4 +1,4 @@
-"""校验 Agent 数据文件，以及 README 的安装、升级、卸载命令与数据文件、VERSION、插件目录一致。"""
+"""Check Agent catalog and README install/upgrade/uninstall commands against the catalog, VERSION, and plugin directories."""
 
 import json
 from pathlib import Path
@@ -12,9 +12,9 @@ REPO = Path(__file__).resolve().parents[1]
 CATALOG = Path("plugins/work-cycle/skills/forge-steward-work-cycle/scripts/agents.json")
 AGENT_IDS = {"claude-code", "codex", "zcode", "opencode", "deepseek-harness"}
 PLACEHOLDERS = {"version", "plugin", "source", "zcode_cli"}
-OPERATIONS = (("install", "Install", "安装"), ("upgrade", "Upgrade", "升级"), ("uninstall", "Uninstall", "卸载"))
+OPERATIONS = (("install", "Install", "Install"), ("upgrade", "Upgrade", "Upgrade"), ("uninstall", "Uninstall", "Uninstall"))
 OVERVIEW = "Supported agents and installation"
-# README 中占位符的写法；{version} 在展开时替换。
+# README placeholder syntax; substitute {version} during expansion.
 README_VALUES = {"source": "$HOME/code/ForgeSteward-v{version}", "zcode_cli": "$ZCODE_CLI"}
 SHELL_SAFE = re.compile(r"^[A-Za-z0-9_@%+=:,./-]+$")
 VERSION_REF = re.compile(r"\bv(\d+\.\d+\.\d+(?:-rc\.\d+)?)\b")
@@ -31,7 +31,7 @@ def plugin_names(repo):
 
 
 def render(argv, values):
-    """把参数数组按 README 的 shell 写法拼成一行；含 $ 或空格的参数加双引号。"""
+    """Join argv into a README shell line; double-quote arguments containing $ or spaces."""
     words = []
     for arg in argv:
         for key, value in values.items():
@@ -41,7 +41,7 @@ def render(argv, values):
 
 
 def expected_steps(steps, version, plugins):
-    """返回 [(步骤, 插件或 None, 期望命令行)] 的分组列表。"""
+    """Return groups of (step, plugin or None, expected command line)."""
     values = {"version": version, "zcode_cli": README_VALUES["zcode_cli"],
               "source": README_VALUES["source"].replace("{version}", version)}
     groups = []
@@ -54,7 +54,7 @@ def expected_steps(steps, version, plugins):
 
 
 def section(lines, level, title):
-    """返回指定标题下直到同级或更高级标题前的行；找不到时返回 None。"""
+    """Return lines under a heading up to the next equal/higher heading, or None if absent."""
     heading = "#" * level + " " + title
     for index, line in enumerate(lines):
         if line.rstrip() == heading:
@@ -81,7 +81,7 @@ def code_lines(lines):
 
 
 def check_readme(repo):
-    """返回 README 与数据文件、VERSION、插件目录不一致的说明；一致时返回空列表。"""
+    """Return README mismatches against catalog, VERSION, and plugin directories, or an empty list."""
     version = (repo / "VERSION").read_text(encoding="utf-8").strip()
     plugins = plugin_names(repo)
     catalog = load_catalog(repo)
@@ -89,33 +89,33 @@ def check_readme(repo):
     errors = []
     overview = section(lines, 2, OVERVIEW)
     if overview is None:
-        return ["README 缺少“## {}”一节".format(OVERVIEW)]
+        return ['README lacks section "## {}"'.format(OVERVIEW)]
     table = [line for line in overview if line.startswith("|")]
     for line in table:
         for found in VERSION_REF.findall(line):
             if found != version:
-                errors.append("README 总表写的是 v{}，VERSION 是 {}：{}".format(found, version, line.strip()))
+                errors.append("README overview has v{}; VERSION is {}: {}".format(found, version, line.strip()))
     for agent in catalog["agents"]:
         name = agent["name"]
         if not any("[" + name + "]" in line for line in table):
-            errors.append("README 总表缺少 {} 一行".format(name))
+            errors.append("README overview lacks a row for {}".format(name))
         body = section(overview, 3, name)
         if body is None:
-            errors.append("README 缺少“### {}”一节".format(name))
+            errors.append('README lacks section "### {}"'.format(name))
             continue
         for key, title, label in OPERATIONS:
             part = section(body, 4, title)
             if part is None:
-                errors.append("README 的 {} 缺少“#### {}”小节".format(name, title))
+                errors.append('README {} lacks subsection "#### {}"'.format(name, title))
                 continue
             commands = code_lines(part)
             for command in commands:
                 for found in VERSION_REF.findall(command):
                     if found != version:
-                        errors.append("README 的 {} {}命令写的是 v{}，VERSION 是 {}：{}".format(
+                        errors.append("README {} {} command has v{}; VERSION is {}: {}".format(
                             name, label, found, version, command))
             if agent["install_mode"] == "all" and not any("--all" in command for command in commands):
-                errors.append("README 的 {} {}命令没有使用 --all".format(name, label))
+                errors.append("README {} {} command does not use --all".format(name, label))
             cursor = 0
             for group in expected_steps(agent["commands"][key], version, plugins):
                 positions = []
@@ -124,18 +124,18 @@ def check_readme(repo):
                     if later:
                         positions.append(later[0])
                     elif expected in commands:
-                        errors.append("README 的 {} {}命令顺序与数据文件不同：{}".format(name, label, expected))
+                        errors.append("README {} {} command order differs from catalog: {}".format(name, label, expected))
                     elif plugin:
-                        errors.append("README 的 {} {}缺少插件 {} 的命令：{}".format(name, label, plugin, expected))
+                        errors.append("README {} {} is missing plugin {} command: {}".format(name, label, plugin, expected))
                     else:
-                        errors.append("README 的 {} {}缺少命令（或与数据文件写法不同）：{}".format(name, label, expected))
+                        errors.append("README {} {} is missing a command (or differs from catalog): {}".format(name, label, expected))
                 if positions:
                     cursor = max(positions) + 1
     return errors
 
 
 def slug(heading):
-    """按 GitHub 规则生成标题锚点：小写，去掉标点，空格换成连字符。"""
+    """Generate GitHub heading anchors: lowercase, remove punctuation, replace spaces with hyphens."""
     text = heading.strip().lower()
     text = re.sub(r"[^\w\- ]", "", text)
     return text.replace(" ", "-")
@@ -245,7 +245,7 @@ class ReadmeDriftTests(unittest.TestCase):
         (self.repo / "plugins" / "new-plugin").mkdir()
         errors = "\n".join(check_readme(self.repo))
         for name in ("Claude Code", "Codex", "ZCode"):
-            self.assertIn("README 的 {} 安装缺少插件 new-plugin".format(name), errors)
+            self.assertIn("README {} Install is missing plugin new-plugin".format(name), errors)
         self.assertNotIn("OpenCode", errors)
 
     def test_version_change_without_readme_fails(self):
@@ -253,8 +253,8 @@ class ReadmeDriftTests(unittest.TestCase):
         (self.repo / "VERSION").write_text("9.9.9\n", encoding="utf-8")
         errors = "\n".join(check_readme(self.repo))
         for name in ("Claude Code", "Codex", "ZCode", "OpenCode", "DeepSeek Harness"):
-            self.assertIn("README 的 {} 安装命令写的是 v{}，VERSION 是 9.9.9".format(name, version), errors)
-        self.assertIn("README 总表写的是 v{}，VERSION 是 9.9.9".format(version), errors)
+            self.assertIn("README {} Install command has v{}; VERSION is 9.9.9".format(name, version), errors)
+        self.assertIn("README overview has v{}; VERSION is 9.9.9".format(version), errors)
 
     def test_catalog_and_readme_disagree_fails(self):
         path = self.repo / CATALOG
@@ -264,7 +264,7 @@ class ReadmeDriftTests(unittest.TestCase):
         path.write_text(json.dumps(catalog), encoding="utf-8")
         errors = check_readme(self.repo)
         self.assertTrue(errors)
-        self.assertTrue(all(error.startswith("README 的 Codex 安装缺少插件") for error in errors), errors)
+        self.assertTrue(all(error.startswith("README Codex Install is missing plugin") for error in errors), errors)
         self.assertIn("codex plugin install prepare-work@forge-steward", "\n".join(errors))
 
     def test_reordered_readme_steps_fail(self):
@@ -276,7 +276,7 @@ class ReadmeDriftTests(unittest.TestCase):
         upgrade = remove + add
         self.assertIn(upgrade, text)
         readme.write_text(text.replace(upgrade, add + remove, 1), encoding="utf-8")
-        self.assertIn("README 的 Codex 升级命令顺序与数据文件不同", "\n".join(check_readme(self.repo)))
+        self.assertIn("README Codex Upgrade command order differs from catalog", "\n".join(check_readme(self.repo)))
 
 
 if __name__ == "__main__":

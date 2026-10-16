@@ -1,4 +1,4 @@
-// 只加载显式提供的包；全部发现根来自本次测试的临时目录。
+// Load only the explicitly supplied package; all discovery roots use this test's temporary directory.
 import assert from 'node:assert/strict';
 import {readFile, mkdir, readdir} from 'node:fs/promises';
 import {join, dirname, resolve, relative} from 'node:path';
@@ -13,7 +13,7 @@ const {resolveDshHome} = await import(packageFile('dsh-home-paths'));
 const isolated = dirname(project);
 const nested = join(project, 'provider nested');
 await mkdir(nested);
-// 模拟 Git worktree 的文件标记，不运行或扫描真实 checkout。
+// Simulate a Git worktree marker file without running or scanning a real checkout.
 const {writeFile} = await import('node:fs/promises');
 await writeFile(join(project, '.git'), 'gitdir: fixture\n');
 const projectRoot = join(project, '.dsh', 'skills');
@@ -51,7 +51,7 @@ try {
     assert.equal(loaded.content, original.split('---').slice(2).join('---').trim());
     assert.equal(loaded.resourceBase.path, directory);
     const receipt = JSON.parse(await readFile(join(directory, '.forge-steward-install.json'), 'utf8'));
-    // 全部资源可从客户端给出的 resourceBase 取得，摘要已由 Python 回归逐字节核对。
+    // All resources are reachable from the client's resourceBase; Python regression tests compare digests byte for byte.
     for (const [resource, digest] of Object.entries(receipt.files)) {
       const path = join(loaded.resourceBase.path, resource);
       assert(!relative(directory, path).startsWith('..'));
@@ -61,7 +61,7 @@ try {
       }
     }
   }
-  // 提供方返回候选；核心目录按 rank 选胜者，此处核对提供方的优先级契约。
+  // The provider returns candidates; the core catalog selects by rank. Check the provider's priority contract here.
   for (const name of names) {
     const pair = candidates.filter(item => item.name === name).sort((a, b) => a.rank - b.rank);
     assert.equal(pair[0].source, 'project-dsh');

@@ -1,52 +1,52 @@
-# OpenCode 安装适配
+# OpenCode installation adapter
 
-## 范围与选择
+## Scope and choices
 
-本适配最初实现 Issue #1，当时仓库有四个插件。`--all` 从当前 checkout 的 `plugins/*/skills/*` 读取，不固定数量；当前源码包含六个插件。本适配是仓库级工具，不是独立 Skill。通用生命周期现位于 `scripts/skill_installer.py`，OpenCode 入口保持作用域、schema 1 收据、输出与退出码；DeepSeek 使用同一核心并单独适配路径，见 [DeepSeek 安装维护](deepseek-installer.md)。改名迁移见 [prepare-work 与 execute-work](prepare-execute-migration.md)，不需要修改安装器算法。`work-cycle` 可独立安装，但完整运行还需同版本的五个阶段技能及可用的子 Agent 能力。
+This adapter originally implemented Issue #1, when the repository had four plugins. `--all` reads `plugins/*/skills/*` from the current checkout rather than a fixed count; the current source has six plugins. This is a repository-level tool, not a separate Skill. Shared lifecycle code now lives in `scripts/skill_installer.py`; the OpenCode entry point preserves scope, schema 1 receipts, output, and exit codes. DeepSeek shares the core with a separate path adapter; see [DeepSeek installation and maintenance](deepseek-installer.md). See [prepare-work and execute-work](prepare-execute-migration.md) for the rename migration, which requires no installer algorithm change. `work-cycle` is independently installable, but a complete run also requires all five stage Skills at the same version and working subagent support.
 
-采用 Python 3.9+ 标准库脚本，避免额外包发布、运行时依赖和三份核心源码。用户取得仓库后，一条命令即可安装指定技能或全部技能；首次取得源码的 Git clone 是明确的准备步骤，不宣称已经提供无需 checkout 的远端一键安装服务。
+The script uses the Python 3.9+ standard library, avoiding another package release, runtime dependencies, and three copies of core code. After obtaining the repository, users can install selected Skills or all Skills with one command. The initial Git clone is an explicit prerequisite; this is not a remote one-command service that needs no checkout.
 
-默认要求用户显式选择 `--project PATH` 或 `--user`。项目级安装到 `PATH/.opencode/skills`；用户级遵循 `OPENCODE_CONFIG_DIR`，否则使用 XDG 配置路径及 `~/.config/opencode` 默认值。打印解析后的目标，保留已有 Agent 配置和权限。
+Users must explicitly choose `--project PATH` or `--user`. Project installation targets `PATH/.opencode/skills`. User installation honors `OPENCODE_CONFIG_DIR`, otherwise using the XDG configuration path and the `~/.config/opencode` default. The resolved destination is printed; existing Agent configuration and permissions are preserved.
 
-依据：[OpenCode 技能发现文档](https://opencode.ai/docs/skills/)、[CLI 调试命令](https://opencode.ai/docs/cli/)、[全局配置路径源码](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/global.ts)。真实发现通过固定版本 `opencode-ai@1.18.30` 验证，不以源码 dev 分支推断任意已发布版本的行为。
+Sources: [OpenCode Skill discovery](https://opencode.ai/docs/skills/), [CLI debug commands](https://opencode.ai/docs/cli/), and [global configuration path source](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/global.ts). Real discovery is verified with pinned `opencode-ai@1.18.30`; the source's dev branch is not evidence for every released version.
 
-## 安装与归属
+## Installation and ownership
 
-- `list` 列出源码可安装项；选择可用插件短名或带 `forge-steward-` 前缀的完整技能名。目录、单行 frontmatter 的名称及描述需通过本仓库的格式检查。本脚本不是通用 YAML 或第三方 Skill 包解析器。
-- 安装完整技能目录，包括包内参考资源。`.forge-steward-install.json` 记录工具标识、收据格式、技能名、插件版本、源码提交/dirty 状态，以及文件摘要与空目录。
-- 相同版本及内容的重复安装保持文件与收据不变。版本或内容变化必须显式 `update`；允许用户通过 checkout 旧提交再 update 回退，不把一次本地安装包装成自动版本服务。
-- `status` 报告未安装、与源码一致、源码已变化、手动修改或无有效收据。发生冲突退出码为 1，查看状态本身不写目录。
-- `uninstall` 仅处理本工具有有效收据且内容未修改的目录，不需要原技能源码仍存在。卸载同时移除收据；无修改的重复卸载成功。空配置容器允许保留。
-- 收据用于本地归属及意外修改检测，不是签名或恶意篡改防护。需要可复现时使用干净 checkout 和固定提交；没有 Git 信息时明确记录未知，并依靠摘要识别实际复制内容。
+- `list` shows installable source entries. Select a plugin's short name or its full Skill name prefixed with `forge-steward-`. Directories and single-line frontmatter names and descriptions must pass repository format checks. This is not a general YAML or third-party Skill package parser.
+- Install the whole Skill directory, including bundled references. `.forge-steward-install.json` records the tool identity, receipt format, Skill name, plugin version, source commit/dirty state, file digests, and empty directories.
+- Reinstalling identical versions and contents leaves files and receipts unchanged. Version or content changes require an explicit `update`. Users may check out an older commit and update to roll back; a local installation is not an automatic version service.
+- `status` reports missing installations, matching source, changed source, manual changes, or an invalid receipt. Conflicts return 1; reading status does not write directories.
+- `uninstall` handles only directories with valid tool receipts and unchanged contents, without requiring the original Skill source to still exist. It removes the receipt too; repeating an unchanged uninstall succeeds. Empty configuration containers may remain.
+- Receipts detect local ownership and accidental changes; they are not signatures or protection from malicious tampering. For reproducibility use a clean checkout at a fixed commit. When Git information is unavailable, record it as unknown and use digests to identify the copied contents.
 
-## 冲突与部分失败
+## Conflicts and partial failures
 
-整批先检查选中的目标，任一同名未托管目录、丢失/损坏收据、手动修改或符号链接导致整批停止，不覆盖。安装冲突的恢复方式是备份/移出原目录、人工保留差异后重装；不提供跳过保护的 `--force`。`uninstall --all` 只选择带收据的前缀目录，因此不带收据的副本不会阻塞其他有效托管项的卸载，但必须在结束时报告，不能静默声称清理完成。卸载残留只需确认归属后移出或删除，无需重装。其他 Agent 路径的手动安装保持原样，重复名称由 OpenCode 的实际发现清单核对。
+Preflight checks all selected destinations. Any same-named unmanaged directory, missing/corrupt receipt, manual edit, or symlink stops the entire batch without overwriting. Recover from installation conflicts by backing up or moving the original directory, preserving differences manually, and reinstalling; there is no `--force` bypass. `uninstall --all` selects only prefixed directories with receipts, so receipt-free copies do not block removal of valid managed entries, but must be reported at the end rather than silently claiming cleanup. Uninstall leftovers only need confirmed ownership and removal or relocation, not reinstallation. Manual installations in other Agent paths remain untouched; check duplicate names in OpenCode's actual discovery list.
 
-安装器在配置目录加独占锁，将完整新副本暂存到 `skills` 之外，避免暂存文件被当成技能发现。提交时通过同文件系统 rename 替换目录；普通异常与 KeyboardInterrupt 尝试逆序回滚。回滚失败保留备份目录并报告路径，后续调用拒绝覆盖未恢复事务。
+The installer holds an exclusive lock in the configuration directory and stages complete new copies outside `skills` so discovery cannot mistake staging files for Skills. Commit replaces directories with same-filesystem renames. Ordinary exceptions and KeyboardInterrupt trigger attempted rollback in reverse order. Failed rollback retains backup directories and reports their paths; later invocations refuse to overwrite unrecovered transactions.
 
-该批次不是对运行中 OpenCode 的多目录原子快照；安装完成后重新启动会话。也不保证断电、SIGKILL、文件系统损坏或恶意并发写入下的自动恢复。异常中断时检查 `.forge-steward.lock` 和 `.forge-steward-txn-*` 中的 `old-<skill>` 副本，先保存、恢复实际安装，再移出事务目录及清理已无进程持有的锁。正常操作清理锁和暂存文件，不主动删除业务文件或其他技能。
+A batch is not an atomic multi-directory snapshot for a running OpenCode session; restart the session after installation. Automatic recovery from power loss, SIGKILL, filesystem corruption, or hostile concurrent writes is not guaranteed. After an abnormal interruption, inspect `.forge-steward.lock` and `old-<skill>` copies in `.forge-steward-txn-*`. Preserve and restore the actual installation before moving transaction directories out and removing locks no process holds. Normal operations remove locks and staging files, not project files or other Skills.
 
-## 卸载残留报告
+## Uninstall leftover reports
 
-卸载后对打印的目标目录做只读复核；预检或普通事务失败后也尽量报告，错误状态优先，不改变原有整批保护与回滚。报告不依赖源码目录或 catalog，因此从新版删除的技能仍能卸载或报告。
+After uninstall, inspect the printed destination read-only. Also try to report after preflight or ordinary transaction failures, with errors taking precedence and existing whole-batch protection and rollback unchanged. Reports do not depend on source directories or the catalog, so a Skill removed from newer source can still be uninstalled or reported.
 
-- `--all` 检查目标的直接子项中所有 `forge-steward-*` 名称，以及历史名称 `check-workflow`、`find-work`、`review-and-merge`、`fix-feedback`。历史名称集只用于兼容提示，不限制当前插件数量，也不构成归属凭据。
-- 指定名称时只检查该名称及已知历史对应名，不把用户明确保留的其他插件当作卸载失败。
-- 报告实际路径及状态：有效托管项仍在、未托管/收据缺失、收据无效、内容修改、旧名称候选或链接。链接不跟随；同名文件或空目录也保留并报告，不直接认定为 ForgeSteward 资产。
-- 正常结束的退出码：`0` 表示有限扫描无候选残留，`2` 表示有候选残留，`1` 表示操作或扫描失败。参数解析器的用法错误也使用 `2`，需结合输出区分。出现扫描错误不能声称已清理。
-- 不跨项目、用户级、兼容目录、祖先目录和自定义搜索路径，也不保证发现任意改名或嵌套副本。报告明确提醒使用新会话和 `opencode debug skill` 复核真实发现。空配置容器不是技能残留，不主动删除。
+- `--all` checks direct children named `forge-steward-*` and historical names `check-workflow`, `find-work`, `review-and-merge`, and `fix-feedback`. Historical names are compatibility hints, not a plugin-count limit or proof of ownership.
+- Named selection checks only the selected name and known historical counterpart, without treating other deliberately retained plugins as uninstall failures.
+- Report actual paths and states: a valid managed entry remains, unmanaged/missing receipt, invalid receipt, changed contents, historical-name candidate, or link. Do not follow links. Retain and report same-named files and empty directories too, without assuming ForgeSteward owns them.
+- Exit codes: `0` means no candidate remains within the limited scan, `2` means candidates remain, and `1` means an operation or scan failed. Argument-parser usage errors also return `2`; distinguish them using the output. A scan failure cannot be reported as successful cleanup.
+- Do not cross project, user, compatibility, ancestor, or custom discovery roots. Arbitrarily renamed or nested copies are not guaranteed to be found. Remind users to verify real discovery in a new session with `opencode debug skill`. Empty configuration containers are not leftover Skills and are not removed automatically.
 
-先备份并确认候选归属，仅移出所有技能搜索路径或删除明确不再需要的副本，不提供自动清除未托管内容的选项。卸载不会回滚项目规则、代码、Issue、PR、评论等既有工作产物。README 中提供三 Agent 的统一卸载步骤、作用域/缓存边界与验证要求。
+Back up candidates and confirm ownership first. Move only confirmed copies outside all Skill discovery paths or delete copies no longer needed. There is no automatic purge of unmanaged contents. Uninstall does not undo project rules, code, Issues, PRs, Comments, or earlier work. The README provides unified uninstall instructions for three Agents, scope/cache boundaries, and verification requirements.
 
-## 验证
+## Verification
 
-`python3 -m unittest discover -s tests -v` 覆盖单个/全部选择、目录名/frontmatter、资源完整性、幂等、版本/同版本内容变化、手动编辑/增删文件/空目录、未托管冲突、收据损坏、路径穿越和符号链接、用户级路径、源文件删除后卸载、锁、暂存失败及提交中途失败回滚。
+`python3 -m unittest discover -s tests -v` covers individual/all selection, directory names/frontmatter, resource completeness, idempotence, version and same-version content changes, manual edits/file additions/removals/empty directories, unmanaged conflicts, corrupt receipts, path traversal and symlinks, user paths, uninstall after source removal, locking, staging failures, and rollback after a partial commit.
 
-设置 `FORGESTEWARD_OPENCODE` 为 OpenCode 可执行文件后，同一套测试会在临时项目及隔离 XDG 配置中调用 `opencode debug skill --pure`，检查实际发现的全部当前名称和完整路径，并在卸载后确认清单为空；不调用模型或修改真实用户配置。未设置且 PATH 无 OpenCode 时明确跳过该项。
+When `FORGESTEWARD_OPENCODE` names an OpenCode executable, the same suite invokes `opencode debug skill --pure` in temporary projects and isolated XDG configuration, checks every current name and full path actually discovered, and confirms an empty list after uninstall. It does not call a model or alter real user configuration. If the variable is unset and OpenCode is absent from PATH, this check is explicitly skipped.
 
-GitHub Actions 在 macOS、Linux、Windows 上运行标准库测试，并在 Linux 使用固定的 OpenCode `1.18.30` 运行真实发现测试。Windows 运行脚本使用 `py -3` 或已配置的 Python 3.9+；符号链接测试在无创建权限时报告跳过，尚无 Windows 原生 OpenCode 运行时验证。
+GitHub Actions runs standard-library tests on macOS, Linux, and Windows, plus real discovery with pinned OpenCode `1.18.30` on Linux. On Windows use `py -3` or a configured Python 3.9+. Symlink tests report a skip if creation is not permitted; native Windows OpenCode runtime behavior has not been verified.
 
-残留回归新增覆盖正常/重复卸载、缺失收据、手工和历史名称候选、不依赖源码、具名卸载不影响保留项、损坏收据的整批保护及报告、悬空链接、用户/项目作用域隔离、扫描失败以及真实 CLI 退出码。真实 OpenCode 测试另验证缺失收据后卸载返回残留状态，技能依然被发现，不能把命令结束冒充技能已消失。测试只使用临时目录，不删除用户实际安装。
+Leftover regressions additionally cover normal/repeated uninstall, missing receipts, manual and historical-name candidates, independence from source, named uninstall preserving other entries, batch protection/reporting for corrupt receipts, dangling links, user/project isolation, scan failures, and real CLI exit codes. The real OpenCode test also verifies that uninstall with a missing receipt returns a leftover state and the Skill remains discoverable; command completion must not be mistaken for removal. Tests use temporary directories and never delete real user installations.
 
-README 已把三个 Agent 的安装与调用放在项目释义之前，并记录源码固定、更新、卸载、迁移、作用域和错误恢复。安装器不修改 Claude/Codex 的分发机制，也不自行改写技能的业务流程与授权边界。
+The README places installation and invocation for three Agents before the project explanation, and documents source pinning, updates, uninstall, migration, scope, and recovery. The installer changes neither Claude/Codex distribution mechanisms nor Skill business workflows and authorization boundaries.

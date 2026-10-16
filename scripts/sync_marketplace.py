@@ -1,4 +1,4 @@
-"""同步 Claude / ZCode 市场的派生版本；不修改插件、用户配置或历史发布。"""
+"""Sync derived Claude / ZCode marketplace versions without changing plugins, user settings, or past releases."""
 
 import argparse
 import json
@@ -33,7 +33,7 @@ def expected_marketplace(root):
 
 
 def main():
-    # CLI 输出采用英文，兼容 Windows Python 3.9 重定向时的默认单字节编码。
+    # English CLI output supports the default single-byte encoding of redirected Windows Python 3.9 output.
     parser = argparse.ArgumentParser(description="Sync derived Claude / ZCode marketplace versions.")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="Check without writing files")

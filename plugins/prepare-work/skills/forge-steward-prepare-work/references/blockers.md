@@ -1,22 +1,22 @@
-## 持续推进主线阻塞
+## Keep advancing mainline blockers
 
-完成冻结清单的初筛（见 [队列与初筛](queue-and-screening.md)）后，优先处理已领取任务和主线存量任务的准备缺口。主线存在可自主推进的阻塞时，即使已有其他 ready 小项，也先推进主线，不以新找到的数量或一轮调查结束为完成标准。主线行动需要等待长耗时结果（例如 CI、环境构建、外部回复）时，等待期间推进其余候选，结果可用后回到主线；等待不解除主线的持续推进义务，也不把主线判为外部阻塞。主线推进到 ready 或确认真实阻塞后，按批次填充顺序继续准备其余候选以填满本轮批次（见 [队列与初筛](queue-and-screening.md)）；先推进主线不等于只输出主线项。
+After [Queue and initial screening](queue-and-screening.md), prioritize preparation gaps in claimed tasks and mainline backlog. Advance any mainline blocker that can be handled autonomously even when small ready items already exist. A count of new findings or one investigation pass is not completion. While mainline actions await lengthy results (CI, environment builds, external replies), advance other candidates, returning when results arrive. Waiting neither removes the obligation to advance mainline nor establishes an external blocker. Once mainline is ready or genuinely blocked, continue batch order to fill the batch under [Queue and initial screening](queue-and-screening.md); prioritizing mainline does not mean outputting it alone.
 
-对每个准备缺口循环执行：
+Repeat for each preparation gap:
 
-1. 记录具体问题、阻塞类型（真实前置、技术设计、环境、外部决策）、现有证据和解除条件。核对前置是否已关闭，删除过时等待；排期先后不伪装成技术依赖。
-2. 选择能改变结论的最小行动：读完整调用链、比较具体方案、运行最小原型或失败实验、验证专项环境路径。每个行动有明确问题和判定标准。实验在隔离的临时环境进行，保留可复现命令、结果与必要产物位置；不提交生产实现，也不触及用户未授权的资源。
-3. 根据代码、契约和实验自主完成常规技术选择，将结论落回原 Issue 的范围、方案及验收。实验失败也要说明排除了什么、下一条可执行路径是什么。
-4. 重新检查准备缺口。仍有授权范围内的具体行动就继续下一步，直至满足 ready 门禁或证据表明确实依赖外部决定、权限、环境或未交付前置。不得以“已做一个实验”“可以另开 unblock”“请用户继续调查”结束尚可推进的任务。条件未变时也不得重复同一实验空转。
+1. Record the concrete question, blocker type (genuine prerequisite, design, environment, external decision), evidence, and release conditions. Check closed prerequisites and remove stale waits. Scheduling order is not a technical dependency.
+2. Choose the smallest action capable of changing the conclusion: read a full call chain, compare concrete designs, run a minimal prototype/failure experiment, or verify a specific environment path. Each action needs a question and decision criteria. Use isolated temporary environments; retain reproducible commands, results, and necessary output paths. Do not commit production implementation or access unauthorized resources.
+3. Resolve routine technical choices autonomously from code, contracts, and experiments, then update original Issue scope, plan, and acceptance. Failed experiments must explain what they ruled out and the next actionable path.
+4. Recheck gaps. Continue concrete authorized actions until readiness or evidence of actual dependence on external decisions, permissions, environment, or undelivered prerequisites. “One experiment done,” “open another unblock task,” or “ask the user to investigate” cannot end work that can still proceed. Do not repeat unchanged experiments idly.
 
-真实外部阻塞须写明已尝试路径、尚缺的具体输入、负责角色、解除证据和恢复动作；需要用户回答时在过程中提出具体问题，同时继续其他独立工作。无可用权限不等于问题已经解除，无法读取必要仓库也不等于没有工作。保存中间证据后继续冻结清单中可推进的项；不以持续造小任务或扩大审计寻找小修复来掩盖主线阻塞、填充批次。
+For genuine external blockers, record attempted paths, exact missing input, responsible role, release evidence, and recovery action. Ask concrete needed questions during progress while continuing independent work. Missing permission does not remove the blocker; an unreadable repository does not mean no work exists. Save evidence and continue actionable frozen items. Do not conceal mainline blockers or fill batches by endlessly creating small tasks or broadening audits to find small fixes.
 
-### 存量阻塞复查
+### Recheck backlog blockers
 
-存量候选带有阻塞标记或平台依赖关联时，每轮重新核对，不沿用标签或上轮结论跳过（同一次连续运行内未变化项按[队列与初筛](queue-and-screening.md)沿用核对结果）：
+Recheck blocked backlog candidates and platform dependencies each round rather than skipping from labels/prior conclusions. Within one continuous run, reuse unchanged checks under [Queue and initial screening](queue-and-screening.md).
 
-1. 逐条读取依赖关联的实际状态和已记录的解除条件。前置已全部关闭，或条件已满足（例如维护者已答复、前置已合并、环境已具备）时，按授权移除过时的阻塞标记，按门禁深入准备。
-2. 区分技术前置与排期顺序。只有代码、契约、数据或环境上的真实依赖才阻止入选；只表达批次先后、能基于最新主线独立实施的关联，按授权改为非阻塞关联并在原 Issue 记录依据后判定门禁。维护者已写明理由的顺序要求保持不变。
-3. 依赖尚在审查的 Change Request 或其他未合并前置（本批入选项按[批内关系](batch-relations.md)处理）时，本轮仍完成审计、方案和验收准备，写明前置合并后需要复核的差异范围；该项本轮不入选，前置合并后只补查差异即可判定。
-4. 解除阻塞需要维护者执行具体动作（作出决定、发布前置版本、提供环境或权限）时，在过程中写明该动作、负责角色及可解除的存量 task，同时在原 Issue 记录，不笼统挂起。
-5. 实现阶段已在原 Issue 记录无法实施的原因和解除条件时，逐条核对这些条件：仍未满足，且相关代码、契约和环境没有变化时，沿用该结论，本轮不入选，不重复同一调查；条件已满足或出现能改变结论的新证据时，按门禁重新准备。
+1. Read each dependency's actual status and recorded release conditions. If prerequisites are closed or conditions met (maintainer reply, merged prerequisite, available environment), remove stale blocked markers when authorized and prepare against all readiness requirements.
+2. Distinguish technical prerequisites from schedule order. Only real code, contract, data, or environment dependencies block selection. If a link only expresses ordering and work can start independently from latest mainline, convert it to a nonblocking relationship when authorized, record evidence, then assess readiness. Preserve ordering requirements with an explicit maintainer rationale.
+3. For dependencies on Change Requests under review or other unmerged prerequisites (within-batch selections follow [Batch relationships](batch-relations.md)), still complete audit, design, and acceptance preparation and specify the diff to recheck after merging. Exclude this round; later inspect only those changes before deciding.
+4. If a maintainer must decide, release a prerequisite version, or provide environment/permissions, state that action, owner role, and affected backlog tasks during progress and on the original Issue, rather than vaguely pausing.
+5. If implementation already recorded why work cannot proceed and release conditions, check each. Reuse the conclusion and exclude without repeating investigation when conditions and relevant code/contracts/environment are unchanged. Reprepare when conditions are met or new evidence could change the conclusion.

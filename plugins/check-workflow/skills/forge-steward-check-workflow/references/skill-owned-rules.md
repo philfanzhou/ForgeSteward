@@ -1,68 +1,68 @@
-# 技能管理的规则与删除方式
+# Skill-owned rules and deletion
 
-## 原则
+## Principle
 
-工作流政策由 ForgeSteward 的四个技能正文唯一维护。技能在执行中不采用目标仓库另行规定的同类政策，所以项目里的这类规则既不能补充技能，也不能替代技能，只会形成第二个规则来源。check-workflow 删除它们；技能明确交由仓库决定的项目约定保留。
+ForgeSteward's four skills alone define workflow policy. Project policies neither supplement nor replace them. check-workflow removes this second source, preserving conventions explicitly left to the repository.
 
-删除后，这些工作流约束只在调用对应技能时生效；不调用技能的会话或贡献者不再从项目文档读到它们。这是设计意图，不作为保留理由。
+After deletion, constraints apply only on skill invocation. Other conversations/contributors no longer find them in project documents. This is intentional, not a retention reason.
 
-## 技能管理的工作流政策
+## Skill-owned workflow policy
 
-以下维度中的规则属于删除对象，不论项目条文与技能措辞是否相同、更严格或更宽松，也不论由项目自行编写还是旧版 check-workflow 增补：
+Delete rules in these dimensions regardless of strictness or authorship, including rules from older check-workflow:
 
-| 维度 | 维护技能 | 项目中常见的条文 |
+| Dimension | Owning skill | Common project clauses |
 | --- | --- | --- |
-| 阶段与授权 | 全部 | 准备、实施、审查、修复的阶段划分；读取、修改 Issue、改代码、推送、创建 Change Request、合并分别需要的授权；只读分析不修改文件；保留用户已有改动 |
-| Issue 开工前的条件 | prepare-work | ready 须写清范围、排除项、方案、实现仓库与依赖、可逐条验证的验收及适用的失败/取消/安全/迁移/并发结果、兼容与回滚结果；保证、非保证与调用方责任；完成代码/测试/契约/配置/迁移历史/部署路径审计；前置已关闭且依赖关系与标签一致；邻近问题已各自登记并链接；模板栏目留空不能标记 ready；ready 标签的添加与移除条件 |
-| 任务大小与拆分 | prepare-work、execute-work | 一个 Issue 对应一个 Change Request；包含第二个独立契约、迁移或接口组时拆分；feature 级阈值；tracker 与 task 拆分；tracker 不接收实现 Change Request；复杂协议或状态任务的权威语义模型与端到端场景 |
-| 实施纪律 | execute-work | 基于最新主线建立独立分支、不叠加未合并变更；排除项有约束力；不顺手重构、改名、升级依赖或修复相邻缺陷；逐条验收；失败、取消、安全和并发行为随实现验证；CI 全绿不代替验收；Change Request 回链 Issue 并记录实际验证 |
-| 新发现问题的处理 | 全部 | 去重；邻近或既有缺陷单独登记并链接；已关闭任务的遗漏记为返工；已接受的非保证不重复登记 |
-| 审查意见分类与轮数 | review-and-merge、fix-feedback | 意见分为本次引入与既有问题；可选建议是否阻塞；范围争议处理；Review 轮次上限、第三轮范围与语义审计、停止增量修补并撤销 ready |
-| 合并与关闭任务 | review-and-merge | 合并前的验收、检查与 head 一致；合并后确认状态、关闭 Issue、核对父项；删除远端分支、清理 worktree 和本地分支、更新主线 |
-| 修复范围 | fix-feedback | 只修复范围内必修项、确定性 CI 失败和验收缺口；在原分支推送；修复不合并 |
-| 交接与状态 | 全部 | 跨会话记录 Issue/Change Request、基线、验收证据、Review 轮次和阻塞；轮次不因换会话重置；区分 ready、已提交、已验收、已合并、已关闭 |
+| Stages and authorization | All | Preparation/implementation/review/repair stages; authorization for reading, Issue edits, code changes, pushes, Change Requests, and merges; read-only analysis leaves files unchanged; preserve existing user work |
+| Conditions before starting an Issue | prepare-work | Readiness requires scope, exclusions, design, implementation repository/dependencies, individually verifiable acceptance and applicable failure/cancellation/security/migration/concurrency outcomes, compatibility/rollback; guarantees, non-guarantees, caller responsibilities; code/test/contract/configuration/migration-history/deployment-path audits; closed prerequisites and consistent dependency links/labels; separately filed and linked adjacent issues; no empty required template sections; adding/removing ready labels |
+| Task size and splitting | prepare-work, execute-work | One Issue per Change Request; split a second independent contract, migration, or interface group; feature-size thresholds; tracker/task split; no implementation Change Request for a tracker; authoritative semantic model and end-to-end scenarios for complex protocol/state work |
+| Implementation discipline | execute-work | Independent branches from latest mainline without stacking unmerged work; binding exclusions; no incidental refactors, renames, dependency updates, or adjacent fixes; acceptance checked item by item; verify failure/cancellation/security/concurrency with implementation; green CI is not acceptance; link Change Request to Issue and record actual verification |
+| New findings | All | Deduplicate; file/link adjacent or pre-existing defects separately; missed work in closed tasks counts as rework; do not refile accepted non-guarantees |
+| Feedback classification and rounds | review-and-merge, fix-feedback | Distinguish introduced from pre-existing issues; whether optional suggestions block; scope disputes; review-round cap, third-round scope/semantic audit, stop incremental patching and remove ready status |
+| Merge and task closure | review-and-merge | Acceptance, checks, and matching head before merge; confirm state, close Issues, reconcile parents after merge; delete remote branches, clean worktrees/local branches, update mainline |
+| Repair scope | fix-feedback | Only required in-scope feedback, deterministic CI failures, and acceptance gaps; push original branch; repair never merges |
+| Handoff and state | All | Persist Issue/Change Request, baseline, acceptance evidence, review rounds, and blockers across conversations; never reset rounds; distinguish ready, submitted, accepted, merged, closed |
 
-## 项目约定（保留）
+## Project conventions (preserve)
 
-技能正文明确交由目标仓库决定的内容不属于工作流政策，保留：
+Preserve conventions explicitly left to the repository:
 
-- 文档、Issue、Change Request、Review 与代码注释的语言；Issue/Change Request 标题、commit message 和分支命名格式。
-- Issue 与 Change Request 模板的栏目结构和填写提示，例如“范围”“验收标准”“验证”“兼容性影响”等标题及其要填写的内容。
-- 合并方式、必要检查、审批数量和分支保护配置。
-- 构建、测试、迁移、冒烟等验证命令，以及“改动某类内容时须运行某项检查或补充某类测试”的工程要求。
-- 架构边界、安全约束、兼容性与迁移要求、配置与部署契约、文档同步要求、版本与发布流程。
-- Agent 入口与加载方式，例如 `CLAUDE.md` 的 `@AGENTS.md` 导入。
+- Languages for documentation, Issues, Change Requests, reviews, and code comments; Issue/Change Request title, commit-message, and branch-name formats.
+- Issue/Change Request template structure and completion guidance, such as “Scope,” “Acceptance criteria,” “Verification,” and “Compatibility impact” headings and their expected contents.
+- Merge methods, required checks, approval counts, and branch protection settings.
+- Build, test, migration, smoke-check, and other verification commands, plus engineering requirements to run particular checks or add certain tests for a class of change.
+- Architecture boundaries, security constraints, compatibility/migration requirements, configuration/deployment contracts, documentation updates, versioning, and release processes.
+- Agent entry and loading mechanisms, such as `CLAUDE.md` importing `@AGENTS.md`.
 
-一条规则同时包含工作流政策和项目约定时，只删除表达工作流政策的部分，见下文删除方式。
+When a rule mixes workflow policy and project conventions, delete only its policy portion under the methods below.
 
-## 候选位置
+## Candidate locations
 
-- 根目录及子目录的 `AGENTS.md`、`CLAUDE.md`；`AGENTS.override.md` 只报告，不修改。
-- `CONTRIBUTING.md`，以及 `docs/` 等处专门说明协作、交付、Review 或 Agent 工作方式的文档。
-- Issue 与 Change Request 模板，例如 `.github/ISSUE_TEMPLATE/`、`.github/pull_request_template.md`、`.gitlab/issue_templates/`、`.gitlab/merge_request_templates/`。
+- Root/nested `AGENTS.md` and `CLAUDE.md`; report `AGENTS.override.md` without editing it.
+- `CONTRIBUTING.md` and documents in `docs/` or elsewhere about collaboration, delivery, review, or Agent workflows.
+- Issue/Change Request templates, such as `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md`, `.gitlab/issue_templates/`, and `.gitlab/merge_request_templates/`.
 
-不在业务代码、测试、CI、非文档配置中查找。决策记录（ADR）、变更日志、发布说明和复盘记录中对流程的历史描述不是现行规则，不删除。产品自身的业务流程（例如身份认证流程、审批业务）不是工作流政策。
+Do not search business code, tests, CI, or non-document configuration. Historical process descriptions in ADRs, changelogs, release notes, and retrospectives are not current rules; preserve them. Product business processes, such as authentication or approval workflows, are not this workflow policy.
 
-## 不删除的情形
+## Cases to retain
 
-以下情形列为待维护者决定，不删除，并在 Change Request 中说明原因：
+Retain these for maintainer decision, explaining why in the Change Request:
 
-- 无法确定是否属于上表维度，或政策与项目约定交织到只删不改就无法保留约定的文字。
-- 仍被候选位置之外的内容引用，例如 README、代码注释或脚本链接到该章节；引用方本身也是候选内容时一并删除。
-- 维护者已在此前的 Change Request 审查或讨论中明确保留的内容；后续运行只在汇报中注明，不再删除。
+- Classification under the table is uncertain, or policy and conventions are intertwined so deletion alone cannot preserve the convention.
+- Content has references outside candidate locations, such as README, a code comment, or a script. If the referrer itself is a candidate, remove its reference too.
+- Maintainers explicitly retained the content in an earlier Change Request review/discussion. Later runs report it without another deletion.
 
-## 删除方式
+## Deletion methods
 
-- **整段删除**：章节全部是工作流政策时，从标题删除到下一个同级或更高级标题之前，连同因此多出的空行。
-- **删除列表项或句子**：章节中只有部分列表项或句子属于工作流政策时，只删除这些行或句子；编号列表删除中间项会导致编号断开时，改为待决定。
-- **删除分句**：同一句中项目约定与工作流政策以顿号、分号或“并”等并列时，只删除表达工作流政策的并列部分，保留其余原文字符；删除的是句末分句时，把它前面的分号或逗号改为句号，这是唯一允许的字符替换。删除后语句不通，或需要调整连接词才能成句时，改为待决定。
-- **模板**：保留栏目标题和填写提示，删除规定工作流政策的说明句、注释和检查项；栏目下的检查项全部是工作流政策时，删除整个栏目。
-- **整份删除**：文档全部内容都是工作流政策时整份删除，并删除只指向它的读取指示、链接和目录项。
-- **旧版区块**：由 `scripts/remove_workflow_blocks.py` 删除。根目录 `AGENTS.md` 删除区块后没有其他内容时删除该文件；此时 `CLAUDE.md` 中指向它的导入行一并删除，`CLAUDE.md` 随之为空时删除该文件。
-- 不改写、合并或重新排版保留内容，不把被删规则搬到其他位置，不代写替代条款。
+- **Whole section:** if entirely policy, delete from its heading to the next equal/higher heading, including the extra blank line.
+- **List item or sentence:** delete only policy items/lines/sentences in a mixed section. If deleting a middle numbered item would break numbering, mark it undecided.
+- **Clause:** when conventions and policy are coordinated by commas, semicolons, or “and,” delete only the policy clause, preserving all other characters. For a final clause, change its preceding comma/semicolon to a period; this is the sole allowed character replacement. If the result is ungrammatical or needs connective changes, mark it undecided.
+- **Template:** preserve section headings and completion guidance; delete policy sentences, comments, and checkboxes. If all checks under a section are policy, delete that entire section.
+- **Whole document:** delete an entirely policy document, along with reading instructions, links, and contents entries pointing only to it.
+- **Legacy blocks:** use `scripts/remove_workflow_blocks.py`. If root `AGENTS.md` has no other content after deletion, delete it and its import in `CLAUDE.md`; if `CLAUDE.md` is then empty, delete it too.
+- Never rewrite, combine, or reformat retained text, relocate deleted rules, or write replacement clauses.
 
-## 记录与重复运行
+## Records and repeated runs
 
-每项记录：文件、删除前行范围、标题或首行、所属维度及维护技能、技能中的等价条款、处理方式和结果（已删除，或待决定及原因）。
+Record each item's file, original line range, heading/first line, dimension and owning skill, equivalent skill clause, deletion method, and outcome (deleted, or undecided with reason).
 
-删除前逐条核对维护技能的正文。找不到等价语义的条文（例如项目要求写明调用方责任，技能只要求保证与非保证）仍按本文件删除，因为技能执行时不采用项目规则；但须在 Change Request 中单列为“技能缺口”，引用原文和缺少的语义，供维护者补入技能。不以“技能已有同维度规则”代替逐条核对。删除合入主线后，重复运行不会再发现这些内容；待决定项没有变化时只再次报告，不产生差异。技能版本新增政策维度时，下次运行可能发现新的删除项，这属于版本更新，不是重复修改。
+Before deleting, compare each clause to its owning skill's full text. If equivalent semantics are absent (for example, the project requires caller responsibilities but the skill only requires guarantees/non-guarantees), still delete under these rules since skills do not adopt project policy. Separately list a “skill gap” in the Change Request, quoting the original and missing semantics for maintainers to add to the skill. A same-dimension rule is no substitute for clause-by-clause comparison. Once deletion merges, repeated runs no longer find that content. Unchanged undecided items are reported again without a diff. New policy dimensions in a skill version may yield new candidates next run; that is a version change, not repeated editing.

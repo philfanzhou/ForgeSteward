@@ -1,46 +1,46 @@
-# 遗留分支清理场景走查
+# Leftover branch cleanup scenarios
 
-本文针对 review-and-merge 的 [遗留分支清理](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) 规则（Issue #81）。以下是按规则正文逐条推演的有限场景，不是真实仓库运行，也不代表各 Agent 的实际行为已经过评测。
+This document covers review-and-merge's [leftover branch cleanup](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) rules (Issue #81). These are limited walkthroughs of the written rules, not runs against real repositories or evaluations of actual Agent behavior.
 
-## 背景
+## Background
 
-review-and-merge 原本只在合并后删除本次刚合并的 Change Request 的源分支。Agent 中途断掉或合并后没清理留下的分支不会被处理，例如：远端分支对应的 PR 全部已合并、本地分支的远端早已删除、以前会话留下的本地分支。新规则在处理完整个冻结清单后多做一次遗留分支清理，work-cycle 每个周期调用 review-and-merge，因此自然生效，不新增阶段。
+Previously, review-and-merge deleted only the source branch of a Change Request merged during that invocation. It left branches from interrupted Agents or earlier merges untouched: remote branches whose PRs were all merged, local branches whose remotes had already gone, and local branches left by previous sessions. The new rules add a cleanup pass after the frozen queue is processed. Since work-cycle calls review-and-merge each cycle, this takes effect without another stage.
 
-## 场景
+## Scenarios
 
-除特别说明外，均为用户明确调用 review-and-merge、允许合并，仓库默认分支为 `main`，非并发调用。
+Unless specified otherwise, the user explicitly invokes review-and-merge and allows merging, the default branch is `main`, and the invocation is not concurrent.
 
-| 编号 | 输入和状态 | 预期结果 | 依据 |
+| ID | Input and state | Expected result | Basis |
 | --- | --- | --- | --- |
-| B01 | 远端和本地都有 `feat/a`，对应 PR 已用普通合并方式合并，分支 head 等于 PR 合并时的 head；没有 worktree 检出它 | 远端、本地 `feat/a` 都删除，各计 1 个；汇报写明提交号，可在 PR 页面恢复 | 分类表第 1 行 |
-| B02 | `feat/b` 的 PR 已 squash 合并，分支提交不在 `main` 历史中，head 等于 PR 记录的合并时 head；`git branch -d` 拒绝删除 | 按 PR 记录判断为已合并，远端删除，本地核对一致后强制删除；不因不是主线祖先而保留 | 分类表第 1 行及其下说明 |
-| B03 | `feat/c` 的 PR 已关闭未合并，远端与本地 head 都等于关闭时的 head | 远端、本地都删除；汇报说明可在 PR 页面恢复 | 分类表第 2 行 |
-| B04 | `feat/d` 的 PR 已关闭未合并，远端 head 等于关闭时的 head，本地多出 2 个未推送提交 | 远端删除；本地不删，列为“本地有未推送提交” | 分类表第 3 行 |
-| B05 | 本地 `claude/agent-x` 从没提过 PR，提交全部在 `main` 里，没有 worktree 检出它 | 本地删除，汇报记下提交号；若远端也有同名分支且同样在主线里，远端也删 | 分类表第 4 行 |
-| B06 | 本地 `fix/e` 的上游显示已不存在，本地 head 等于某个已合并 PR 的最后 head | 本地删除；没有远端可删 | 分类表第 5 行 |
-| B07 | 本地 `fix/f` 的上游已不存在，查不到对应 PR，head 不在主线里 | 不删，列为“远端已不存在，无法确认没有未推送提交” | 分类表第 6 行 |
-| B08 | 远端 `wip/g` 有 3 个不在主线里的提交，从没提过 PR | 远端和本地都只列出，说明多半是中断留下的，删了无法恢复 | 分类表最后一行 |
-| B09 | `feat/h` 有一个开放 PR，同名分支另有一个更早的已合并 PR | 不删；有开放 PR 时先判绝不删除，不看已合并的那个 | 绝不删除第 2 条；多个 Change Request 的说明 |
-| B10 | `~/.codex/worktrees/` 下有两个分离 HEAD 的 worktree；`.claude/worktrees/` 下一个 worktree 检出已合并 PR 的分支 `feat/i`，另一个已加锁 | 这些 worktree 一律不动，汇报列出原因；`feat/i` 仍被不满足移除条件的 worktree 检出，远端和本地都按绝不删除保留；`git worktree prune` 也会跳过加锁记录 | worktree 第 3 条；绝不删除第 3 条 |
-| B11 | ForgeSteward 约定目录 `<仓库上级目录>/<仓库目录名>-forge-steward/42` 下的 worktree 检出已合并 PR 的分支 `forge-steward/issue-42`，没有改动、未加锁；另一个同目录的 worktree 有未跟踪文件 | 第一个用 `git worktree remove` 移除后删除分支；第二个及其分支保留，列为“有未提交的改动” | worktree 第 2 条 |
-| B12 | 符合删除条件的远端分支 40 个、本地分支 25 个 | 按最后提交时间从早到晚删除前 50 个，其余 15 个列为“留到下次”；随分支移除的 worktree 不计数 | 删除与上限第 3 条 |
-| B13 | 用户只要求审查、不允许合并或修改，仓库里有 B01、B03、B05 那样的分支 | 一个也不删，也不执行 `git worktree prune`；汇报列出这些分支及其归类和原因 | 时机与模式第 2 条 |
-| B14 | B01 的 `feat/a` 在删除前重新读取时 head 变了，或刚出现一个开放 PR | 保留并列出原因，不删 | 删除与上限第 1 条 |
-| B15 | 查询 PR 列表时接口报错，只拿到部分分支的 PR 记录 | 只处理已确认的分支；查不到记录的一律保留，汇报列为“查询失败，没检查” | 范围与读取第 3 条 |
-| B16 | 删除远端 `feat/c` 时平台返回保护规则拒绝；删除 `feat/j` 时发现已被别人删掉 | `feat/c` 记录拒绝原因并保留，继续下一个；`feat/j` 记为已不存在，不算失败 | 删除与上限第 2 条 |
-| B17 | work-cycle 并发派发审查，调度表列出执行阶段正在使用 `forge-steward/issue-43` 及其工作区；该分支提交恰好都在主线里 | 不删 `forge-steward/issue-43`，不动其工作区；其他符合条件的分支照常清理 | 绝不删除第 4 条；`concurrent.md` 第 3 步 |
-| B18 | 并发调用，调用方没给“其他阶段正在使用”清单 | 遗留分支只列出、不删除 | `concurrent.md` 第 3 步 |
-| B19 | 并发调用，本项审查后没有合并 | 不做遗留分支清理 | `concurrent.md` 第 3 步 |
-| B20 | 删除进行到第 12 个时用户要求停止 | 不再删除，汇报已删的 12 个和其余未处理的分支 | 时机与模式第 4 条 |
-| B21 | 远端 `release/1.x` 被仓库 CI 配置点名，没有开放 PR，提交都在主线里 | 只列出，不删 | 长期分支说明 |
-| B22 | 远端 `upstream` 指向 fork 来源仓库，其中有已合并 PR 的分支 | 不碰，不在清理范围内 | 范围与读取第 1 条 |
+| B01 | Remote and local `feat/a` exist; its PR was merged normally; branch head equals the PR head at merge; no worktree checks it out | Delete remote and local `feat/a`, counting each once; record the commit in the report and note restoration from the PR page | Classification table, row 1 |
+| B02 | `feat/b` was squash-merged; its commits are not in `main`, but head equals the PR's recorded head at merge; `git branch -d` refuses | Use the PR record to confirm the merge, delete the remote, and force-delete the local branch after verifying its head; absence from main's ancestry is not a reason to retain it | Classification table, row 1 and its explanation |
+| B03 | `feat/c` has a PR closed without merge; both remote and local heads equal its head at closure | Delete both; report restoration through the PR page | Classification table, row 2 |
+| B04 | `feat/d` has a PR closed without merge; the remote head equals its head at closure, but the local branch has 2 unpushed commits | Delete the remote; keep the local branch and report unpushed local commits | Classification table, row 3 |
+| B05 | Local `claude/agent-x` never had a PR, all commits are in `main`, and no worktree checks it out | Delete the local branch and record its commit; also delete a same-named remote branch if all its commits are in main | Classification table, row 4 |
+| B06 | Local `fix/e` has a missing upstream and its head equals a merged PR's final head | Delete the local branch; there is no remote branch to delete | Classification table, row 5 |
+| B07 | Local `fix/f` has a missing upstream, no matching PR can be found, and its head is not in main | Keep it and report that the remote is gone and absence of unpushed commits cannot be confirmed | Classification table, row 6 |
+| B08 | Remote `wip/g` has 3 commits outside main and never had a PR | List remote and local branches without deleting; explain that they may be leftovers from interrupted work and deletion would prevent recovery | Last classification-table row |
+| B09 | `feat/h` has an open PR and an older merged PR for the same branch name | Keep it; the open-PR exclusion takes precedence over the merged PR | Never-delete rule 2; multiple-Change-Request guidance |
+| B10 | Two detached-HEAD worktrees are under `~/.codex/worktrees/`; under `.claude/worktrees/`, one checks out merged-PR branch `feat/i` and another is locked | Leave every worktree untouched and report why; retain both remote and local `feat/i` because a worktree ineligible for removal still checks it out; `git worktree prune` also skips locked records | Worktree rule 3; never-delete rule 3 |
+| B11 | A clean, unlocked worktree at ForgeSteward's conventional `<repository-parent>/<repository-name>-forge-steward/42` checks out merged-PR branch `forge-steward/issue-42`; another worktree under the same parent has untracked files | Remove the first with `git worktree remove`, then delete its branch; retain the second and its branch and report uncommitted changes | Worktree rule 2 |
+| B12 | 40 remote and 25 local branches qualify for deletion | Delete the first 50 in oldest-last-commit order; report the remaining 15 as left for next time; associated worktree removals do not count | Deletion and limit rule 3 |
+| B13 | User requests review only, with no merge or modifications; branches like B01, B03, and B05 exist | Delete none and do not run `git worktree prune`; report branches, classifications, and reasons | Timing and mode rule 2 |
+| B14 | On the final reread, B01's `feat/a` has a different head or a newly opened PR | Keep it and report the reason | Deletion and limit rule 1 |
+| B15 | The PR-list API fails and returns records for only some branches | Process only confirmed branches; keep every branch with unavailable records and report that the query failed and it was not checked | Scope and reading rule 3 |
+| B16 | Protection rejects deletion of remote `feat/c`; `feat/j` has already been deleted by someone else | Record the rejection and keep `feat/c`, then continue; record `feat/j` as already absent, not a failure | Deletion and limit rule 2 |
+| B17 | work-cycle dispatches concurrent reviews; the schedule identifies execution's active `forge-steward/issue-43` branch and workspace; all its commits happen to be in main | Preserve that branch and workspace; clean other eligible branches normally | Never-delete rule 4; `concurrent.md` step 3 |
+| B18 | Concurrent invocation with no caller-provided list of branches used by other stages | List leftover branches without deleting | `concurrent.md` step 3 |
+| B19 | Concurrent invocation where this review merges nothing | Do not clean leftover branches | `concurrent.md` step 3 |
+| B20 | User requests a stop after the 12th deletion | Stop deleting; report the 12 deleted branches and all unprocessed branches | Timing and mode rule 4 |
+| B21 | Repository CI explicitly names remote `release/1.x`; it has no open PR and all commits are in main | List it without deleting | Long-lived branch guidance |
+| B22 | Remote `upstream` points to the fork's source repository and contains merged-PR branches | Leave it untouched; it is outside cleanup scope | Scope and reading rule 1 |
 
-## 恢复与回退
+## Recovery and rollback
 
-- 有 Change Request 的被删分支可在对应 Change Request 页面恢复；没有 Change Request 的只在“全部提交都在主线里”时才删，可用汇报里记下的提交号重建。
-- 这是新增行为，旧版本不清理遗留分支；回退方式是撤销引入本规则的 PR。
+- Restore deleted branches with a Change Request through its page. A branch without a Change Request is deleted only if all commits are in main; recreate it from the commit recorded in the report.
+- This is new behavior; older versions do not clean leftover branches. Roll back by reverting the PR introducing these rules.
 
-## 不保证的部分
+## Limitations
 
-- 不保证清理干净所有遗留分支，不确定的都会保留。
-- 不检查别人本地克隆里的同名分支，不处理 fork 上的分支，不修改仓库设置。
+- Cleanup does not guarantee removal of every leftover branch; uncertain cases are retained.
+- It does not inspect same-named branches in other people's local clones, handle fork branches, or change repository settings.

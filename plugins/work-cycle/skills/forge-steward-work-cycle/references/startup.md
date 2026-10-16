@@ -1,17 +1,17 @@
-## 启动与低频检查
+## Startup and infrequent checks
 
-识别用户当前仓库、远端、默认主线和工作区；刷新只读远端状态，不覆盖用户修改。五个阶段技能必须已安装且统一版本相同；确认缺少子 Agent 能力或必需技能时，在任何阶段写入前停止。不能仅凭额度较低的提醒判定能力缺失，也不创建无业务作用的探针 Agent；首次实际阶段派发失败时按 [子 Agent 生命周期与恢复](agents.md) 处理。编排 Agent 不代替子 Agent 阅读和执行阶段规则。
+Identify the user's current repository, remotes, default mainline, and workspace. Refresh remote state read-only and preserve user changes. All five stage skills must be installed at the same unified version. Stop before any stage writes if required skills or subagent capabilities are confirmed absent. Low-quota warnings alone do not establish absence; create no purposeless probe Agents. Handle the first real dispatch failure under [Subagent lifecycle and recovery](agents.md). The orchestrator cannot read/execute stage rules in place of subagents.
 
-`check-workflow` 是低频的启动前检查，不是每个工作周期的一环。运行本技能包内的 `scripts/check_workflow_gate.py --repo <目标仓库> --branch <默认主线> --claim`。脚本从本技能包的 `scripts/VERSION` 读取统一版本，在目标仓库的 Git common dir 内维护 `forge-steward/check-workflow.json`；它不修改受版本控制的项目文件。`--claim` 原子判定并在需要运行时先写入 `incomplete` 占位，避免同一 checkout 的并发编排重复启动；返回 `0` 跳过、`1` 运行、`2` 状态无法可靠判定。需要只读查看判定时使用 `--check`，它不占位。返回 `2` 时报告具体错误，本次跳过自动检查并继续独立的工作周期，不反复试探。
+`check-workflow` is an infrequent startup check, not part of every cycle. Run this package's `scripts/check_workflow_gate.py --repo <target-repository> --branch <default-mainline> --claim`. It reads the unified version from `scripts/VERSION` and maintains `forge-steward/check-workflow.json` in the target's Git common dir without changing tracked files. `--claim` decides atomically and writes an `incomplete` placeholder before a required run, preventing duplicate concurrent orchestration in one checkout. Exit `0` means skip, `1` run, `2` unreliable state. For read-only inspection use `--check`, which does not claim. On `2`, report the error, skip this automatic check, and continue independent cycles without repeated probing.
 
-判定仅使用该仓库与主线的上次运行记录、统一版本和 UTC 时间：
+Decide using only the repository/mainline's prior run record, unified version, and UTC time:
 
-- 没有记录，或主线与记录不一致：运行一次。
-- 上次运行未完成：距离上次尝试未满 168 小时则跳过；满 168 小时再运行。
-- 上次运行已完成（零修改或已提交清理 Change Request）：版本相同则跳过；版本不同但未满 168 小时仍跳过；版本不同且已满 168 小时才运行。
+- No record, or recorded mainline differs: run once.
+- Previous run incomplete: skip within 168 hours of its attempt; rerun after 168 hours.
+- Previous run complete (no changes or cleanup Change Request submitted): skip the same version; skip a different version within 168 hours; run only when the version differs and 168 hours have elapsed.
 
-普通代码或文档提交、候选文件变化、PR/MR 的创建、状态变化或合并，均不是自动运行条件。跳过时不刷新记录时间。这个策略允许同版本中新写的重复规则暂时留在项目中；本技能的主任务是持续交付 Issue，不因清理规则的频繁扫描拖慢工作。
+Ordinary code/document commits, candidate-file changes, and PR/MR creation, status changes, or merges do not trigger this check. Skips do not refresh timestamps. This intentionally lets newly duplicated rules remain temporarily in the same version; sustained Issue delivery must not be slowed by frequent cleanup scans.
 
-判为运行时，`--claim` 已记录本次尝试；创建独立子 Agent，明确调用 `forge-steward-check-workflow` 完成其默认交付流程，不得由编排 Agent 直接实施清理。子 Agent 完成后，以 `--record --result clean` 记录零修改结果，或用 `--record --result pr-open --change-request <URL>` 记录已提交清理 Change Request；调用失败或结果无法确认时保留 `incomplete`。写入结果不确定时先回读记录，不重复派发。记录只代表该版本的一次运行，`pr-open` 不声称已合并；该 Change Request 之后由正常审查阶段处理，状态变化不会触发新一轮 `check-workflow`。无法写入记录时报告，但不在本次编排中重新运行该阶段。锁文件遗留时先确认没有仍在运行的编排会话，不自动删除锁。
+When a run is needed, `--claim` has recorded the attempt. Create a separate subagent explicitly invoking `forge-steward-check-workflow` for its default delivery flow; the orchestrator must not clean directly. After completion, use `--record --result clean` for no changes or `--record --result pr-open --change-request <URL>` for a submitted cleanup request. On failed calls/uncertain results, retain `incomplete`. Read back uncertain writes before redispatching. The record represents one version's run; `pr-open` does not mean merged. Normal review handles that request later; its status changes do not trigger another check. Report record-write failure without rerunning the stage in this orchestration. Before handling a leftover lock, confirm no orchestration is still running; never delete it automatically.
 
-该记录属于本地 checkout 的 Git 元数据，worktree 共享 common dir；新克隆或另一台机器没有该缓存，会各自执行首次检查。不得为了共享缓存而向目标项目提交标记文件、创建空 PR，或修改 `check-workflow` 的“只删除”契约。
+This cache belongs to local checkout Git metadata, shared by worktrees through the common dir. New clones/machines lack it and each perform a first check. Never commit cache markers, create empty PRs, or change check-workflow's delete-only contract to share it.

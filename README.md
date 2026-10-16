@@ -2,7 +2,7 @@
 
 ForgeSteward is a collection of cross-agent skills for maintaining software repositories. It is designed to help Claude Code, OpenCode, Codex, ZCode, and other compatible coding agents move work safely from an actionable issue to a reviewed and merge-ready change request.
 
-The current release is **0.2.23**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. The [installation commands](#supported-agents-and-installation) install exactly this release; the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases) confirm it is published. See the [v0.2.23 version matrix, changes, and migration notes](docs/releases/v0.2.23.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules. Preparation includes a read-only check of available automated security alerts within the authorized repository scope, with deduplication and the existing frozen-queue boundaries. Check-workflow also reconciles release evidence read-only against each repository's release contract; findings appear only in the final report. Reports and forge comments written by the skills use plain Chinese instead of internal rule terms. Work cycles avoid idle waits and repeated checks: repairs watch their own CI, branch syncs are handled without consuming review rounds, unchanged items keep earlier conclusions, and finished change requests can move to review before the whole batch is done when the agent runtime supports background subagents. With that support, work cycles also implement, review and repair independent issues and change requests concurrently (three stage subagents by default) in worktrees outside the repository, queue local verification on shared resources through Git-metadata locks, and merge one change request at a time. When a repository requires up-to-date branches, approved change requests go through a single merge lane (or the repository's own merge queue when it is already enabled); CI failures unrelated to a change are re-run once; each run keeps per-stage timings in Git metadata; repository language and commit conventions take precedence over the plain-Chinese default. The final work-cycle report is rendered from run records in a fixed format; it includes a read-only check of which ForgeSteward version each local agent has installed and, only after the user agrees, installs or upgrades the agents that are missing or behind.
+The current release is **0.2.23**, with six independently installable plugins: `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, `fix-feedback`, and `work-cycle`. The [installation commands](#supported-agents-and-installation) install exactly this release; the matching tag and non-draft [GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases) confirm it is published. See the [v0.2.23 version matrix, changes, and migration notes](docs/releases/v0.2.23.md). The orchestration skill reviews existing open change requests before running bounded issue work cycles through mandatory stage subagents; the five stage skills retain their independent entrypoints and complete bundled rules. Preparation includes a read-only check of available automated security alerts within the authorized repository scope, with deduplication and the existing frozen-queue boundaries. Check-workflow also reconciles release evidence read-only against each repository's release contract; findings appear only in the final report. The current source defaults skill reports and forge comments to clear, everyday English instead of internal rule terms; see the [English migration and saved-record compatibility notes](docs/work-cycle-scenarios.md#english-migration-and-record-compatibility-118). Work cycles avoid idle waits and repeated checks: repairs watch their own CI, branch syncs are handled without consuming review rounds, unchanged items keep earlier conclusions, and finished change requests can move to review before the whole batch is done when the agent runtime supports background subagents. With that support, work cycles also implement, review and repair independent issues and change requests concurrently (three stage subagents by default) in worktrees outside the repository, queue local verification on shared resources through Git-metadata locks, and merge one change request at a time. When a repository requires up-to-date branches, approved change requests go through a single merge lane (or the repository's own merge queue when it is already enabled); CI failures unrelated to a change are re-run once; each run keeps per-stage timings in Git metadata; repository language and commit conventions take precedence over the everyday-English default. The final work-cycle report is rendered from run records in a fixed format; it includes a read-only check of which ForgeSteward version each local agent has installed and, only after the user agrees, installs or upgrades the agents that are missing or behind.
 
 The five-plugin split shipped in [v0.2.3](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3): `prepare-work` replaces `find-work` and returns only a single-line issue list; `execute-work` implements that list and opens independent change requests. When migrating from v0.2.1 or earlier, uninstall `find-work` as described in the [rename migration](docs/prepare-execute-migration.md); the historical v0.2.1 commands are kept in the [fixed-version guide](docs/versioned-installation.md).
 
@@ -65,7 +65,7 @@ claude plugin install work-cycle@forge-steward --scope user
 claude plugin list
 ```
 
-Refreshing a marketplace pinned to an old tag does not move it to a newer tag, which is why the marketplace is replaced. For `project` or `local` scope installations, run the matching commands with that scope from each affected project and follow the [scope-aware switching guide](docs/versioned-installation.md#切换或回退); marketplace scope and plugin scope are separate, and `marketplace remove` without `--scope` removes the declaration from every scope.
+Refreshing a marketplace pinned to an old tag does not move it to a newer tag, which is why the marketplace is replaced. For `project` or `local` scope installations, run the matching commands with that scope from each affected project and follow the [scope-aware switching guide](docs/versioned-installation.md#switching-or-rolling-back); marketplace scope and plugin scope are separate, and `marketplace remove` without `--scope` removes the declaration from every scope.
 
 #### Uninstall
 
@@ -199,7 +199,7 @@ node "$ZCODE_CLI" plugins marketplace remove forge-steward
 node "$ZCODE_CLI" plugins list --json
 ```
 
-Without `--keep-data` the plugin data directories are deleted too. Skills imported by copy or symlink in **Settings → Skills** are separate from plugins; see [ZCode cleanup](docs/zcode.md#卸载与只保留目标版本).
+Without `--keep-data` the plugin data directories are deleted too. Skills imported by copy or symlink in **Settings → Skills** are separate from plugins; see [ZCode cleanup](docs/zcode.md#uninstalling-and-keeping-only-the-target-version).
 
 ### OpenCode
 
@@ -267,7 +267,7 @@ git clone --branch v0.2.23 --depth 1 https://github.com/philfanzhou/ForgeSteward
 python3 "$HOME/code/ForgeSteward-v0.2.23/scripts/deepseek.py" uninstall --all --user
 ```
 
-Other discovery roots can still hold copies the installer does not manage. See the Chinese [DeepSeek installation, recovery and verification guide](docs/deepseek-installer.md) for exact boundaries.
+Other discovery roots can still hold copies the installer does not manage. See the [DeepSeek installation, recovery and verification guide](docs/deepseek-installer.md) for exact boundaries.
 
 ## Upgrade and keep only the selected version
 
@@ -304,7 +304,7 @@ Only the `work-cycle` orchestration does this; the five stage skills and stage s
 - **What it may change:** user-level plugins and the `forge-steward` marketplace setting of Claude Code, Codex and ZCode (project or local installs are left alone); the user skill directories of OpenCode and DeepSeek Harness, through the bundled installers, which never overwrite modified, unrecorded or linked copies; and, in the system temporary directory, a lock directory plus a temporary clone of the release tag (its commit is verified against the release; both are removed afterwards). A local Claude Code marketplace clone is reused instead of downloading when it is clean and at the release commit. Nothing is written to the repository being maintained.
 - **How to decline:** say no, or simply do not answer. Nothing is changed.
 
-A failed step stops only that agent and is reported with the state found afterwards; there is no automatic rollback, so agree again after fixing the cause to complete it. An agent upgraded while it is running uses the new version from its next new session. See the Chinese [work-cycle scenarios](docs/work-cycle-scenarios.md) for every case.
+A failed step stops only that agent and is reported with the state found afterwards; there is no automatic rollback, so agree again after fixing the cause to complete it. An agent upgraded while it is running uses the new version from its next new session. See the [work-cycle scenarios](docs/work-cycle-scenarios.md) for every case.
 
 ## Skills
 
@@ -404,7 +404,7 @@ Selected targets are checked and staged before changing installed skills. Ordina
 
 If OpenCode does not discover the skills, confirm the printed target and run `status`, then `opencode debug skill` from the target project. Check OpenCode's skill permissions, custom configuration, and any duplicate manual installs. The installer never changes agent permissions or configuration files. The same script supports macOS, Linux and Windows; CI runs it on all three, and actual OpenCode discovery is tested with `1.18.30` on macOS locally and Linux in CI.
 
-Development checks: `python3 -m unittest discover -s tests -v`. Set `FORGESTEWARD_OPENCODE` to an OpenCode executable to include actual discovery and removal checks in isolated temporary configuration directories; otherwise that test is explicitly skipped. See the Chinese [installer design and verification notes](docs/opencode-installer.md).
+Development checks: `python3 -m unittest discover -s tests -v`. Set `FORGESTEWARD_OPENCODE` to an OpenCode executable to include actual discovery and removal checks in isolated temporary configuration directories; otherwise that test is explicitly skipped. See the [installer design and verification notes](docs/opencode-installer.md).
 
 ## Uninstall and verify
 
@@ -424,7 +424,7 @@ OpenCode also discovers project/user `.agents/skills` and `.claude/skills` copie
 
 ### ZCode imported skills
 
-In **Settings → Skills**, inspect the actual paths of remaining `forge-steward-*` and legacy skills. Imported copies or symlinks are independent of plugin installations: preserve edits, confirm ownership, and move only the redundant copy/link outside discovery paths. Do not follow a symlink and delete another agent's source. Check project/user `.zcode/skills`, `.agents/skills`, configured roots and remote environments as applicable; verify in a new task that removed skills are absent. See [ZCode cleanup and recovery](docs/zcode.md#卸载与只保留目标版本).
+In **Settings → Skills**, inspect the actual paths of remaining `forge-steward-*` and legacy skills. Imported copies or symlinks are independent of plugin installations: preserve edits, confirm ownership, and move only the redundant copy/link outside discovery paths. Do not follow a symlink and delete another agent's source. Check project/user `.zcode/skills`, `.agents/skills`, configured roots and remote environments as applicable; verify in a new task that removed skills are absent. See [ZCode cleanup and recovery](docs/zcode.md#uninstalling-and-keeping-only-the-target-version).
 
 ### What removal does not undo
 
@@ -442,7 +442,7 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex, OpenCode and ZCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Open this repository root as the ZCode workspace: ZCode does not recursively load nested `AGENTS.md` or expand `@import` / `@include`. Platform adapters must not duplicate shared guidance.
 
-Project design documents other than README files are written in Simplified Chinese. Issue and change-request titles are written in English, while their bodies and comments are written in Simplified Chinese.
+Project-maintained documentation, Issue and change-request titles, bodies, and comments are written in clear English. Skills default to everyday English while honoring explicit user and target-repository language requirements.
 
 ## Principles
 

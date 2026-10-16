@@ -5,36 +5,32 @@ description: Implement a supplied fixed issue list sequentially, using each issu
 
 # Execute Work
 
-## 规则加载
+## Load the rules
 
-对冻结队列中的候选进入实现、验证或提交阶段前，完整读取 [实现与提交规则](references/implementation.md)。只读调查和缺失输入按本入口处理；不得仅凭入口摘要实施或发布。汇报前完整读取 [最终报告规则](references/reporting.md)。
+Before implementing, verifying, or submitting any frozen-queue candidate, read [Implementation and submission](references/implementation.md) in full. Use this entry for read-only investigation and missing inputs; never implement or publish from its summary alone. Read [Final report](references/reporting.md) in full before reporting.
 
-引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。本技能规则文件的读取结果被截断时按行或段补读至文件末尾（不适用于 CI 日志、测试输出等其他工具结果）；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
+These references are required rules. Resolve paths relative to this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 
-## 输入与授权
+## Input and authorization
 
-接收用户给出的 Issue 编号、平台限定标识或完整 URL 列表，例如 `#123, #145, #167`。不要求安装或先运行 prepare-work，也不依赖它生成的 prompt 或先前会话；实施依据来自原 Issue、持久化证据和所属仓库规范。实施范围、验收和交付纪律以本技能为准，不采用所属仓库另行规定的同类工作流规则；语言、标题与提交格式、模板、构建和验证命令、分支保护等项目约定仍按所属仓库执行。
+Accept the user's list of Issue numbers, platform-qualified identifiers, or full URLs, such as `#123, #145, #167`. No prepare-work installation, prior run, generated prompt, or previous conversation is required. Use original Issues, persisted evidence, and owning-repository conventions. This skill governs scope, acceptance, and delivery discipline, replacing separate repository rules for the same workflow. Follow repository conventions for language, title/commit formats, templates, build/verification commands, and branch protection.
 
-用户明确调用本技能并提供清单时，默认要求读取、实现、验证、提交、推送并创建 Change Request，不在一个 PR 提交后结束。遵守用户更窄的只读、本地修改、禁止发布等边界；隐式匹配技能或只讨论名字不额外授予写入权限。本技能不合并，合并由单独授权的审查流程处理，不自动调用其他技能。
+Explicit invocation with a list requests reading, implementation, verification, commit, push, and Change Request creation for the whole list, not just one PR. Respect narrower read-only, local-only, or no-publication limits. Implicit matching or name discussion grants no additional write permission. This skill never merges; a separately authorized review flow handles merging. Do not invoke other skills automatically.
 
-单独调用而没有清单时请求缺失的 Issue 列表，不自行发现任务；输入 `[]` 时说明没有待执行项，不写代码或创建空 PR。短编号依据明确的跟踪仓库解析，无法唯一定位时先请求澄清，不能猜测仓库或把多个同号任务合并。使用实际托管平台可用的连接器、CLI 或 API，不硬编码平台。
+A standalone invocation without a list requires requesting the missing list, not discovering work. For `[]`, report no work without changing code or creating an empty PR. Resolve short numbers against an unambiguous tracking repository; ask when ambiguous instead of guessing a repository or combining same-numbered tasks. Use the actual platform's available connector, CLI, or API; never hard-code a platform.
 
-## 冻结完整执行队列
+## Freeze the complete queue
 
-1. 将清单解析成原 Issue 的唯一身份，按原顺序去重，保留用户要求的完整数量，不重新排序、不缩成单项、不自动补新任务。记录每项状态及清理周期原 task、未完成范围和退出条件。
-2. 逐项读取原 Issue、评论、验收、排除项、准备证据及关联实现，识别实际拥有代码的仓库、主线和工作区状态。跨仓保留原跟踪身份和回链，不复制同范围 Issue。
-3. 读取实现仓库的规范，刷新远端主线和开放 Change Request。不能只信 ready 标签或输入来源；有关联或明显重合的开放实现时确认覆盖范围，不重复创建，也不擅自接管他人分支。记录已有实现及未完成范围，继续其余独立项；修复既有 PR 的工作按另行授权处理。
-4. 检查前置和开工证据。已有完整审计先核对其 commit、相关主线差异、实现/测试/契约覆盖及未决项，无相关变化则复用；相关变化补读受影响完整成员、测试及调用路径。缺失证据时完成必要补查，不强制用户重跑 prepare-work，也不因无关主线提交反复全仓审计。
-5. 若环境、验收或设计存在缺口，先执行授权范围内可完成的调查、实验或 Issue 补充，持续至可实施或确认真实阻塞。范围需新增独立契约，或实际范围达到 feature 级（三个或以上公共协议面、三个或以上有状态产物，或耦合事务与并发、数据迁移、敏感数据流、能力启用中的多个领域）且不能收敛为单一可独立验证的切片时，停止该项实施，更新或拆分跟踪为 tracker 与有依赖关系的 task，不将新项自动加入冻结队列。tracker 本身不提交实现 Change Request。无法推进的项在原 Issue 记录具体原因、已尝试动作和解除条件，按授权移除过时的可开工标记，再继续独立后项。
+Before freezing or investigating candidates, read [Freeze the complete queue](references/queue.md) in full. Preserve every input item and its original order, check evidence and existing implementations, and follow that file’s rules for gaps, splitting, and genuine blockers.
 
-## 连续执行与恢复
+## Continue and recover
 
-每项达到已提交、已有实现覆盖、已完成无须修改或真实阻塞的状态后，继续冻结清单的下一项，直到全部处理。用户明确停止或变更范围时更新队列；切换目录、压缩上下文、提交首个 PR 都不是结束整个批次的理由。轮询外部检查不应妨碍可独立进行的后项。
+After each item is submitted, covered by an existing implementation, already complete without changes, or genuinely blocked, continue to the next frozen item until all are handled. Update the queue when the user stops or changes scope. Changing directories, context compaction, or submitting the first PR does not end the batch. Polling external checks must not prevent independent later work.
 
-沿用已有授权 tracker 或任务记录，保存完整有序清单及每项状态、原 Issue/Change Request 链接、实现仓库、基线和 head、分支/工作区、验收证据、仍有效的审计、意见分类与 review 轮次、已解决意见和已接受边界、阻塞及下一步。没有外部可写位置时保留会话交接，不虚构已经持久化；跨上下文恢复时读取记录，不将未完成项遗漏或 review 轮次归零。
+Use the existing authorized tracker or task record to retain the complete ordered list and each status, original Issue/Change Request links, implementation repository, base/head, branch/workspace, acceptance evidence, valid audits, feedback classification and review rounds, resolved feedback, accepted limits, blockers, and next steps. Without a writable external location, retain a conversation handoff and do not claim persistence. Reload records after context changes; never lose unfinished items or reset review rounds.
 
-仅清理本任务拥有、干净且无独有未交付工作的临时环境。未合并 PR 的分支保留用于后续修复；有失败、未推送提交或必要实验产物时保存路径和恢复方式，不为“环境干净”删除工作。
+Clean only task-owned temporary environments that are clean and contain no unique undelivered work. Retain unmerged PR branches for repairs. Preserve paths and recovery steps for failures, unpushed commits, and necessary experiment outputs; do not delete work to make the environment look clean.
 
-## 最终报告
+## Final report
 
-按 [最终报告规则](references/reporting.md) 汇总全部项。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+Cover all items using [Final report](references/reporting.md). Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.

@@ -35,7 +35,7 @@ class RunRecordTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def run_cli(self, *arguments, repo=None):
-        # -B 避免在技能目录生成 __pycache__，否则会进入安装快照。
+        # -B avoids __pycache__ in the skill directory, which would enter installation snapshots.
         return subprocess.run([sys.executable, "-B", str(SCRIPT), "--repo", str(repo or self.repo), *arguments],
                               capture_output=True, text=True)
 

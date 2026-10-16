@@ -1,23 +1,23 @@
-## 合并车道
+## Merge lane
 
-适用于两种情况：仓库已启用平台合并队列；或仓库要求分支与主线保持最新，而已审查通过的 Change Request 只因落后、没有冲突而不能合并。目的是让这些项一个接一个合并，不必每合并一项就把其余项全部同步一遍。合并判定的其余条件照常逐项核对，不因进入车道而放宽。
+Use when the repository already has a platform merge queue, or when an approved, conflict-free Change Request cannot merge solely because policy requires an up-to-date branch. Merge these one at a time instead of syncing every remaining request after each merge. All other merge conditions still apply individually without relaxation.
 
-调用方交给一份已审查通过、待合并车道的清单时，不重新审查各项，直接按本节处理；按其给出的顺序（依赖的前置在前，其后按原优先级）进行。车道运行期间新审查通过的项不加入本次，留给调用方下次安排。
+When the caller supplies an approved list awaiting this lane, do not repeat reviews; follow this section in supplied order (prerequisites first, then original priority). Newly approved items during execution wait for the caller's next lane run.
 
-### 仓库已启用合并队列
+### Existing platform merge queue
 
-- 合并判定除“分支最新”外都满足时，按仓库流程把该项加入合并队列并等待结果，不自行同步主线，也不需要取 `merge` 锁。不替仓库开启合并队列或自动合并。
-- 队列合并成功后按[合并后结项与清理](post-merge.md)处理。因冲突被退回时，记为需要同步主线并交修复流程；因检查失败被退回时，按 [冻结与审查步骤](review.md) 中的 CI 失败规则处理，与本项有关的失败记为修改要求。
-- 等待队列结果的上限与等待 CI 相同，超时记为等待外部；等待方式按[读日志与等待检查](ci.md)。
+- Once all merge conditions except branch freshness hold, enqueue under repository process and wait; neither sync mainline yourself nor acquire `merge`. Do not enable a queue or auto-merge for the repository.
+- After successful queue merging, follow [Post-merge work](post-merge.md). If rejected for conflicts, send to repair for mainline sync. For failed checks, apply [Review](review.md)'s CI rules, treating related failures as required changes.
+- Use the CI wait limit for queue results; timeout means waiting externally. Follow [Read logs and wait for checks](ci.md).
 
-### 没有合并队列：逐个同步并合并
+### Without a queue: sync and merge individually
 
-被并发调用时，用调用方给的命令取 `merge` 锁，整条车道处理完或出错时释放；单独调用时不需要锁。逐项：
+For concurrent invocation, acquire the caller's `merge` lock and release after the entire lane or on error. Standalone invocation needs no lock. For each item:
 
-1. 获取最新主线，在本地把主线合入该项 head 试合并（不推送）。有冲突时不解决，记为需要同步主线交修复流程，继续下一项。源分支不可写（例如来自 fork）时记为需要作者同步，继续下一项。
-2. 没有冲突时，用 merge 把主线合入该项源分支并推送；平台提供“更新分支”功能时也可以用它。不强推，不改动该项自身的改动；无冲突地合入主线不算修改 Change Request 的代码。只同步当前这一项，不同步清单中的其他项。只为同步主线的推送不计 Review 往返。
-3. 等待这次推送触发的必要检查，等待方式按[读日志与等待检查](ci.md)，等待上限和失败处理与 [冻结与审查步骤](review.md) 相同；与本项有关的失败记为修改要求交修复流程，继续下一项。
-4. 核对新 head 相对审查时 head 的差异只来自主线合入，且与平台自动合并的结果一致；主线新增的改动与本项改动文件相交，或双方都改动依赖锁文件、数据库迁移、注册表、自动生成代码、版本号、更新日志、多语言文案、共享配置时，确认受影响的检查已在第 3 步覆盖，未覆盖的补跑。核对不通过时不合并，记录原因。
-5. 合并判定其余条件仍成立时执行合并，完成[合并后结项与清理](post-merge.md)，再处理下一项。
+1. Fetch latest mainline and try a local merge into this head without pushing. Do not resolve conflicts; return them to repair as sync needed and continue. If source is unwritable, such as a fork, record author sync needed and continue.
+2. Without conflicts, merge mainline into this source branch and push, or use the platform's update-branch feature. Never force-push or alter this request's own changes; a conflict-free mainline merge is not code modification. Sync only the current item. Mainline-only pushes do not count as review rounds.
+3. Await required checks triggered by this push using [Read logs and wait for checks](ci.md), with [Review](review.md)'s wait/failure rules. Send related failures to repair as required changes and continue.
+4. Confirm the new head differs from reviewed head only by mainline integration and matches the platform's automatic merge result. If mainline overlaps request files or both sides touch dependency lockfiles, migrations, registries, generated code, versions, changelogs, localized strings, or shared configuration, confirm step 3 covered affected checks and run missing ones. Do not merge on failed verification; record why.
+5. If all other merge conditions still hold, merge, complete [Post-merge work](post-merge.md), then continue.
 
-输出中逐项写明：已合并、交修复（冲突或有关的检查失败）、需要作者同步、等待外部，以及每项等待检查和合并的耗时。
+For each item report merged, sent to repair (conflict/related check failure), author sync needed, or waiting externally, plus check-wait and merge durations.

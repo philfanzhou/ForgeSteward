@@ -1,57 +1,57 @@
-## 已完成项先往下走
+## Move completed items forward
 
-目的是不让先完成的项等待整批：工作量、各阶段技能的判定标准、合并条件和 Review 轮数上限都不变，只改变派发时机。
+Avoid making completed items wait for the whole batch. Workload, stage standards, merge conditions, and review-round limits remain unchanged; only dispatch timing changes.
 
-### 启用条件与退回
+### Enable or fall back
 
-运行时能在后台运行子 Agent，并能在其运行期间读取其进度（交接记录、消息或状态查询），且[资源锁](verification.md)可用时启用本节；否则按 [轮次、交接与终止](cycles.md) 逐阶段串行，不因此报错或缩减工作。启用后某次后台派发或进度读取失败，先按 [生命周期与恢复](agents.md) 处理；仍无法确认进度时，该部分退回串行，等相关阶段结束后再派发依赖它的工作。
+Enable when the runtime can run subagents in the background and read their progress (handoffs, messages, or status) while active, and [Resource locks](verification.md) work. Otherwise run serially under [Cycles, handoffs, and stopping](cycles.md), without treating it as failure or reducing work. After background-dispatch/progress-read failure, apply [Lifecycle and recovery](agents.md). If progress remains unknown, make that portion serial and await its stage before dependent dispatch.
 
-### 并发上限与派发顺序
+### Concurrency limits and order
 
-- 实现、审查、修复和准备子 Agent 合计默认最多 3 个；机器逻辑核心少于 8 个时为 2，少于 4 个时为 1（即逐个进行）。编译、整套测试等重活另按[并发时的本地验证](verification.md)的 `heavy` 上限排队。
-- 有空位时依次派发：已交出待审查或待修复的 Change Request（越接近完成越先推进）→ 本周期列表中可开工的 Issue（按列表顺序）→ 下一周期的准备。
-- 审查和修复按 Change Request 并发：每个 Change Request 派一个审查或修复子 Agent，只交给它这一项；同一 Change Request 仍按“审查 → 修复 → 新审查”依次进行，不同 Change Request 互不等待。这些循环可以与实现、下一周期的准备同时进行。启动时已有 Change Request 的处理也可与第 1 周期的准备同时进行。
+- Default to at most 3 implementation/review/repair/preparation subagents combined; use 2 with fewer than 8 logical cores, or 1 with fewer than 4. Compilation/full suites and other heavy work also queue under [Local verification](verification.md)'s `heavy` limit.
+- Fill slots in this order: handed-off requests awaiting review/repair, prioritizing those closest to completion → startable Issues in current-cycle list order → next-cycle preparation.
+- Review/repair concurrency is per Change Request, one dedicated subagent per request. Each still follows review → repair → new review; separate requests do not wait for each other. These loops may overlap implementation/next-cycle preparation. Startup requests may overlap first-cycle preparation too.
 
-### 调度表
+### Scheduling table
 
-编排 Agent 为每个 Issue 和 Change Request 记录：当前所处步骤（待开工、实现中、已交出、审查中、待修复、修复中、已合并、等待外部、暂停）、负责的子 Agent、工作区路径、批内关系和持有的锁。每个子 Agent 结束后先核对结果和远端状态，更新调度表，释放它遗留的锁，再按上限和顺序派发下一项。
+For every Issue/Change Request, the orchestrator records current step (Awaiting start, Implementing, Handed off, Reviewing, Awaiting repair, Repairing, Merged, Waiting externally, Paused), owner subagent, workspace, batch relationships, and locks held. After a subagent ends, verify results/remote state, update the table, release its leftover locks, then dispatch under limits/order.
 
-### 实现阶段按 Issue 并发
+### Concurrent implementation by Issue
 
-- 每个 Issue 派一个 `execute-work` 子 Agent，只交给它这一个 Issue，并提供：工作区路径、任务标识、锁命令与本项需排队的资源、本批其他正在实现项的预计改动范围。
-- 是否可以开工看 Issue 交接中的批内关系：互不相干的立即开工；代码依赖的等前置合并；改动重叠的等列表中靠前者合并，靠前者已暂停、确认真实阻塞或确认不提交时可以直接开工，之后的冲突交修复阶段同步主线。代码依赖的前置最终没合并时，该项保持等待并记录原因，不开工。
-- 没有批内关系记录的 Issue（例如旧版准备结果）按与本批其他项改动重叠处理，即按列表顺序依次开工。
-- 实现子 Agent 报告实际改动超出预计并与另一正在实现项重叠时，保留其工作区与本地提交，把该项改为等对方合并后再继续。
-- 本周期列表中每项都已开工、在等前置或确认不能开工后，才派发下一周期的准备，并把本次运行中已分配、尚未完成的 Issue 清单交给它，避免选重。
+- Give each execute-work subagent exactly one Issue, workspace, task identifier, lock commands/queued resources, and expected changes of other active batch items.
+- Use Issue handoff relationships: independent items start immediately; code dependencies await prerequisite merges; overlapping items await earlier-listed merges. An overlapping predecessor that pauses, is genuinely blocked, or is confirmed not submitting permits the later item to start; later conflicts go to repair/mainline sync. A code prerequisite that never merges leaves its dependent waiting with reasons, not started.
+- Without relationship records, such as older preparation output, treat the Issue as overlapping all others and start in list order.
+- If actual changes exceed expectation and overlap another active item, retain workspace/commits and wait for that other item to merge before resuming.
+- Dispatch next-cycle preparation only after every current-list item has started, is awaiting prerequisites, or is confirmed unable to start. Provide all assigned unfinished Issues from this run to avoid duplicate selection.
 
-### 一个 Change Request 同一时间只归一个阶段
+### One stage owns each Change Request at a time
 
-编排 Agent 维护持有表：每个 Change Request 当前由哪个阶段处理。
+Maintain an ownership table identifying each request's current stage.
 
-- 执行阶段完成某项的验证并处理完本项 CI 后，在交接记录中标明该 Change Request 已交出；交出前它归执行阶段，交出后执行阶段不再向其分支推送，后续修改只经审查和修复。
-- 派发审查或修复时，明确列出仍由其他阶段持有的 Change Request；派发审查时还按调度表列出其他阶段正在使用的分支名和工作区路径。阶段技能本轮跳过这些项并在输出列明，不审查、合并、评论或推送。审查开始后才交出的项，不塞进这次审查，留给下一次审查派发。
-- 每个已交出、尚未审查的 Change Request，有空位就派发一个审查子 Agent；审查要求修改或需要同步主线时，派发该项的修复子 Agent，完成后再派新的审查子 Agent。合并前重新获取 head 并与审查时比对的规则继续作为兜底。
+- After an item's verification and CI handling, execution marks it handed off. Before that execution owns it; afterward execution cannot push its branch and later changes use review/repair only.
+- Review/repair dispatch explicitly lists requests other stages still own. Review also gets other active branch names/workspace paths from the table. Stage skills skip/list those items without review, merge, comment, or push. Items handed off after a review starts wait for the next review dispatch.
+- Dispatch a reviewer whenever a slot opens for an unreviewed handed-off request. Required changes/mainline sync lead to its repair subagent, then a new reviewer. Refetching head before merge and comparing to reviewed head remains mandatory.
 
-### 合并一次一个
+### One merge at a time
 
-- 派发审查时提供合并锁 `merge`（容量 1）的命令。审查子 Agent 按 `review-and-merge` 被并发调用时的规则，在合并前于新主线上复核、在锁内确认并合并，合并后的清理也在锁内完成。
-- 依赖其他未合并 Change Request 的项，派发时注明前置；前置合并前不合并。
-- 仓库要求分支保持最新时，审查通过但因落后交回的 Change Request 进入合并车道：同一时刻只派一个 `review-and-merge` 子 Agent，说明本次只按该技能的合并车道规则处理，交给它按合并顺序排好的清单和 `merge` 锁命令；它持锁逐个同步、等检查、合并。车道运行期间新交回的项留给下一次车道。被车道交回修复的项，修好后重新审查。不再在每次合并后同步全部待合并项。
-- 子 Agent 结束后遗留的 `merge` 锁按[资源锁](verification.md)规则由编排 Agent 释放。
+- Give reviewers commands for `merge` capacity 1. Under review-and-merge's concurrent rules they recheck on latest mainline before merging, confirm/merge while locked, and clean up under the lock.
+- Identify unmerged prerequisites at dispatch; do not merge before them.
+- If policy requires up-to-date branches, approved requests returned only for being behind enter a merge lane. Dispatch only one review-and-merge subagent for it at a time, explicitly limited to that skill's lane rules, with ordered list and `merge` commands. It holds the lock while syncing, waiting for checks, and merging one by one. New returned items wait for the next lane. Lane items sent to repair require re-review afterward. Do not sync every pending item after each merge.
+- Release completed subagents' leftover `merge` locks under [Resource locks](verification.md).
 
-### 工作目录与 git 操作
+### Workspaces and git
 
-- 每个阶段在自己独立的工作区中工作，不使用用户的主工作目录，不检出其他阶段正在使用的分支。默认使用 worktree，放在仓库目录之外（例如 `<仓库上级目录>/<仓库目录名>-forge-steward/<任务标识>`），避免测试和检查工具扫描到其他副本；仓库有子模块或其工具要求 `.git` 是目录时改用独立 clone。分支名遵守仓库约定，没有约定时用 `forge-steward/issue-<编号>`。
-- 编排 Agent 在每批派发前统一获取一次远端，子 Agent 只在推送前再获取。
-- 执行阶段只从刚获取的远端主线建立分支，不依赖本地主线；推送和创建 Change Request 前再获取一次远端主线，有冲突先同步再提交。之后才出现的冲突按修复阶段的同步主线规则处理。
-- 合并后的清理只删除已合并 Change Request 自己的分支和专用工作区，避开其他阶段正在使用的分支和工作区；遗留分支清理按 [轮次、交接与终止](cycles.md) 在整次运行收尾时做一次。更新本地主线只在没有阶段使用的主线工作区进行。
-- 并发阶段的本地验证按[并发时的本地验证](verification.md)隔离和排队。
-- 并发 git 操作报告锁冲突时，等待几秒后有限重试；重试仍失败时记录错误交回结果，不删除锁文件，不当作业务失败。
+- Each stage uses its own workspace, not the user's primary directory or another stage's branch. Default to worktrees outside the repository, such as `<repository-parent>/<repository-name>-forge-steward/<task-id>`, so checks do not scan other copies. Use separate clones for submodules or tools requiring a `.git` directory. Follow repository branch naming, otherwise `forge-steward/issue-<number>`.
+- The orchestrator fetches once before each dispatch batch; subagents fetch again only before pushing.
+- Execution branches only from freshly fetched remote mainline, never local mainline. Refetch before push/Change Request creation; sync conflicts before submission. Later conflicts follow repair sync rules.
+- Post-merge cleanup removes only that request's branches/dedicated workspace, avoiding other active stages. Run leftover cleanup once at run end under [Cycles, handoffs, and stopping](cycles.md). Update local mainline only in a mainline workspace unused by stages.
+- Isolate/queue concurrent local checks under [Local verification](verification.md).
+- On concurrent git lock conflicts, wait a few seconds and retry a bounded number. If still failing, return the recorded error; do not delete lockfiles or classify it as a business failure.
 
-### 共享记录只由编排 Agent 写
+### Only the orchestrator writes shared records
 
-同时运行时，tracker 的当前调度段落等共享进度记录只由编排 Agent 写入：派发时告知阶段子 Agent 不写共享记录，把需要写入的内容放进返回结果，由编排 Agent 汇总写入。各阶段照常写自己负责的 Issue 和 Change Request。需要新建 Issue 时，先用[资源锁](verification.md)取 `issue-registry`，在锁内检索开放与关闭记录后再登记或追加证据，完成后释放，避免两个子 Agent 为同一问题各建一单。
+With concurrent stages, only the orchestrator writes shared progress such as the tracker's current scheduling section. Tell subagents not to write it; return needed content for orchestrator aggregation. Stages still write their own Issues/Change Requests. Before new Issues, acquire [Resource lock](verification.md) `issue-registry`, search open/closed records inside the lock, file/append evidence, then release to avoid duplicate filings.
 
-### 汇报
+### Report
 
-是否启用同时运行、使用的并发上限、退回串行的原因，以及多个 Change Request 同时运行 CI 时出现的排队，按 [最终汇报](report.md) 记入交接的 `concurrency`；排队增加的耗时不算作节省的时间。
+Record enabled concurrency, chosen limit, serial-fallback reasons, and CI queuing among simultaneous requests in handoff `concurrency` under [Final report](report.md). Queue delays are not time savings.

@@ -1,4 +1,4 @@
-"""DeepSeek 路径与共享生命周期；真实 Provider 仅显式选择时加载。"""
+"""DeepSeek paths and shared lifecycle; load a real Provider only when explicitly selected."""
 
 import argparse
 import json
@@ -29,7 +29,7 @@ class DeepSeekInstallerTests(lifecycle.InstallerTests):
         os.environ.pop("DSH_HOME", None)
 
     def test_user_scope_respects_xdg(self):
-        # XDG 是 OpenCode 约定，Harness 默认使用 OS home。
+        # XDG is an OpenCode convention; Harness defaults to the OS home.
         with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.base / "unused")}):
             output = self.run_cli("install", "--all", user=True)
             root = self.isolated_home / ".dsh/skills"
@@ -141,7 +141,7 @@ class DeepSeekInstallerTests(lifecycle.InstallerTests):
 
         def fail_second(source, destination, *args, **kwargs):
             nonlocal calls
-            # copytree 递归也调用自身，只统计事务顶层技能目录。
+            # copytree calls itself recursively; count only transaction-level skill directories.
             if Path(destination).name.startswith("new-forge-steward-"):
                 calls += 1
                 if calls == 2:
@@ -195,7 +195,7 @@ class DeepSeekInstallerTests(lifecycle.InstallerTests):
             process.wait(timeout=10)
 
     def test_real_opencode_discovery(self):
-        # 覆盖继承的 Agent 专属测试；这里读取显式用户包，不下载运行时。
+        # Override inherited Agent-specific tests; read an explicit user package without downloading a runtime.
         runtime = os.environ.get("FORGESTEWARD_DEEPSEEK")
         if not runtime:
             self.skipTest("Set FORGESTEWARD_DEEPSEEK to a DeepSeek Harness package directory for actual Provider discovery")

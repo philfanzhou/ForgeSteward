@@ -1,34 +1,34 @@
-# 准备与执行技能迁移
+# Preparation and execution Skill migration
 
-## 当前状态
+## State at this migration
 
-当前目标为 `0.2.3`，尚未发布。本次将 `find-work` 改为 `prepare-work`，把原执行 prompt 收为独立 `execute-work`；两个技能不互相依赖安装，也不自动调用对方。全部五个插件的三份 manifest 与根目录 `VERSION` 一致。版本自动调整遵守 [AGENTS.md](../AGENTS.md#统一版本)，改名的不兼容性仍通过本说明披露。
+The target at the time of this migration was `0.2.3`, not yet released. It renamed `find-work` to `prepare-work` and packaged the former execution prompt as the independent `execute-work` Skill. Neither requires or automatically invokes the other. All three manifests of all five plugins matched the root `VERSION`. Version changes follow [AGENTS.md](../AGENTS.md#unified-version); this document still discloses the incompatible rename.
 
-| 旧标识 | 当前标识 | 使用变化 |
+| Previous identifier | New identifier | Usage change |
 | --- | --- | --- |
-| `find-work@forge-steward` | `prepare-work@forge-steward` | 持续调查、实验和方案收敛，直到可实施或真实外部阻塞；不实施生产代码 |
-| `forge-steward-find-work` | `forge-steward-prepare-work` | 原 Issue 持久化完整交接；最终只输出一行编号，不输出执行 prompt |
-| 手动复制长执行 prompt | `execute-work@forge-steward` / `forge-steward-execute-work` | 直接接收编号列表，逐项实现、验收并提交独立 PR/MR；不合并 |
+| `find-work@forge-steward` | `prepare-work@forge-steward` | Continue investigation, experiments, and plan refinement until implementation is possible or a real external blocker remains; do not implement production code |
+| `forge-steward-find-work` | `forge-steward-prepare-work` | Persist the complete handoff on the original Issue; finish with one line of identifiers and no execution prompt |
+| Manually copied long execution prompt | `execute-work@forge-steward` / `forge-steward-execute-work` | Accept an identifier list directly, implement and validate each item, and submit independent PRs/MRs without merging |
 
-其余三个插件保留名称。未提供旧名 alias，避免同时加载两份不同准备流程。旧版本中的 prompt 行为仍属于旧版本，不改写历史 Tag 或 Release。
+The other three plugins retain their names. No old-name alias is provided, avoiding simultaneous loading of two preparation workflows. Earlier prompt behavior remains part of earlier versions; historical Tags and Releases are not rewritten.
 
-## 使用交接
+## Usage handoff
 
-明确调用 prepare-work 后，其过程更新可报告调查进度和外部问题；最终响应只能是 `#123, #145, #167` 这样的一行，无手动换行。没有符合门禁的项为 `[]`。同号跨仓须用平台可识别的限定标识，不能唯一定位时用完整 Issue URL；仍保持同一行。跨仓实现归属写在原 Issue 中，不复制任务。
+After an explicit prepare-work invocation, progress updates may describe investigation and external problems. The final response must be exactly one line such as `#123, #145, #167`, without manual line breaks. If nothing meets the requirements, return `[]`. For duplicate numbers across repositories, use platform-recognized qualified identifiers, or complete Issue URLs if necessary for unique resolution. Keep everything on one line. Record cross-repository implementation ownership on the original Issue instead of duplicating the task.
 
-将该列表原样附在 execute-work 调用后。执行者自己读取 Issue 和实际仓库规则，复用仍有效的审计并补查相关变化；中途某项真正受阻时保留证据，继续其他独立项，不在首个 PR 后停止，不叠加未合并代码。
+Append that list unchanged to an execute-work invocation. The implementer reads the Issues and actual repository rules, reuses valid audits, and checks relevant changes. If an item becomes genuinely blocked, retain evidence and continue other independent items. Do not stop after the first PR or stack work on unmerged code.
 
-只读准备不发布 Issue 更新；必要交接缺失时该项不入选，过程中交代缺口。显式本地实施不发布 PR。只有讨论名称或隐式技能匹配时，仍以实际用户请求判断授权。
+Read-only preparation does not publish Issue updates; omit items missing a required handoff and explain the gap during progress updates. Explicit local-only implementation does not publish a PR. Merely discussing a name or an implicit Skill match still requires interpreting authorization from the actual user request.
 
-## 安装迁移
+## Installation migration
 
-以下操作供选择新版的维护者使用；本次源码 PR 不执行用户安装或发布。正式使用等待确认发布的目标 Tag；提前验证开发源码时使用独立 checkout 和审查过的具体 commit，不把 `v0.2.3` 当作已存在 Tag。仓库根目录安装示例仍固定在已发布 `v0.2.1`，不能只替换插件名就取得新技能。
+These steps are for maintainers choosing the newer version; the source PR did not perform user installation or publication. For production use, wait for a confirmed published target Tag. To validate development source early, use a separate checkout at a specific reviewed commit rather than assuming `v0.2.3` already exists. At the time, root installation examples remained pinned to published `v0.2.1`; changing only plugin names could not obtain the new Skills.
 
-先记录当前来源、已安装子集与作用域，保留本地定制，停止旧技能的活动任务。Codex/Claude 通过各自插件管理器移除旧 `find-work@forge-steward`，再按 [版本切换指南](versioned-installation.md) 将 marketplace 指向选定新版快照。安装 `prepare-work@forge-steward`，需要执行能力时再装 `execute-work@forge-steward`；其余已选插件同步该快照版本。只替换市场目录不证明已安装副本升级。
+Record the current source, installed subset, and scopes first, preserve local customizations, and stop active tasks using old Skills. In Codex/Claude, remove old `find-work@forge-steward` through the plugin manager, then follow the [version-switching guide](versioned-installation.md) to point the marketplace at the chosen newer snapshot. Install `prepare-work@forge-steward` and, if execution is needed, `execute-work@forge-steward`; synchronize other selected plugins to that snapshot. Replacing only a marketplace directory does not prove installed copies were upgraded.
 
-开发验证也可将市场指向独立本地 checkout；用 Agent 支持的本地路径市场入口，不直接修改缓存或真实用户配置来冒充安装验证。安装成功后检查实际包版本、来源和新会话选择器，保存的快捷调用更新到新名称。Codex 使用 `$forge-steward-prepare-work`、`$forge-steward-execute-work`；Claude 使用 `/prepare-work:forge-steward-prepare-work`、`/execute-work:forge-steward-execute-work`。
+For development validation, the marketplace may point to a separate local checkout. Use the Agent's supported local-path marketplace entry; do not edit caches or real user configuration to simulate installation validation. After installation, inspect actual package version, source, and the new-session selector, and update saved shortcuts to the new names. Codex uses `$forge-steward-prepare-work` and `$forge-steward-execute-work`; Claude uses `/prepare-work:forge-steward-prepare-work` and `/execute-work:forge-steward-execute-work`.
 
-OpenCode 从已选择的新版 checkout 调用以下命令；把 `/path/to/ForgeSteward` 替换为实际路径，从目标项目执行：
+For OpenCode, use the chosen newer checkout with these commands. Replace `/path/to/ForgeSteward` with the actual path and run from the target project:
 
 ```bash
 python3 /path/to/ForgeSteward/scripts/opencode.py uninstall find-work --project .
@@ -37,12 +37,12 @@ python3 /path/to/ForgeSteward/scripts/opencode.py status prepare-work execute-wo
 opencode debug skill
 ```
 
-按顺序检查每步结果。用户级安装改为 `--user`，保留原 XDG/自定义配置选择。需要同步其余三个已有插件时按名称 `update`；`update --all` 不会安装缺失的新技能，也不会将旧名自动改为新名。`install --all` 只安装当前 catalog，不清除已退役名称，因此不能代替旧名卸载。
+Check each result in order. For user installation use `--user`, retaining the original XDG/custom configuration choice. Update the other three existing plugins by name when needed. `update --all` neither installs missing new Skills nor renames old entries automatically. `install --all` installs only the current catalog and does not remove retired names, so it cannot replace uninstalling an old name.
 
-安装器不需要旧源码也能卸载有有效收据且未修改的旧技能。旧副本被定制、缺失收据或来自手动复制时会保留并报告；备份、确认归属并移出搜索路径后再继续，不绕过保护。其他 Agent 兼容路径中的旧副本也须单独核对，不能因新名已出现就认为旧流程已消失。回退选择历史快照并恢复历史名称，不回滚技能已产生的 Issue 或代码。
+The installer can remove an unchanged old Skill with a valid receipt without its original source. Customized, receipt-free, or manually copied old versions are preserved and reported. Back up, confirm ownership, and move them outside discovery paths before continuing; do not bypass protection. Check old copies in other Agent compatibility paths separately. A new name appearing does not prove the old workflow disappeared. To roll back, choose a historical snapshot and restore historical names; do not roll back Issues or code already produced by the Skills.
 
-ZCode 的开发支持复用 Claude 兼容市场。若此前手动导入或安装过旧 `find-work`，按 [ZCode 维护流程](zcode.md) 卸载该旧插件、核对导入副本并切换市场快照，然后选择 `prepare-work` 和按需选择 `execute-work`；不直接复制 Codex/Claude 的命令。新任务使用 `$` 选择实际技能项，执行技能仍需附加明确清单。
+ZCode's development support reuses the Claude-compatible marketplace. If an old `find-work` was manually imported or installed, follow [ZCode maintenance](zcode.md) to remove that plugin, inspect imported copies, and switch marketplace snapshots. Then select `prepare-work` and optionally `execute-work`; do not copy Codex/Claude commands directly. In new tasks use `$` to select the actual Skill item; execution still requires an explicit list.
 
-## 验证边界
+## Verification boundaries
 
-安装器回归覆盖当前五项安装、退役名称安全卸载、旧内容受保护及新增名称安装；格式和市场元数据校验不等于真实模型遵守行为。有限规则走查见 [场景验收](prepare-execute-scenarios.md)，实际执行的校验及安装结果记录在 PR。
+Installer regressions at this migration covered installation of all five entries, safe removal of retired names, protection of old contents, and installation of new names. Format and marketplace validation do not prove actual model behavior. See [scenario acceptance checks](prepare-execute-scenarios.md) for limited rule walkthroughs; the PR records the checks and installation results actually run.

@@ -1,3 +1,3 @@
-# 最终报告
+# Final report
 
-使用中文按原顺序汇总全部项：原 Issue、实际状态、实现及验证、Change Request 链接、遗留与解除条件。区分已提交、已验收、已合并交付，不因提交 PR 关闭原 task 或重置清理周期。本次清理开始前已有任务的完成与剩余、新发现问题的归类处理、返工和关闭的上级任务分别列出；“本次清理”从 tracker 或交接记录中的清理起点算起，多次运行之间不重置，不是这一次运行开始的时间。未知计数不猜测；无关联项写不适用。最后说明保留的分支/工作区及恢复动作。
+In everyday English unless the user or owning repository specifies another language, summarize every item in original order: original Issue, actual status, implementation/verification, Change Request link, remaining work, and release conditions. Distinguish submitted, accepted, and merged/delivered. A submitted PR neither closes the original task nor resets the cleanup cycle. Separately report completion/remainder of tasks predating cleanup, classification of new findings, rework, and closed parents. “This cleanup” starts at the tracker/handoff's cleanup baseline and persists across runs; it is not this invocation's start. Do not guess unknown counts; use not applicable for absent relationships. Finish with retained branches/workspaces and recovery actions.

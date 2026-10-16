@@ -1,4 +1,4 @@
-"""check-workflow 旧版区块删除脚本的确定性与幂等契约；不调用模型、Agent 或托管平台。"""
+"""Determinism and idempotence of legacy check-workflow block removal, without model, Agent, or hosting-platform calls."""
 
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ class RemoveWorkflowBlocksTests(unittest.TestCase):
         self.root = Path(directory.name)
 
     def run_script(self, *arguments, expected=0, repo=None, env=None):
-        # -B 避免在技能目录生成 __pycache__，否则会进入安装快照。
+        # -B avoids __pycache__ in the skill directory, which would enter installation snapshots.
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--repo", str(repo or self.root), *arguments],
                                 capture_output=True, text=True, timeout=30, env=env)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
@@ -130,7 +130,7 @@ class RemoveWorkflowBlocksTests(unittest.TestCase):
         try:
             os.symlink("RULES.md", str(self.root / "AGENTS.md"))
         except (OSError, NotImplementedError):
-            self.skipTest("当前环境不能创建符号链接")
+            self.skipTest("This environment cannot create symlinks")
         self.run_script("--write")
         self.assertEqual(self.read("RULES.md"), block("workflow"))
 
@@ -138,7 +138,8 @@ class RemoveWorkflowBlocksTests(unittest.TestCase):
         self.write("AGENTS.override.md", "override\n")
         self.assertIn("Warning: AGENTS.override.md", self.run_script("--check"))
         environment = dict(os.environ, PYTHONIOENCODING="cp1252")
-        output = self.run_script("--check", repo=self.root / "缺失目录", expected=2, env=environment)
+        # CJK path code points preserve non-ASCII error-output coverage.
+        output = self.run_script("--check", repo=self.root / "".join(map(chr, (0x7F3A, 0x5931, 0x76EE, 0x5F55))), expected=2, env=environment)
         self.assertNotIn("codec can't encode", output)
 
 

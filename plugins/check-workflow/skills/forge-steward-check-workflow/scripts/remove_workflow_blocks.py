@@ -1,4 +1,4 @@
-"""删除旧版 check-workflow 写入目标仓库的 ForgeSteward 标记区块；不读取或改写区块外的项目规则。"""
+"""Remove legacy ForgeSteward blocks written by check-workflow without reading or rewriting project rules outside them."""
 
 import argparse
 from pathlib import Path
@@ -17,12 +17,12 @@ class BlockError(Exception):
 
 
 def say(message, stream=None):
-    # CLI 输出采用 ASCII 转义，兼容 Windows Python 3.9 重定向时的默认单字节编码。
+    # ASCII-escaped CLI output supports the default single-byte encoding of redirected Windows Python 3.9 output.
     print(message.encode("ascii", "backslashreplace").decode("ascii"), file=stream or sys.stdout)
 
 
 def outside_fences(lines):
-    """返回围栏代码块以外的行号；代码块中的标记和导入不生效。"""
+    """Return line numbers outside fenced code; markers and imports inside code do not apply."""
     fence, opened, result = None, None, []
     for index, line in enumerate(lines):
         stripped = line.strip()
@@ -35,7 +35,7 @@ def outside_fences(lines):
             fence, opened = match.group(1), index
         else:
             result.append(index)
-    # 未闭合的围栏无法确定标记是否生效，须先由项目修正。
+    # An unclosed fence makes marker scope uncertain; the project must fix it first.
     if fence:
         raise BlockError("Unclosed code fence opened at line %d" % (opened + 1))
     return result
@@ -69,7 +69,7 @@ def trim(lines):
 
 
 def remove(lines, name):
-    """删除全部同名区块，连同因此多出的一个空行。"""
+    """Remove every matching block and one resulting extra blank line."""
     result, position = [], 0
     for start, end in find_blocks(lines, name):
         result += lines[position:start]
@@ -82,7 +82,7 @@ def remove(lines, name):
 
 
 class Line(str):
-    """原文件中的一行，记录其换行符。"""
+    """A source line with its original newline."""
     ending = ""
 
 
@@ -115,7 +115,7 @@ class Document:
         if not any(line.strip() for line in lines):
             self.path.unlink()
             return
-        # 保留行各自的换行符；删除区块不会产生新行。
+        # Keep each retained line's newline; removing blocks creates no new lines.
         text = "".join(line + line.ending for line in lines)
         self.path.write_bytes((b"\xef\xbb\xbf" if self.bom else b"") + text.encode("utf-8"))
 
@@ -133,7 +133,7 @@ def plan(repo):
     if expected == agents.lines:
         return []
     changes = [(agents, expected, "remove forge-steward workflow blocks")]
-    # AGENTS.md 只剩区块时整份删除；CLAUDE.md 中指向它的导入随之悬空，一并删除。
+    # Delete AGENTS.md when only blocks remain; also remove the now-dangling CLAUDE.md import.
     if not any(line.strip() for line in expected) and claude_path.exists() and not claude_path.is_symlink():
         claude = Document(claude_path)
         effective = set(outside_fences(claude.lines))

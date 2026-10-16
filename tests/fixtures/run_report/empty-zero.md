@@ -1,23 +1,23 @@
-## work-cycle 运行汇报
+## work-cycle report
 
-结论：合并 0 个 PR，0 项需要你处理。共跑 0 轮（上限 3），准备阶段没有找到可做的 Issue。
+Conclusion: 0 PRs merged; 0 items need your action. Completed 0 cycles (limit 3); Preparation found no ready Issues.
 
-### 需要你处理
-- 无
+### Needs your action
+- None
 
-### PR 结果
-- 无
+### PR results
+- None
 
-### 本次概况
-- 启动检查：首次运行，已检查
-- 开始前已有的 PR：0 个
-- 轮数：0 / 3，停止原因：准备阶段没有找到可做的 Issue
-- 同时进行：未开启，原因：运行环境不能在后台运行子 Agent
-- 分支清理：没有需要清理的分支
+### Run overview
+- Startup check: First run; checked
+- Existing PRs: 0
+- Cycles: 0 / 3; Stop reason: Preparation found no ready Issues
+- Concurrency: Disabled; Reason: The runtime cannot run subagents in the background
+- Branch cleanup: No branches need cleanup
 
-### 耗时
-- 总计 0 分：准备 0（分钟）
-- 其中等 CI 0 分，等本地资源 0 分
+### Time spent
+- Total 0 min: Preparation 0 (minutes)
+- Including Waiting for CI 0 min, Waiting for local resources 0 min
 
-### 异常与恢复
-- 无
+### Errors and recovery
+- None

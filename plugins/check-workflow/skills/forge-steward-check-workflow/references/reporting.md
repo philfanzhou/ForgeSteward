@@ -1,24 +1,24 @@
-# 汇报与变更汇总
+# Reporting and change summary
 
-结束时用目标项目约定的语言向用户汇报：操作模式、合并后自动删除源分支设置及证据或无法确认的原因、检查命令与退出码、Change Request 链接或零修改结论、待决定项、技能缺口、未完成事项和下一步。设置停用本身不产生项目文件变更或空 Change Request。
+Report in the language specified by the target project, otherwise everyday English: mode, automatic post-merge source-branch deletion setting and evidence or reason it is unknown, check commands/exit codes, Change Request link or zero-change conclusion, undecided items, skill gaps, unfinished work, and next steps. A disabled setting alone creates no file changes or empty Change Request.
 
-本次运行修改了任何项目文件时（包括仅本地修改，或提交、推送、创建 Change Request 中途受阻），汇报中必须包含变更汇总。汇总依据实际的 `git status` 和 `git diff`（已提交时对比主线）填写，不按计划推测，不省略任何文件：
+If this run changed any project file, including local-only changes or interrupted commit/push/creation, include a change summary. Use actual `git status` and `git diff` (against mainline after committing), not planned changes; omit no file:
 
-| 文件 | 操作 | 变更内容 | 行数 |
+| File | Action | Change | Lines |
 | --- | --- | --- | --- |
 
-- **操作**：修改或删除。
-- **变更内容**：写明删除的区块、章节、条文或引用（标题或首行、删除前行范围、所属政策维度及对应技能）。同一文件有多个动作时逐项列出。
-- **行数**：该文件的新增与删除行数，例如 `+0 / -32`。
+- **Action:** modified or deleted.
+- **Change:** identify removed blocks, sections, clauses, or references by heading/first line, original line range, policy dimension, and owning skill. List multiple actions within a file individually.
+- **Lines:** added/deleted counts for that file, such as `+0 / -32`.
 
-表后说明这些修改所处的状态：未提交、已提交（分支与 commit）、已推送，或已创建/更新的 Change Request 链接；再列出待维护者决定的候选，并注明未修改。变更汇总与 Change Request 正文中的变更说明保持一致。
+After the table, state the changes' actual status: uncommitted, committed (branch and commit), pushed, or created/updated Change Request link. List candidates awaiting maintainer decisions as unchanged. Keep this summary consistent with the Change Request body.
 
-没有修改任何项目文件时，明确说明“未修改项目文件”。仅检查模式下，另列执行删除时将修改的文件和原因，写明尚未修改，不写成已修改。
+When no project file changed, explicitly say “No project files were changed.” In check-only mode, separately list files that deletion would change and why; clearly label them unchanged.
 
-只宣称“确认的工作流政策条文和旧版区块已删除”；不宣称删除后项目中已不存在任何工作流约束，也不宣称各 Agent 运行时的行为已经改变。
+Claim only that confirmed workflow policy text and legacy blocks were removed. Do not claim that the project contains no remaining workflow constraints or that Agent runtime behavior changed.
 
-## 发布核对单列
+## Report the release check separately
 
-发布核对与删除结果分别汇报，汇报中写“核对”，不写“对账”。按 [发布管线健康对账](release-audit.md) 列出成文契约与基线、查询来源和时间、发布范围及覆盖、逐维度结论和脱敏证据、发现、无法确认的原因及恢复输入、不适用项和未完成事项；不能用一个“健康”结论覆盖未知部分。已确认发现与未知维度同时保留。用户取消时写明已完成范围及未完成项，不把取消当成通过。
+Separate release-check and deletion results. Use plain language such as “check” in the report. Under [Release pipeline audit](release-audit.md), list written contracts/baseline, query sources/times, scope/coverage, each dimension's conclusion and redacted evidence, findings, unknowns with reasons and recovery inputs, inapplicable checks, and unfinished work. One healthy conclusion must not conceal unknowns. Retain confirmed findings alongside unknown dimensions. On cancellation, state completed and remaining scope without treating cancellation as a pass.
 
-核对发现只进本次最终汇报：不创建或更新 Issue，不修复，不放入目标仓库的清理 Change Request 正文；登记留给用户或后续独立 prepare-work 归类处理。不因发现创建空分支、commit 或 Change Request。纯对账运行同样明确说明“未修改项目文件”，然后列出核对结论与发现。原有删除变更表及交付状态只描述实际项目文件变更，清理 Change Request 正文保持原有删除说明。
+Release findings appear only in this final report: do not create/update Issues, fix findings, or include them in the cleanup Change Request. Filing belongs to the user or a later independent prepare-work run. Create no empty branch, commit, or Change Request for findings. Audit-only runs must also say “No project files were changed,” then list release conclusions and findings. The deletion table and delivery status describe actual project file changes only; retain deletion-only content in the cleanup Change Request body.

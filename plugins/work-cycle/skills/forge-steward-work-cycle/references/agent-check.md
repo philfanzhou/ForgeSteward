@@ -1,39 +1,39 @@
-## 其他 Agent 安装检查与升级
+## Other Agent installations and upgrades
 
-只有 work-cycle 编排 Agent 做这件事；五个阶段技能和各阶段子 Agent 都不检查、不提问、不安装。运行开始时只查看、不改动：查出本机各 Agent 在用户级装了哪些 ForgeSteward 插件、各是什么版本，再和 GitHub 上最新的正式发布版比较。结束汇报只列可安装或升级的 Agent，或提示本次会话技能包较旧，并问一句；只有用户明确同意后才安装或升级，而且只改用户级，不向被维护的仓库写入。
+Only the work-cycle orchestrator does this; the five stage skills and their subagents never check, ask, or install. At run start, inspect user-level ForgeSteward installations/versions for local Agents without changes and compare to GitHub's latest stable release. At report time list only actionable installations/upgrades or an older session package, and ask once. Install/upgrade only after explicit consent, affecting user scope only and never the maintained repository.
 
-### 开始时检查
+### Check at startup
 
-1. [运行记录](run-record.md)的 `start` 之后，用确认可用的 Python 运行本技能包的：
-
-   ```bash
-   python3 <本技能目录>/scripts/agent_install.py check --json --output <运行目录>/agent-check.json
-   ```
-
-   检测方式全部来自同目录的 `agents.json`。脚本只读：外部命令不经过 shell，每条最多等 20 秒；最新版先用 `gh release view` 查，失败时不带凭据请求 GitHub 接口，只认 `vX.Y.Z` 形式的正式发布。单个 Agent 查不了只把它记为“无法判断”，其余照常；退出码 `0` 表示检查完成（不论结果），`2` 表示参数或环境错误。
-2. 检查不能拖慢主流程：运行环境能在后台执行命令时放到后台，接着做后续步骤；不能时直接运行。从开始算最多等 60 秒，到时还没结束就不再等它，按“超时”处理。
-3. 结果写进 `handoff.json` 的 `agent_check`（字段见[最终汇报](report.md)）：返回 `0` 且文件已写出时记 `{"file": "agent-check.json"}`；返回 `2`、超时、被中断、找不到可用的 Python 或被沙箱拦截时记 `{"unavailable": "<原因>"}`，原因写日常中文短句，例如“超时”“被中断”“没有可用的 Python”。只运行一次，失败不重试，也不影响本次工作交付。
-4. 汇报里的安装情况由 `report` 按该文件和[最终汇报](report.md)的规格生成；编排 Agent 原样使用，不改写状态，也不自行补猜版本。用户中途停止时检查结果照常保留在运行目录。
-5. 只看用户级安装；项目级、其他机器或远端环境不在检查范围内。Agent 命令行输出格式在未核对的版本上变化时，该 Agent 记为“无法判断”。Codex 数据文件已核对 macOS CLI `0.157.1`：`plugin list` 限定 `forge-steward` 市场，跳过无关远端目录获取，仍读 `installed` 数组的 `pluginId`、`version`；单条 20 秒、整体 60 秒不变。不保证旧 CLI 支持该选项；选项不支持、失败、超时或格式变化只记“无法判断”，不重试、不退回无过滤查询，也不读内部缓存补结果。
-
-### 汇报第 7 节的写法
-
-按[最终汇报](report.md)规格中 `agents` 的写法：最新版必须是已确认的三段整数版本，只列状态属于 `ask_for`（缺少、不完整、落后）的 Agent；最新、无法判断、开发版、不存在都不列。最新版未知、检查未做、不可用、文件缺失或格式无法识别时省略整节，前 6 节照常生成，检查 JSON 照常保留。
-
-本次会话版本只读运行中的 work-cycle 包 `scripts/VERSION`，与检查文件里的 `latest.version` 按三段整数比较；不能取仓库版本、安装清单或猜当前 Agent 名称。包较旧时先写 `session_old`；版本文件缺失或非法时不猜，但已有可升级 Agent 仍列出。包版本相同或更高时不写会话提示。
-
-被列出的 Agent 有非用户级安装时，句末加 `other_scopes`；`{versions}` 是去重后的“vX、vY”，`{missing}` 是“a、b”。有可升级 Agent 时最后加一行 `ask`，`{names}` 用“、”连接；只有会话旧版提示时加 `ask_session`。两者同时存在也只问一次。没有上述内容时整节省略。
-
-### 结束时询问，同意后安装或升级
-
-1. 汇报贴出后本次工作即告结束，不等回答。用户之后明确同意（可以只同意其中几个 Agent）才继续；拒绝、没回答或回答含糊时什么都不做，也不记住这次拒绝，下次运行照样检查和询问。不能把没回答当作同意。
-2. 会话旧版提示不代表某个 Agent 的安装状态，不能凭它构造 `apply --agents`。用户只同意升级会话版本但未指定实际 Agent 时，先依据检查记录确认用户要处理的 Agent。同意后，从 `agent-check.json` 取被同意 Agent 的 `id`，用汇报里的目标版本运行：
+1. After [Run records](run-record.md)'s `start`, use confirmed Python to run this package's:
 
    ```bash
-   python3 <本技能目录>/scripts/agent_install.py apply --version <X.Y.Z> --agents <id,id>
+   python3 <skill-directory>/scripts/agent_install.py check --json --output <run-directory>/agent-check.json
    ```
 
-   只传用户同意的 Agent 和版本，不自行增加。脚本先重新检查：最新正式版已变时返回 `3`、不做改动，这时重新运行 `check`，按新版本再问一次；另一个安装正在进行（系统临时目录里的锁目录已存在）时也返回 `3`，告诉用户，不删除那个锁。已是最新或比目标版本新的 Agent 跳过，不降级。
-3. 脚本逐个处理 Agent，一个失败不影响其他，并以处理后再检查一次的结果判断是否装好。Claude Code、Codex、ZCode 不论装没装过，都按 `agents.json` 的升级命令处理：改动前先列出市场，然后卸载用户级旧插件（保留数据），`forge-steward` 市场在才删除，再添加目标版本的市场来源并逐个安装；列不出市场时这个 Agent 不做任何改动，结果写“查不到市场是否存在”。项目级或本地级安装不动；某一步失败就停下这个 Agent。OpenCode 和 DeepSeek Harness 用与该版本 Tag 提交一致的源码：本地已有、提交一致且没有改动的副本直接用，否则把 Tag 下载到临时目录并核对提交，不一致就不装；缺的技能安装、旧的更新、已停用的卸载，被修改过、没有安装记录或链接形式的副本不覆盖；临时源码用完即删。
-4. 退出码：`0` 全部处理完且收尾完成，`1` 有 Agent 没装好或收尾没完成（逐行说明），`2` 只用于开始改动前的参数或环境错误（如参数不对、数据文件读不了）且未做改动，`3` 开始前已停下且未做改动（含建不了临时目录）。开始改动后出现意外的文件错误只记在当时处理的 Agent 上，照常复查、继续其他 Agent；临时目录或锁目录没删掉时单独一行说明，锁目录要确认没有安装在运行后再手动删。把输出的每一行原样告诉用户：装了什么、升到哪个版本、哪个失败及原因和恢复办法（解决原因后再同意一次重新运行）。当前正在运行的 Agent 被升级时，说明本次会话仍是旧版本，新版本要在下一个新会话才生效。
-5. 运行环境不允许联网或改动用户目录而被拦截时，如实说明，并给出同一条命令让用户自己运行；不改用其他安装方式。
+   Detection comes entirely from adjacent `agents.json`. The script is read-only: no shell for external commands, at most 20 seconds each. It first queries `gh release view`, then GitHub API without credentials on failure, accepting only stable `vX.Y.Z` releases. An unreadable Agent becomes “Unknown”; others continue. Exit `0` means check completed regardless of results; `2` means argument/environment error.
+2. Do not delay the main flow: background the command when supported and continue; otherwise run directly. Wait at most 60 seconds from start, then stop waiting and treat as timed out.
+3. Record `agent_check` in `handoff.json` under [Final report](report.md). For exit `0` with a written file use `{"file": "agent-check.json"}`. For exit `2`, timeout, interruption, unavailable Python, or sandbox blocking use `{"unavailable": "<reason>"}` with a short everyday-English reason such as “Timed out,” “Interrupted,” or “No usable Python.” Run once, without retries or blocking delivery.
+4. `report` renders installation results from that file and [Final report](report.md)'s specification. Use unchanged output; do not rename statuses or guess versions. Retain check results in the run directory if the user stops.
+5. Inspect user scope only, not project installations, other machines, or remote environments. Unverified CLI-format changes yield “Unknown.” Codex data was verified with macOS CLI `0.157.1`: filter `plugin list` to the `forge-steward` marketplace, avoiding unrelated remote catalog fetches while reading `installed[].pluginId` and `version`. Keep 20-second command/60-second overall limits. Do not assume older CLI support. Unsupported options, failures, timeouts, or format changes mean “Unknown,” without retries, unfiltered fallback, or reading internal caches for missing results.
+
+### Report section seven
+
+Follow `agents` in [Final report](report.md). Latest must be a confirmed three-integer version; list only `ask_for` statuses (`Missing`, `Incomplete`, `Behind`), excluding current, unknown, development, or absent Agents. If latest is unknown, check not run/unavailable, file missing, or format unrecognized, omit the entire section while generating the first six and retaining check JSON.
+
+Read this session's version only from the running work-cycle package's `scripts/VERSION` and compare to check-file `latest.version` as three integers. Never use repository version, install inventory, or a guessed Agent name. If older, place `session_old` first. With missing/invalid version, do not guess, but still list actionable Agents. Equal/newer packages get no session notice.
+
+Append `other_scopes` for listed Agents also installed outside user scope. `{versions}` is deduplicated “vX, vY”; `{missing}` is “a, b.” For actionable Agents append one `ask` line with comma-separated `{names}`; for only an older-session notice use `ask_session`. Ask once even when both apply. With neither, omit the section.
+
+### Ask at completion; install only after consent
+
+1. Posting the report ends the run; do not wait for a reply. Continue only after later explicit consent, possibly for selected Agents. Do nothing on refusal, silence, or ambiguity; do not remember refusal as a future opt-out. Check/ask again next run. Silence is not consent.
+2. An older-session notice does not identify an Agent installation and cannot construct `apply --agents`. If the user agrees only to session upgrading without naming the actual Agent, use check records to clarify which Agent. After consent, take approved `id` values from `agent-check.json` and use the report's target version:
+
+   ```bash
+   python3 <skill-directory>/scripts/agent_install.py apply --version <X.Y.Z> --agents <id,id>
+   ```
+
+   Pass only approved Agents/version. The script rechecks first. Changed latest release returns `3` without changes: rerun `check` and ask for the new version. An existing installer lock in the system temporary directory also returns `3`; tell the user without deleting it. Skip Agents already current or newer than target; never downgrade.
+3. Process Agents independently, continuing after individual failures; determine success from a post-action recheck. Claude Code, Codex, and ZCode always use `agents.json` upgrade commands, installed or not: list marketplaces before changes; uninstall old user plugins while retaining data; remove `forge-steward` marketplace only if present; add target-version marketplace source and install each plugin. If marketplaces cannot be listed, change nothing for that Agent and report that marketplace existence could not be checked. Leave project/local installations untouched. Stop that Agent on a failed step. OpenCode/DeepSeek Harness use source matching the version tag commit: reuse a clean matching local copy, otherwise download tag source temporarily and verify its commit; mismatch prevents installation. Install missing skills, update old ones, uninstall retired ones. Do not overwrite modified, unrecorded, or linked copies. Remove temporary source afterward.
+4. Exit `0`: all actions/cleanup complete. `1`: an Agent failed or cleanup incomplete, explained line by line. `2`: argument/environment errors before changes only, such as invalid arguments/unreadable data, with no changes. `3`: stopped before changes, including temporary-directory creation failure. Unexpected file errors after changes begin belong to the current Agent; recheck and continue others. Report temporary/lock-directory cleanup failures separately; remove locks manually only after confirming no installation runs. Relay every output line unchanged: what installed, target version, failures/reasons, and recovery (resolve cause, then consent again to rerun). If upgrading the running Agent, explain that this session retains its old version and a new session is required.
+5. If networking/user-directory writes are blocked, report accurately and provide the same command for the user; do not switch installation methods.

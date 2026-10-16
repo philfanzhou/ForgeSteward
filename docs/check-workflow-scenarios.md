@@ -1,297 +1,297 @@
-# Check Workflow 接入验收
+# Check Workflow adoption acceptance
 
-## 范围
+## Scope
 
-新增独立插件 `check-workflow`，初始版本 `0.1.0`。它为首次接入的项目检查并增补缺失工作流规则；三个执行插件保持 `0.1.1`，正文与版本不变。现有 OpenCode 安装体验任务 #1 不在本次范围内，本 Skill 不安装插件或修改 Agent 配置。
+The new independent `check-workflow` plugin began at `0.1.0`. It checked and added missing workflow rules for initial project adoption; the three execution plugins stayed at `0.1.1`, with unchanged bodies and versions. OpenCode installation task #1 was outside scope. This Skill neither installed plugins nor changed Agent configuration.
 
-约束源是目标项目原有规则。此 Skill 只增补无冲突的缺失内容，不替换技术栈、架构边界、语言、Review 预算、审批门槛、任务粒度或原规则的加载作用域。规则覆盖按语义判断，不要求复制 ForgeSteward 模板。
+The target project's existing rules were authoritative. The Skill added only nonconflicting missing contents, preserving stack, architecture boundaries, language, review budget, approval thresholds, task granularity, and loading scope. Coverage was semantic; copying a ForgeSteward template was not required.
 
-## 有限场景
+## Limited scenarios
 
-以下是当前正文的人工规则走查，输入是有限条件而非真实使用方修改请求。结果描述依据条文得到的预期动作，不代表已执行独立 Agent 的行为评测。
+These are manual walkthroughs of the rules then current, using limited conditions rather than real consumer change requests. Expected actions are derived from the text, not an independent Agent evaluation.
 
-| 编号 | 输入 | 预期动作及结束条件 | 走查依据 |
+| ID | Input | Expected action and completion condition | Rule basis |
 | --- | --- | --- | --- |
-| C01 | 用户要求接入；仓库无任何规则或 Agent 配置，未指定 Agent | 增补通用工作流条款到 AGENTS.md，CLAUDE.md 仅导入它；不虚构测试命令、审批数或批次上限 | 主流程的缺失增补及入口参考的最小布局 |
-| C02 | 只使用 Claude Code/OpenCode；仅有 CLAUDE.md，已有 pytest 命令和五轮建议预算 | 原文、命令及五轮预算保留；追加缺失工作流条款或文档引用；不创建会遮蔽 CLAUDE 回退的 AGENTS.md | 保留规则文字/语义、预算引用、OpenCode 回退检查 |
-| C03 | 类似 ServiceMantle：已有完整范围、显式验收、非保证、依赖及第三轮范围审计 | 记录等价覆盖和来源，不复制模板，不改成“已有测试即可 ready”，不把三轮带到别的项目 | 要求映射按语义判断，既有政策优先保留 |
-| C04 | 原规则要求所有可选建议都修完，与非阻塞建议流程冲突；交接要求另有缺失 | 保留冲突原文，报告具体受影响阶段和决策；只增补独立交接项，结论为部分接入 | 五类状态及冲突处理，不写入隐式覆盖条款 |
-| C05 | 用户只要求检查；其余输入与 C01 相同 | 仅输出覆盖表、建议补丁，不写文件或创建 Change Request | 检查模式的明确写入边界 |
-| C06 | 用户要求本地接入；文档已有未提交改动，没有发布授权 | 以执行前内容为比较基线，保留用户改动，完成允许的文档追加；交付本地 diff，不自行 commit/push/创建远端变更 | 工作区保留及按授权交付 |
-| C07 | 第二次运行；内容、源规则和入口未变化 | 所有已补齐项按等价覆盖处理；零新增段落、时间戳或重复引用，不生成无意义 commit | 不写入的重跑判断及既有生成内容保留 |
-| C08 | 根和子目录存在 AGENTS.override.md；规则正文通过另一文件引用 | 沿实际生效链确认作用域，只在允许增补的入口添加读取指示；不删除 override 或制造优先级更高的入口 | Codex 覆盖与目录检查；必要来源不可读记未知 |
-| C09 | CLAUDE.md 已导入 AGENTS.md，AGENTS.md 作为唯一规则源 | 缺失条款只增补到既有权威位置；不创建反向导入，不为 Claude 再复制正文 | 唯一来源及循环检查 |
-| C10 | 项目采用其他 Agent，但其文档加载协议无法验证 | 通用条款可正常增补；该 Agent 标为适配未验证并给出所需证据，不猜文件名、安装工具或修改全局配置 | 其他 Agent 的有据适配和验证层级 |
-| C11 | OpenCode 的现有配置不加载所选文档；只能修改非文档配置才能接通 | 不修改配置，不声称入口已接通；交付独立文档部分，报告具体配置缺口及下一步 | 非文档配置范围边界 |
-| C12 | 项目仅允许在指定文档维护工作流，其他入口禁止修改 | 在允许位置增补；如果不存在可用读取路径，报告入口缺口，不改权限或以新增入口绕过原政策 | 权威来源、作用域保留与部分接入出口 |
+| C01 | Adoption requested; no rules/configuration or specified Agent | Add shared workflow rules to AGENTS.md; CLAUDE.md only imports it; invent no test commands, approval counts, or batch limits | Missing-rule addition and minimal entry layout |
+| C02 | Claude Code/OpenCode only; only CLAUDE.md, with pytest command and five-round suggestion budget | Preserve text, commands, and budget; append missing rules/references; do not create AGENTS.md that shadows CLAUDE fallback | Preserve wording/semantics, budget references, OpenCode fallback |
+| C03 | ServiceMantle-like project has complete scope, explicit acceptance, non-guarantees, dependencies, and third-round scope audit | Record equivalent coverage/source; do not copy templates, reduce ready to existing tests, or impose three rounds elsewhere | Semantic mapping and existing-policy priority |
+| C04 | Existing rule requires all optional advice fixed, conflicting with nonblocking feedback; handoff also incomplete | Preserve conflicting text, report affected stage/decision, add only independent handoff rules, and report partial adoption | Five classifications and conflict handling, no implicit override |
+| C05 | Check-only request, otherwise C01 | Output coverage table/proposed patch only; no files or Change Request | Explicit check-only write boundary |
+| C06 | Local adoption requested; docs have uncommitted edits, no publication authorization | Compare against initial contents, preserve user work, append allowed docs, deliver local diff without commit/push/remote change | Workspace preservation and authorized delivery |
+| C07 | Second run, unchanged contents/source rules/entries | Treat additions as equivalent coverage; no paragraphs, timestamps, duplicate references, or pointless commit | No-write rerun and preservation of generated contents |
+| C08 | Root/subdirectory AGENTS.override.md; body references another file | Follow effective loading chain/scope and add reading directions only where allowed; do not delete overrides or create higher-priority entries | Codex overrides/directories; unreadable required sources are unknown |
+| C09 | CLAUDE.md already imports sole-source AGENTS.md | Add missing rules only at the authoritative location, without reverse imports or duplicate Claude body | Single source and cycle checks |
+| C10 | Other Agent's loading protocol cannot be verified | Add generic rules if allowed; mark Agent adaptation unverified and state evidence needed, without guessing filenames/installing tools/changing global config | Evidence-based adaptation and validation levels |
+| C11 | Existing OpenCode config cannot load chosen docs without non-document edits | Do not change config or claim loading works; deliver independent docs and report exact configuration gap/next action | Non-document configuration boundary |
+| C12 | Workflow may be maintained only in designated docs, other entries immutable | Add only there; if no loading path exists, report the gap without changing permissions or bypassing policy with an entry | Authority/scope preservation and partial-adoption exit |
 
-## 验证层级与复核入口
+## Validation levels and rerun entry points
 
-- 对新 Skill 运行 `skill-creator/scripts/quick_validate.py`：检查 frontmatter、名称及脚手架残留。
-- 对四个插件检查 JSON、名称/版本一致性、marketplace 源路径、技能入口及资源引用；将新技能目录单独复制到临时安装布局，确认引用不依赖 ForgeSteward 仓库外文件或其他插件。
-- 人工核对以上场景，以及新增正文是否会改变已有规则的实际含义；检查 diff 只包含新插件、其登记和必要项目说明。
-- 本次不安装 Codex、Claude Code 或 OpenCode，不启动额外 Agent；文档与包结构检查不算运行时加载或行为兼容性证明。
+- Run `skill-creator/scripts/quick_validate.py` on the new Skill for frontmatter, name, and scaffold leftovers.
+- Check four plugins' JSON, matching names/versions, marketplace sources, Skill entries, and resources. Copy the new Skill alone into a temporary installation layout and confirm no dependency outside ForgeSteward or on another plugin.
+- Manually check these scenarios, possible semantic changes to existing rules, and that the diff contains only the new plugin, registration, and necessary project explanation.
+- This check installed no Codex, Claude Code, or OpenCode and launched no additional Agent. Documentation/package checks do not prove runtime loading or behavior compatibility.
 
-Agent 入口细节和已核对的官方资料见包内 [入口适配](https://github.com/philfanzhou/ForgeSteward/blob/v0.2.6/plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md)。该文件随技能分发，不依赖本验收文档才能运行。以上为 `0.1.0` 的历史验收记录；`0.2.0` 将技能调用名改为 `forge-steward-check-workflow`，插件名仍为 `check-workflow`，工作流行为不变。
+Agent entry details and checked official sources are in bundled [entry adaptation](https://github.com/philfanzhou/ForgeSteward/blob/v0.2.6/plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md), which ships independently of this acceptance document. The above is the historical `0.1.0` record. `0.2.0` renamed the Skill invocation to `forge-steward-check-workflow`, retaining plugin name `check-workflow` and workflow behavior.
 
-## 0.2.2 默认补齐并提交变更
+## 0.2.2 default completion and Change Request submission
 
-本节保留 `0.2.2` 开发修订的验证背景；该版本未发布。当前源码统一版本见根目录 `VERSION`，此行为随 `0.2.3` 目标继续交付，不表示其他插件仍停留在 `0.2.2`。
+This section preserves verification context for the unreleased `0.2.2` development revision. Root `VERSION` gives the current unified version; the behavior continued toward `0.2.3`, not with other plugins frozen at `0.2.2`.
 
-用户反馈明确调用技能后可能停在检查报告或本地修改。原因是原正文分别要求增补授权和发布授权，默认 prompt 也未要求提交。`0.2.2` 将明确调用的默认交付改为检查、增补、验证、commit、push 并创建 PR/MR。本次按维护者明确指定的版本号，以 check-workflow `0.2.2` 交付此默认流程修复；默认外部写入行为的变化及限制仍须明确说明。按统一版本规则，其他三个插件也同步为 `0.2.2`，但不改变其技能流程。历史 Release 不变；不改用户安装、不在本次变更中发布 Tag。
+Users reported explicit invocation stopping at a report or local edits. The previous text separately required addition and publication authorization, and its default prompt did not require submission. `0.2.2` changed explicit invocation's default to check, add, validate, commit, push, and create a PR/MR. The maintainer explicitly selected check-workflow `0.2.2` for this fix; changed external-write defaults and limits still needed disclosure. The other three plugins also moved to `0.2.2` under unified versioning without workflow changes. Historical Releases and user installations remained unchanged; no Tag was published in that change.
 
-以下为新增的人工条文走查及后续行为评测用例，不是已执行的独立 Agent 端到端测试。C01–C12 的规则保留/范围边界继续适用；其中 C06 的“本地接入”仍是明确限制，不因新默认值而发布。
+The following are manual rule walkthroughs and future behavior-test cases, not independent end-to-end Agent runs. C01–C12's rule/scope preservation remained applicable; C06's local-only request still restricted publication.
 
-| 编号 | 输入/状态 | 应观察到的结果 |
+| ID | Input/state | Expected observation |
 | --- | --- | --- |
-| D01 | 明确选择技能，无额外 prompt；主线缺交接规则，远端可写且无冲突 | 独立分支补齐规则和必要入口，验证，提交推送并返回真实 PR/MR 链接；不只输出计划，不合并 |
-| D02 | 同样有缺口，但用户要求“仅检查，不修改” | 文件及分支不变，报告缺失，不提交或创建远端变更 |
-| D03 | 用户明确要求“补齐，但只改本地，不提交” | 保留本地差异，未 commit/push/创建 PR；不让默认 prompt 覆盖限制 |
-| D04 | 用户要求解释技能用途，或 Agent 为只读分析自动加载技能 | 只完成实际请求；不会因加载技能而获得发布授权 |
-| D05 | 主线已有等价完整规则 | 零修改、无空提交或空 PR/MR，不为了交付而造缺口 |
-| D06 | 存在覆盖本次缺口的开放 PR/MR | 本任务已有分支则更新原项；属于其他任务则报告覆盖关系，不重复创建或擅自接管 |
-| D07 | 缺失项可补齐，但另有原政策冲突 | 原文不变，独立增补可提交，明确部分完成/按规范 draft；冲突不被暗中覆盖 |
-| D08 | 无写权限或创建 PR 的调用超时 | 权限不足保存允许的本地成果；响应未知先核对远端分支及已有 PR，不盲目重复创建；准确报告停在哪一步 |
-| D09 | 用户文件有未提交改动，或工作区依赖他人的未合并代码 | 保留用户工作，使用不夹带其他改动的独立交付基线；无法分离时报告具体阻塞 |
-| D10 | 已补齐并提交后再次运行 | 复用规则覆盖及已有交付，除真实新增缺口外不制造新段落、提交或重复 PR |
+| D01 | Explicit Skill selection, no extra prompt; main lacks handoff rules, remote writable, no conflicts | Add rules/entries on an independent branch, validate, commit/push, return a real PR/MR link rather than a plan; no merge |
+| D02 | Same gaps, but check-only/no-modification request | No file/branch changes, commits, or remote Change Request; report gaps |
+| D03 | Explicitly add locally without committing | Preserve local diff without commit/push/PR; default prompt cannot override restriction |
+| D04 | Explain Skill purpose, or Skill auto-loaded for read-only analysis | Complete only the actual request; loading grants no publication authority |
+| D05 | Main already has equivalent complete rules | No edits, empty commits/PRs, or invented gaps |
+| D06 | Open PR/MR already covers gaps | Update this task's existing branch if applicable; otherwise report coverage without duplicate creation or takeover |
+| D07 | Additions possible but another original-policy conflict exists | Preserve original text, submit independent additions with partial-completion/draft status under policy; no hidden override |
+| D08 | No write permission or PR creation times out | Preserve allowed local work if unauthorized; for uncertain response query remote branch/PR before retrying and report exact stopping point |
+| D09 | Uncommitted user files or dependency on another unmerged branch | Preserve user work and use an independent delivery baseline; report a concrete blocker if inseparable |
+| D10 | Rerun after additions submitted | Reuse coverage/delivery, adding no paragraphs/commits/duplicate PR unless a real new gap exists |
 
-元数据测试检查插件入口与技能入口的默认 prompt 相同，防止入口选错导致任务终点不一致；它不靠固定正文关键字断言行为正确。技能格式校验、安装器测试与上述人工走查均不能替代 D01–D10 在独立使用方场景中的实际执行证据。
+Metadata tests compare plugin and Skill default prompts so entry choice cannot change the intended endpoint. They do not assert behavior through fixed body keywords. Format checks, installer tests, and these manual walkthroughs cannot replace actual D01–D10 execution evidence in independent consumer scenarios.
 
-## 五技能阶段交接修订
+## Five-Skill stage handoff revision
 
-本节追加 check-workflow 对 prepare-work / execute-work 拆分后的接入检查，不改写上面的历史验收，也不改变其他四个技能、安装入口或调用格式。接入只补必要的阶段边界和交接语义，不把技能全文复制到使用方规则，不自动串联技能。
+This adds check-workflow adoption checks after prepare-work/execute-work split, without rewriting earlier acceptance history or changing other Skills, installation entries, or invocation syntax. Add only necessary stage boundaries/handoff semantics, not complete Skill copies or automatic chaining.
 
-以下为本次人工条文走查及后续行为评测用例；已逐项对照包内最低约束及准备、执行技能正文，未执行独立 Agent 端到端行为测试。静态包校验及安装器回归不证明模型一定遵循这些决策。
+These manual walkthroughs/future behavior cases were checked against bundled minimum constraints and preparation/execution bodies. No independent Agent end-to-end tests ran. Static packaging and installer regressions do not prove model compliance.
 
-| 编号 | 输入/状态 | 接入检查或增补后的预期结果 |
+| ID | Input/state | Expected adoption check/addition |
 | --- | --- | --- |
-| F01 | 旧仓库明确要求 find-work 最终生成执行 prompt，并以聊天记录作为唯一方案依据 | 报告准备输出及交接的迁移冲突，保留原规则，不通过新增“以 Issue 为准”暗中覆盖；其他独立缺口可补，结论为部分接入 |
-| F02 | 旧技能名称只在历史发布记录或过往示例出现，实际规则已覆盖新阶段 | 不把名称出现判为冲突，不重写历史；其余规则和入口也完整时零修改 |
-| F03 | 仓库有通用会话交接，但未要求准备成果可从原 Issue 恢复；与新要求无冲突 | 仅增补准备阶段持久化门槛，保留其他阶段的会话交接兜底；编号列表只是定位入口，不是完整方案 |
-| F04 | 用户仅允许只读准备；A 的 Issue 已有完整方案与可访问证据，B 只有聊天里的验收计划 | 规则允许 A 通过后续实际 ready 核验，B 缺必要持久化交接则不能入选；过程中说明缺口，不扩大写入授权。接入检查本身不替这些 Issue 判定 ready |
-| F05 | 用户直接给执行技能明确 Issue 清单，未安装或运行准备技能 | 规则允许读取原 Issue 开始核验，自行补查可解决缺口；不要求先安装全部技能、不强制回到准备，也不自动调用其他技能 |
-| F06 | 执行输入分别为缺失、空列表和同号跨仓但归属不明的编号 | 分别请求清单、无操作结束、确认身份；不自行发现任务、猜测仓库或创建空 PR/MR。具体输出格式仍由技能维护 |
-| F07 | 明确顺序 A、B、C；A 已提交 PR，B 有真实外部阻塞，C 可独立实施 | 保存 A 的提交和 B 的阻塞后继续 C；C 基于当时最新主线，不叠加 A 的未合并代码，不因首个 PR 或单项阻塞结束整批 |
-| F08 | 清单执行期间切换会话，A 已提交、B 尚待处理，已有审查轮次和接受边界 | 从记录恢复完整顺序、逐项状态及有效证据，不丢弃 B、不重置轮次，不重新发现或扩充队列；准备就绪、已提交均不冒充已合并交付 |
-| F09 | 准备实验产生必要证据，执行已推送但 PR 尚未合并，另有未推送提交 | 先保存实验产物及恢复位置，保留开放 PR 后续修复分支和未推送成果；仅清理本任务可安全删除的临时环境 |
-| F10 | 已有等价阶段边界、原 Issue 交接、清单完成条件和安全清理规则，重新接入 | 引用现有来源，零追加、无空 PR；只增补真正缺失的语义，不照搬整份检查表、批次数量或技能命令 |
-| F11 | 目标项目明确要求堆叠变更，或要求准备与生产实现由同一步骤完成 | 标为与新流程冲突，保留原规则并说明所需决策，不擅自改成独立分支或拆分流程；不宣称已完整兼容 |
+| F01 | Old repository requires find-work to output an execution prompt and chat as sole plan source | Report output/handoff migration conflict, preserve old rules, and do not silently override with Issue authority; add independent gaps only and report partial adoption |
+| F02 | Old names occur only in historical releases/examples; effective rules cover new stages | Names alone are not conflicts; preserve history and make no change if rules/entries are otherwise complete |
+| F03 | General session handoff exists but preparation need not be recoverable from original Issue; no conflict | Add only preparation persistence requirements, retaining other-stage session fallback; identifier lists locate plans rather than contain them |
+| F04 | Read-only preparation; A has full Issue plan/evidence, B acceptance exists only in chat | A may pass later real readiness checks; B cannot qualify without required persisted handoff. Explain the gap without widening writes; adoption itself does not decide these Issues' readiness |
+| F05 | Explicit execution list, preparation neither installed nor run | Read original Issues and verify, filling solvable gaps; do not require all Skills or a preparation rerun, and do not invoke other Skills automatically |
+| F06 | Execution list missing, empty, or ambiguous across repositories | Request list, finish without action, or clarify identity respectively; no discovery, guessed repository, or empty PR/MR; Skills retain detailed format rules |
+| F07 | Ordered A/B/C; A PR submitted, B externally blocked, C independent | Save A/B state and continue C from then-current main, without stacking A or ending after one PR/blocker |
+| F08 | Session changes mid-list: A submitted, B pending, known rounds/accepted boundaries | Restore full order, item states, and valid evidence; retain B/rounds, neither rediscover nor expand queue; ready/submitted are not merged delivery |
+| F09 | Preparation experiments produce evidence; execution pushed but PR open; unpushed commits also exist | Save experiment outputs/recovery locations, preserve repair branches and unpushed work, and clean only this task's safely disposable environments |
+| F10 | Equivalent stage boundaries, Issue handoffs, completion, and cleanup rules already exist | Cite existing sources with no additions/empty PR; add only missing semantics, not full checklists, batch counts, or commands |
+| F11 | Project requires stacked changes or preparation and production implementation in one step | Preserve/report the conflict and needed decision; do not silently enforce separate branches/stages or claim full compatibility |
 
-本修订仅修改 check-workflow 正文、其随包检查清单和本验收记录。没有新增正文关键字匹配测试来冒充行为验证；发布时统一版本，开发修订本身不改写已发布 Tag，也不升级使用者安装。
+This revision changed only check-workflow, its bundled checklist, and this record. No body-keyword tests were added as a substitute for behavior validation. Releases use unified versions; development changes neither rewrite published Tags nor upgrade users.
 
-## 0.2.5 标准区块同步
+## 0.2.5 standard block synchronization
 
-本节记录 check-workflow 从“逐项语义检查并增补缺失规则”改为“按随包模板同步标准区块”的决策和验收，不改写上面的历史记录。
+This records the decision and acceptance for switching from semantic gap checks/additions to synchronizing a bundled standard block, preserving earlier history.
 
-### 变更原因
+### Why it changed
 
-旧流程由 Agent 逐项判断项目规则是否已覆盖，再自行撰写增补。判断门槛依赖语义理解，不同会话或 Agent 的结论可能不同；已合入的增补又被视为项目规则而只能继续追加。结果是同一仓库重复运行可能不断产生新段落，增补质量也取决于 Agent 的能力。
+The former Agent judged coverage and authored additions. Semantic judgment varied by session/Agent, and merged additions became project rules that could only be appended to. Repeated runs could accumulate paragraphs, with quality dependent on Agent capability.
 
-新流程由技能随包提供唯一的标准正文，写入目标仓库时逐字复制，只比较、不撰写：
+The replacement shipped one standard body to copy verbatim, comparing rather than composing:
 
-- 管理范围固定为根 `AGENTS.md` 中的 `forge-steward:workflow` 区块、根 `CLAUDE.md` 中的 `@AGENTS.md` 导入行，以及 `CLAUDE.md` 另有内容时的 `forge-steward:claude-rules` 读取指示区块。
-- 区块缺失时追加，内容与模板不同时整体替换，一致时零修改。区块外的文字逐字节保留，不再读取、评价或引用项目其他规则。
-- 模板正文声明区块外的项目规则优先，项目差异写在区块外，而不是修改区块。
-- 模板提供 `zh-CN` 与 `en` 两种语言，语言记录在开始标记中，后续运行沿用。
-- 判定和写入由 `scripts/sync_workflow_block.py` 完成；同一技能版本重复运行结果相同。
+- Managed scope: root AGENTS.md's `forge-steward:workflow` block, root CLAUDE.md's `@AGENTS.md` import, and the `forge-steward:claude-rules` reading-direction block when CLAUDE.md contains other text.
+- Append missing blocks, replace differing blocks completely, and do nothing when equal. Preserve outside text byte for byte, without reading/evaluating/referencing other project rules.
+- The template gives outside project rules priority; project differences belong outside the block.
+- Historical templates provided `zh-CN` and `en`, recording the language in the opening marker and reusing it later.
+- `scripts/sync_workflow_block.py` decides/writes changes; the same Skill version produces identical rerun results.
 
-### 迁移说明
+### Migration
 
-- 这是不兼容的行为变化。以前 C01–C12、D01–D10、F01–F11 中关于语义覆盖判断、冲突报告、保留原规则而不写入等预期不再适用；关于授权边界、只读检查、本地修改、不合并、响应不明确时先回读等交付预期继续适用。
-- 以前版本增补的段落不带标记，脚本无法识别，不会自动删除。首次运行新版本会在其旁边追加标准区块，维护者可以在审查中删除重复的旧增补。
-- 维护者在区块内的手工修改会在下次运行时被模板覆盖；需要保留的差异应移到区块外。
-- 升级技能版本后，模板正文如有变化，下次运行会产生一次同步变更；这是版本更新，不是重复修改。
+- This was incompatible. Semantic coverage/conflict/preservation expectations in C01–C12, D01–D10, and F01–F11 no longer applied. Authorization, check-only/local-only, no-merge, and reread-before-retry delivery boundaries remained.
+- Older unmarked additions could not be identified automatically and were not deleted. A first new-version run appended the standard block beside them; maintainers could remove duplicates during review.
+- Manual edits inside blocks would be replaced next run; move desired differences outside.
+- A changed template after upgrading causes one synchronization change, not redundant modification.
 
-### 有限场景
+### Limited scenarios
 
-G01–G10 由 `tests/test_check_workflow_block.py` 在临时目录中自动验证脚本行为。G11–G14 是交付流程的人工条文走查，没有执行独立 Agent 的端到端测试。
+`tests/test_check_workflow_block.py` automatically verified G01–G10 in temporary directories. G11–G14 were manual delivery-rule walkthroughs without independent Agent end-to-end tests.
 
-| 编号 | 输入/状态 | 预期结果 |
+| ID | Input/state | Expected result |
 | --- | --- | --- |
-| G01 | 空仓库，未指定语言 | `--check` 退出码 2 且不写文件；指定语言后创建区块和 `CLAUDE.md` 导入；再次运行退出码 0，文件字节和修改时间不变 |
-| G02 | 区块内容被改写，区块外有项目文字 | 只替换区块，区块外文字逐字节不变 |
-| G03 | `AGENTS.md` 有项目规则但没有区块 | 在文件末尾追加区块，原文不变 |
-| G04 | 只有含规则的 `CLAUDE.md` | 新建 `AGENTS.md` 区块及紧随的读取指示，`CLAUDE.md` 追加导入；已存在的读取指示原位更新；`CLAUDE.md` 只剩导入时移除读取指示 |
-| G05 | `CLAUDE.md` 的导入或 `AGENTS.md` 的标记只出现在代码块中 | 视为不存在，按规则追加 |
-| G06 | 存在重复区块，或标记不成对、嵌套，或代码围栏未闭合 | 重复区块合并到第一个位置；标记损坏或围栏未闭合时退出码 2，不写文件 |
-| G07 | 文件使用 CRLF 或混用 LF/CRLF 换行，或带 BOM | 原有各行保留自己的换行符和 BOM，新增行使用占多数的换行符 |
-| G08 | 已有 `zh-CN` 区块，用户明确指定 `en` | 替换为英文模板；之后不传语言时沿用 `en` |
-| G09 | `CLAUDE.md` 是指向 `AGENTS.md` 的符号链接，或根目录存在 `AGENTS.override.md` | 不写穿链接；override 只输出 Warning，不修改 |
-| G10 | 两种语言的模板 | 标题与列表结构一致，正文不含标记文本 |
-| G11 | 明确调用技能，检查退出码 1，远端可写 | 在 `forge-steward/workflow-block` 分支写入，`--check` 复核为 0，提交推送并创建 PR/MR，不合并 |
-| G12 | 检查退出码 0 | 零修改，不建分支、提交或空 PR/MR；已有同名开放 PR/MR 时报告已不需要，不自动关闭 |
-| G13 | 已有 `forge-steward/workflow-block` 开放 PR/MR，主线仍需同步 | 在原分支合入最新主线后同步并推送，不重复创建 |
-| G14 | 用户只要求检查 | 只运行 `--check` 并报告，不写文件、不建分支 |
+| G01 | Empty repository, no language selected | `--check` returns 2 without writes; choosing a language creates block and CLAUDE.md import; rerun returns 0 with unchanged bytes/mtime |
+| G02 | Edited block with surrounding project text | Replace only block; preserve surrounding bytes |
+| G03 | AGENTS.md has project rules but no block | Append block at EOF without altering original text |
+| G04 | Only CLAUDE.md with rules | Create AGENTS.md block and following reading directions; append CLAUDE import; update existing directions in place, remove them when CLAUDE has only import |
+| G05 | Import/markers appear only in code fences | Treat as absent and append under rules |
+| G06 | Duplicate, unpaired, nested markers, or unclosed fence | Collapse duplicates into first location; malformed markers/unclosed fence return 2 without writes |
+| G07 | CRLF, mixed LF/CRLF, or BOM | Preserve each original line ending/BOM; new lines use majority ending |
+| G08 | Existing `zh-CN`, explicit `en` request | Replace with English template; later language-unspecified runs retain `en` |
+| G09 | CLAUDE.md symlinks to AGENTS.md, or root AGENTS.override.md exists | Never write through links; only warn about override |
+| G10 | Both language templates | Matching heading/list structure; bodies contain no marker text |
+| G11 | Explicit invocation, check returns 1, writable remote | Write on `forge-steward/workflow-block`, recheck 0, commit/push/create PR/MR, no merge |
+| G12 | Check returns 0 | No edits/branch/commit/empty PR; report same-named open PR no longer needed without auto-closing |
+| G13 | Existing open `forge-steward/workflow-block` PR/MR, main still needs sync | Merge latest main into original branch, synchronize/push, no duplicate |
+| G14 | Check-only request | Run/report only `--check`, without writes/branch |
 
-静态包校验、脚本单元测试和安装器回归不能证明 Agent 一定按正文执行交付流程，也不能证明各 Agent 运行时实际加载了区块。
+Static packages, script tests, and installer regressions do not prove Agent delivery compliance or runtime loading of the block.
 
-## 0.2.6 删除旧版增补
+## 0.2.6 removal of old additions
 
-本节记录 check-workflow 在同步标准区块时删除旧版增补的决策和验收，不改写上面 0.2.5 的历史记录。
+This records removing old additions during standard-block synchronization, without rewriting 0.2.5 history.
 
-### 变更原因
+### Why it changed
 
-0.2.5 的迁移说明规定旧版增补不识别、不删除，只在旁边追加标准区块，由维护者自行清理。实际使用中，旧增补通常插在项目规则中间，没有标记，提交和 PR 标题也与普通文档修改无异，维护者难以逐仓找出。标准区块又声明区块外的项目规则优先，旧增补留在区块外会重复区块或以旧条款覆盖它。维护者要求技能删除旧版增补，用标准区块替代。
+0.2.5 left old unmarked additions beside a new block for manual cleanup. In practice they were interspersed with project rules, with ordinary documentation commit/PR titles, making them hard to locate. Because outside rules took priority, old additions could duplicate or override the block. The maintainer requested their removal in favor of the standard block.
 
-旧增补无法由脚本确定性识别，所以删除由 Agent 按 `references/legacy-additions.md` 取证完成，并放在同步区块的同一 Change Request 中，由维护者审查：
+Scripts could not identify them deterministically. Agents therefore gathered evidence under `references/legacy-additions.md`, including removals in the same synchronization Change Request for maintainer review:
 
-- 候选位置限于旧版本可能写入的 Agent 指令、工作流/协作文档和 Issue/Change Request 模板。
-- 确认删除须同时具备内容特征（旧约束维度且以补充形式出现）和来源证据（提交历史显示由一次工作流补充提交整段加入）。
-- 项目自行编写的规则、加入后被实质修改、仍被项目规则引用、维护者明确保留或证据不足的内容不删除，列为待决定。
-- Change Request 逐项列出删除项的来源和判定依据，维护者可撤回任一删除。
-- 零修改的条件变为：区块与模板一致，且没有确认删除项。
+- Candidate locations were limited to Agent instructions, workflow/collaboration docs, and Issue/Change Request templates older versions might have written.
+- Removal required both content characteristics—old constraint dimensions presented as supplements—and provenance showing the whole passage added by a workflow-supplement commit.
+- Preserve project-authored, substantially edited, still-referenced, explicitly retained, or insufficiently evidenced content; list it for decision.
+- List source and rationale for each removal in the Change Request; maintainers may withdraw any deletion.
+- No-change now required both matching blocks and no confirmed removals.
 
-### 迁移说明
+### Migration
 
-- 这是默认外部写入行为的变化：升级后首次运行，可能在同步区块的同一 Change Request 中删除旧版技能写入的规则段落、文档和读取指示。
-- `0.2.4` 及更早版本“以前生成的内容一旦成为项目现有规则，也不得自动覆盖”的约定不再适用于能确认的旧增补；维护者采纳并实质修改过的内容仍按项目规则保留，列为待决定。
-- 0.2.5 已追加标准区块、旧增补仍在的仓库，再次运行会产生一次删除变更。
+- This changed default external writes: the first upgraded run could remove old Skill-authored paragraphs, documents, and reading directions in the same synchronization Change Request.
+- The `0.2.4`-and-earlier rule against overwriting generated content once adopted as project rules no longer applied to confirmed old additions. Content substantially revised and adopted by maintainers remained preserved for decision.
+- A repository already synchronized in 0.2.5 but retaining old additions would receive one removal change on rerun.
 
-### 有限场景
+### Limited scenarios
 
-H01–H10 为人工条文走查，没有执行独立 Agent 的端到端测试；脚本行为不变，G01–G10 自动测试继续适用。
+H01–H10 are manual walkthroughs, not independent Agent end-to-end tests. Script behavior stayed unchanged; G01–G10 automated tests still applied.
 
-| 编号 | 输入/状态 | 预期结果 |
+| ID | Input/state | Expected result |
 | --- | --- | --- |
-| H01 | `AGENTS.md` 中间有一节“工作流授权、复审与交接补充”，引言声明落实既有政策、不要求历史 Issue 重写；由一次只改 `AGENTS.md` 的提交加入，其 PR 说明为工作流补充 | 整节删除，同一 PR 同步标准区块；PR 列出原行范围、加入提交和判定依据 |
-| H02 | 区块已与模板一致，仍存在 H01 的旧增补 | 检查退出码 0 不代表零修改；创建 PR 删除旧增补 |
-| H03 | 项目自行编写的三轮 Review 预算与标准区块主题相同 | 不删除、不改写；不列为候选 |
-| H04 | 旧增补加入后，维护者另有提交改写了其中两条 | 不删除，列为待决定并说明修改提交 |
-| H05 | 旧版本新建 `docs/workflow.md` 并在 `CLAUDE.md` 加读取指示，文档全部为补充内容 | 删除该文档和只指向它的读取指示行；不留悬空链接 |
-| H06 | 疑似旧增补被 `CONTRIBUTING.md` 的项目规则链接引用 | 撤回该项删除，列为待决定 |
-| H07 | 仓库为浅克隆，无法定位加入提交 | 按权限补全历史；仍无法取得时列为待决定，不删除 |
-| H08 | 用户只要求检查 | 报告区块差异、确认删除项和待决定候选，不写文件、不建分支 |
-| H09 | 已合入删除后再次运行 | 不再发现已删内容；待决定项未变时只报告，零修改 |
-| H10 | 维护者在上次 PR 审查中撤回某项删除并说明保留 | 后续运行不再删除该项，只在汇报中注明 |
+| H01 | AGENTS.md has a workflow-authorization/review/handoff supplement whose introduction says it implements policy without rewriting old Issues; one AGENTS-only commit and PR identify a workflow addition | Delete the whole section and sync block in one PR, listing original lines, introducing commit, and rationale |
+| H02 | Block matches template but H01 remains | Check exit 0 does not mean no edits; create PR removing addition |
+| H03 | Project-authored three-round review budget shares block's topic | Preserve unchanged; not a candidate |
+| H04 | Maintainer later rewrote two rules in an old addition | Preserve for decision and cite editing commit |
+| H05 | Older version created entirely supplemental docs/workflow.md and a CLAUDE reading direction | Delete document and direction pointing only to it, leaving no dangling link |
+| H06 | CONTRIBUTING.md project rules reference a suspected addition | Withdraw removal and list for decision |
+| H07 | Shallow clone prevents locating introducing commit | Obtain history when authorized; if unavailable, preserve for decision |
+| H08 | Check-only request | Report block differences, confirmed removals, and undecided candidates without writes/branch |
+| H09 | Rerun after removal merged | Do not rediscover removed content; unchanged undecided items are report-only, no edits |
+| H10 | Maintainer previously withdrew a deletion and explained retention | Do not remove in later runs; mention only in report |
 
-### 变更汇总
+### Change summary
 
-运行后修改了项目文件时，技能须在汇报中按文件列出操作、变更内容和增删行数，并说明修改所处的状态；未修改时明确说明。以下 I01–I04 为人工条文走查。
+When project files change, report operations, contents, added/deleted line counts, and delivery state per file. Explicitly state when nothing changed. I01–I04 are manual walkthroughs.
 
-| 编号 | 输入/状态 | 预期结果 |
+| ID | Input/state | Expected result |
 | --- | --- | --- |
-| I01 | 同步区块并删除一节旧增补，已创建 PR | 汇总表列出 `AGENTS.md`（修改：删除旧增补及其来源、新增区块，`+59 / -32`）和 `CLAUDE.md`（追加导入）；表后给出 PR 链接，并列出待决定候选 |
-| I02 | 已提交，推送因权限失败 | 汇总仍列出全部修改文件和行数，状态写明“已提交未推送”及分支与 commit |
-| I03 | 区块已一致且没有确认删除项 | 明确说明未修改项目文件，不输出空的汇总表 |
-| I04 | 用户只要求检查，区块缺失 | 说明未修改项目文件，另列执行同步时将修改的文件和原因，不写成已修改 |
+| I01 | Block synced and old section removed; PR created | Summary lists AGENTS.md's old-addition removal/source and new block (`+59 / -32`), plus CLAUDE import; follow with PR link and undecided candidates |
+| I02 | Committed but push denied | List all changed files/counts and committed-but-unpushed state, branch, and commit |
+| I03 | Block matches and no confirmed removals | Explicitly state no project files changed, without an empty summary table |
+| I04 | Check-only request with missing block | State no files changed; separately list proposed files/reasons without implying completion |
 
-## 0.2.7 删除与技能重复的项目规则
+## 0.2.7 removing project rules that duplicate Skills
 
-本节记录 check-workflow 从“同步标准区块”改为“删除项目中与技能重复的工作流规则”的决策和验收，不改写上面的历史记录。
+This records switching from standard-block synchronization to removal of duplicate project workflow rules, preserving earlier history.
 
-### 变更原因
+### Why it changed
 
-0.2.5、0.2.6 把技能流程的摘要作为标准区块写入项目 `AGENTS.md`，并声明区块外的项目规则优先。实际使用暴露两个问题：
+0.2.5/0.2.6 copied Skill summaries into project AGENTS.md while prioritizing outside rules. Actual use exposed two problems:
 
-- 区块内容在四个技能正文中都已存在，写入项目只是复制了一份，技能升级后项目副本还会过时。
-- 项目自行编写的 ready 门禁、Review 规则等与区块并存。区块声明项目规则优先，技能正文又多处要求“遵守仓库更具体的门禁/Review 预算”，于是同一件事有两到三个来源，彼此措辞和严格程度不同。
+- All block contents already existed in four Skills; project copies could become stale after Skill upgrades.
+- Project-authored readiness/review rules coexisted with blocks. Blocks prioritized project rules while Skills also deferred to more specific repository requirements/budgets, leaving two or three differently worded/strict sources for the same policy.
 
-维护者决定：Issue、Change Request、Review 等工作流政策只放在各技能中，项目内同类约束一律删除，以技能为准；check-workflow 的职责是删除项目中与技能重复的规则。
+The maintainer decided Issue/Change Request/Review workflow policy belongs only in Skills. Remove equivalent project constraints and use Skill policy; check-workflow now removes project duplicates.
 
-### 决策
+### Decisions
 
-- check-workflow 不再向项目写入任何内容：删除模板资源、读取指示和入口管理，`sync_workflow_block.py` 改为只删除旧版区块的 `remove_workflow_blocks.py`。
-- 删除对象按包内 [技能管理的规则与删除方式](../plugins/check-workflow/skills/forge-steward-check-workflow/references/skill-owned-rules.md) 的政策维度判定，不再要求“旧版增补”的提交历史证据；项目自行编写的同类规则同样删除。
-- 技能明确交由仓库决定的项目约定保留：语言、标题与提交格式、模板栏目结构、合并方式、必要检查与审批、分支保护、构建与验证命令、工程与安全约束、Agent 入口。
-- 删除范围包括 Agent 指令、`CONTRIBUTING.md`、协作类文档和 Issue/Change Request 模板；模板保留栏目结构，删除规定工作流政策的说明和检查项。
-- 四个技能删除“遵守仓库更具体的门禁”“按仓库 Review 预算处理”等条款，并迁入通用化的 feature 级拆分、复杂协议或状态任务的语义模型与端到端场景、第三次审查或修复前的逐 commit 审计，以及往返满 3 轮后跳过、等待人工处理的规则。迁入规则的场景见 [技能工作流政策场景](skill-owned-policy-scenarios.md)。C03 中“不把三轮带到别的项目”的历史约定由此决策取代。
+- check-workflow writes no new project contents. Remove template resources, reading directions, and entry management; replace `sync_workflow_block.py` with deletion-only `remove_workflow_blocks.py`.
+- Classify by bundled [Skill-owned rules and removal](../plugins/check-workflow/skills/forge-steward-check-workflow/references/skill-owned-rules.md), without old-addition provenance requirements. Equivalent project-authored rules also qualify.
+- Preserve project conventions explicitly delegated by Skills: language, title/commit format, template structure, merge method, required checks/approvals, branch protection, build/verification commands, engineering/security constraints, and Agent entries.
+- Scope includes Agent instructions, CONTRIBUTING.md, collaboration docs, and Issue/Change Request templates. Preserve template structure while removing workflow-policy directions/checklists.
+- Four Skills dropped repository-specific readiness/review-budget deference and adopted generalized feature splitting, complex protocol/state semantic models/end-to-end scenarios, per-commit audits before a third review/repair, and stopping after three exchanges for human handling. See [Skill workflow policy scenarios](skill-owned-policy-scenarios.md). This superseded C03's historical rule against carrying three rounds into other projects.
 
-### 迁移说明
+### Migration
 
-- 这是不兼容的行为变化。升级后首次运行，check-workflow 会在一个 Change Request 中删除旧版区块，以及 Agent 指令、贡献文档和模板中与技能重复的工作流规则，包括项目自行编写的规则。维护者可在审查中撤回任一删除。
-- 删除后，这些约束只在调用技能时生效；不调用技能的会话或贡献者不再从项目文档读到它们。
-- 项目需要与技能不同的工作流政策时，不能再通过项目规则覆盖技能，应修改技能本身。
-- 0.2.5、0.2.6 创建的 `forge-steward/workflow-block` 开放 Change Request 由本版本取代；技能只报告，不自动关闭。
-- 0.2.5 的 G01–G14 与 0.2.6 的 H01–H10 不再适用；I01–I04 的变更汇总要求继续适用，操作只剩修改与删除。
+- Incompatible behavior: the first upgraded check-workflow run submits one Change Request removing old blocks and duplicate workflow rules from instructions, contribution docs, and templates, including project-authored rules. Maintainers may withdraw any deletion during review.
+- Afterwards these constraints apply only when Skills are invoked; other sessions/contributors no longer read them in project docs.
+- Projects needing different workflow policy must change the Skill itself rather than override through project rules.
+- This version supersedes open 0.2.5/0.2.6 `forge-steward/workflow-block` Change Requests, reporting them without automatic closure.
+- G01–G14 and H01–H10 no longer apply. I01–I04 summaries remain, with modification/removal as the only operations.
 
-### 有限场景
+### Limited scenarios
 
-J01–J08 由 `tests/test_check_workflow_blocks.py` 在临时目录中自动验证脚本行为。J09–J19 是人工条文走查，没有执行独立 Agent 的端到端测试。
+`tests/test_check_workflow_blocks.py` automatically verifies J01–J08 in temporary directories. J09–J19 are manual walkthroughs, not independent Agent end-to-end tests.
 
-| 编号 | 输入/状态 | 预期结果 |
+| ID | Input/state | Expected result |
 | --- | --- | --- |
-| J01 | 没有旧版区块，项目已有规则 | `--check`、`--write` 退出码 0，文件字节和修改时间不变 |
-| J02 | `AGENTS.md` 含 `workflow` 与 `claude-rules` 区块，前后有项目文字 | 两个区块及多出的空行删除，区块外文字逐字节不变；再次运行零修改 |
-| J03 | 区块位于文件开头或末尾，或存在重复区块 | 不留下多余首尾空行，全部区块删除 |
-| J04 | `AGENTS.md` 只有区块，`CLAUDE.md` 只有 `@AGENTS.md` | 两个文件都删除 |
-| J05 | `AGENTS.md` 只有区块，`CLAUDE.md` 另有规则，代码块中也有导入示例 | 删除 `AGENTS.md` 与有效导入行，保留规则和代码块示例 |
-| J06 | 标记只出现在代码块中；标记不成对、嵌套或围栏未闭合 | 前者不视为区块；后者退出码 2，不写文件 |
-| J07 | CRLF、混用换行或 BOM | 保留行各自的换行符和 BOM |
-| J08 | `AGENTS.md` 是符号链接；根目录存在 `AGENTS.override.md` | 不写穿链接；override 只输出 Warning |
-| J09 | `AGENTS.md` 有项目自写的“范围纪律”章节，内容全部是 ready 门禁、一个 PR 一个 Issue、Review 分类与第三轮停止规则 | 整节删除，不要求提交历史证据；Change Request 列出维度与对应技能 |
-| J10 | 同一章节混有“一个 PR 只关闭一个 Issue”和项目构建命令 | 只删除政策列表项，保留命令和代码块 |
-| J11 | 列表项“增加依赖、改变公开 API 前说明兼容性影响” | 属于工程约定，保留 |
-| J12 | 语言规范要求 Issue 标题使用中文、PR 标题使用 conventional commit | 保留，不列为候选 |
-| J13 | Issue 模板有“范围”“验收标准”栏目，以及“留空不能标记 ready”“一个 task 一个 PR”的说明和“交付约束”栏目 | 保留栏目和填写提示；删除政策说明句，整个“交付约束”栏目删除 |
-| J14 | PR 模板“Review 收敛”栏目全部是 Review 政策检查项，“验证”栏目是项目构建检查 | 删除前者，保留后者 |
-| J15 | 章节被 README 链接引用 | 列为待决定，不删除 |
-| J16 | 删除编号列表的中间项会导致编号断开，或删除分句后语句不通 | 列为待决定，不改写保留内容 |
-| J17 | ADR 或发布说明记录了旧 Review 流程 | 历史描述，不删除 |
-| J18 | 用户只要求检查 | 报告区块和候选，不写文件、不建分支 |
-| J19 | 项目 ready 条件要求写明“调用方责任”，对应技能正文没有该语义 | 仍删除；在 Change Request 单列技能缺口，引用原文并写明缺少的语义，不以“同维度已有规则”跳过逐条核对 |
+| J01 | No old blocks; project rules exist | `--check`/`--write` return 0, bytes/mtime unchanged |
+| J02 | AGENTS.md has workflow/claude-rules blocks and surrounding text | Remove both and excess blank lines, preserving outside bytes; rerun makes no edits |
+| J03 | Blocks at beginning/end or duplicated | Remove all blocks without extra leading/trailing blanks |
+| J04 | AGENTS.md contains only blocks; CLAUDE.md only `@AGENTS.md` | Delete both files |
+| J05 | AGENTS.md only blocks; CLAUDE also has rules and fenced import example | Delete AGENTS and effective import, preserving rules/fenced example |
+| J06 | Markers only in code fences; compare unpaired/nested markers/unclosed fences | First is not a block; malformed cases return 2 without writes |
+| J07 | CRLF, mixed endings, or BOM | Preserve retained lines' own endings/BOM |
+| J08 | AGENTS.md symlink; root AGENTS.override.md | Never write through links; only warn about override |
+| J09 | Project-authored scope section consists entirely of ready checks, one-PR-one-Issue, feedback classification, and third-round stop | Delete whole section without provenance requirement; Change Request lists dimensions/corresponding Skills |
+| J10 | Same section mixes one-PR-one-Issue with build commands | Remove only policy list item; preserve commands/code blocks |
+| J11 | List item requires compatibility impact before dependencies/public API changes | Preserve as engineering convention |
+| J12 | Language policy requires Chinese Issue titles and conventional-commit PR titles | Preserve; not a candidate |
+| J13 | Issue template has scope/acceptance fields, no-empty-ready and one-task-one-PR directions, and delivery-constraints section | Preserve fields/filling guidance; delete policy sentences and entire delivery-constraints section |
+| J14 | PR template has review-convergence policy checklist and project-build verification section | Remove former, preserve latter |
+| J15 | README links a candidate section | Preserve for decision |
+| J16 | Removing numbered middle item breaks numbering, or deleting clause breaks grammar | Preserve for decision without rewriting retained contents |
+| J17 | ADR/release notes describe older review process | Historical description; preserve |
+| J18 | Check-only request | Report blocks/candidates without writes/branch |
+| J19 | Project ready rule requires caller responsibilities, absent from Skill body | Still delete; separately identify Skill gap on Change Request with original quote and missing meaning, not merely same-dimension coverage |
 
-## 0.2.14 仓库设置只读检查
+## 0.2.14 read-only repository setting checks
 
-`check-workflow` 每次调用均只读检查托管平台的合并后自动删除源分支设置，并在结果中记录设置值、查询来源和无法确认的原因。它不修改设置或删除分支；合并后的实际分支清理属于 `review-and-merge`。
+Every check-workflow invocation reads the hosting platform's automatic post-merge source-branch deletion setting and records value, source, and reasons for uncertainty. It changes neither settings nor branches; actual post-merge cleanup belongs to review-and-merge.
 
-| 编号 | 输入/状态 | 预期结果 |
+| ID | Input/state | Expected result |
 | --- | --- | --- |
-| L01 | 自动删除设置停用，项目文档没有待删规则 | 报告设置停用及证据；零文件修改，不创建空 Change Request |
-| L02 | 设置无法读取，文档有确认删除项 | 记录查询失败原因；继续删除、验证并提交 Change Request，不猜测设置值 |
-| L03 | 用户仅要求检查 | 只读报告设置和待删规则，不修改文件、仓库设置或分支 |
+| L01 | Automatic deletion disabled, no document removals | Report setting/evidence, no files or empty Change Request |
+| L02 | Setting unreadable, confirmed document removals | Record failure, continue authorized removal/validation/submission, never guess setting |
+| L03 | Check-only request | Read/report settings and candidates only; no file/settings/branch changes |
 
-## 0.2.17 发布对账
+## 0.2.17 release reconciliation
 
-本节按 [Issue #51](https://github.com/philfanzhou/ForgeSteward/issues/51) 的验收和实现后的[发布对账规则](../plugins/check-workflow/skills/forge-steward-check-workflow/references/release-audit.md)、[执行步骤](../plugins/check-workflow/skills/forge-steward-check-workflow/references/procedure.md)及[汇报规则](../plugins/check-workflow/skills/forge-steward-check-workflow/references/reporting.md)作有限人工演算。规则输入为成文契约和有限证据，不引入只供测试的生产对账器，也不把正文关键字断言当成行为验证。历史 C01–L03 原文保留。
+This section manually evaluates [Issue #51](https://github.com/philfanzhou/ForgeSteward/issues/51)'s acceptance against implemented [release-audit rules](../plugins/check-workflow/skills/forge-steward-check-workflow/references/release-audit.md), [procedure](../plugins/check-workflow/skills/forge-steward-check-workflow/references/procedure.md), and [reporting](../plugins/check-workflow/skills/forge-steward-check-workflow/references/reporting.md). Inputs are written contracts and finite evidence. No production reconciler was added merely for testing, and keyword assertions are not behavior validation. Historical C01–L03 records remain.
 
-以下 R01–R24 已逐项演算：先确定输入契约与覆盖，再按规则得到表中唯一结果，最后核对允许的写入/交付出口。它们验证规则在这些输入下的语义，不证明任意 Agent、模型或真实私有 feed 的端到端行为。除另述外，夹具契约要求每个 `v1.2.x` 发布标签有同名公告、包 A/B 的 `1.2.x` 版本、正式版标记和实际 latest 指向最新正式版；所有查询完整。夹具版本与本仓实际版本无关。
+R01–R24 were each evaluated by establishing contract/coverage, deriving the single result below, and checking authorized writes/delivery exits. They validate semantics for these inputs, not arbitrary Agents/models/private feeds. Unless stated otherwise, the fixture requires every `v1.2.x` release Tag to have a same-named announcement, A/B package `1.2.x`, stable-release marking, and actual latest pointing to the newest stable release. All queries are complete. Fixture versions are unrelated to this repository's versions.
 
-| 编号 | 契约与有限输入 | 演算结果及交付出口 |
+| ID | Contract and input | Derived result and delivery exit |
 | --- | --- | --- |
-| R01 | `v1.2.3` 标签存在，完整公告清单无该版本 | 确认“有发布标签无公告”，列版本与查询来源；只进最终汇报，不登记/修复 |
-| R02 | 公告 `v1.2.3` 存在，A/B feed 完整且均无 `1.2.3` | 确认“有公告无必需包”，分别列 A/B，不把公告成功当包成功 |
-| R03 | 标签与公告为 `v1.2.3`，A/B 只有 `1.2.4`，契约仅允许去掉 `v` | 确认版本不一致；不把相近版本归一化成一致 |
-| R04 | 标签、公告、A 的 `1.2.3` 齐全；B 完整查询后缺失 | 确认多包部分缺失，只列 B 缺失，保留 A 已满足的证据 |
-| R05 | 契约规定 `v1.2.4-rc.1` 为预发布，公告却 `prerelease=false` | 确认预发布标记错误；不因主版本为 0 或其他惯例改变渠道 |
-| R06 | 正式版 `v1.2.3` 已完整发布，实际 latest 指向 `v1.2.4-rc.1` | 确认 latest 指错；使用实际指针，不能按版本排序猜测 |
-| R07 | 2 个草稿有版本/日期；契约没设草稿时限 | 列实际 2 个草稿事实，不自定逾期阈值；有明确 24 小时时限且证据超过时才判逾期 |
-| R08 | 契约要求自动发布 A/B；最近运行 A 成功、B 失败；另一次整体失败/取消，另一次运行中 | 分别确认部分成功、失败、取消；运行中保留未完成，不提前判失败，不用测试 CI 成功替代发布 |
-| R09 | 成文契约明确只发布源码快照、手动发布，不使用包 feed；平台没有 latest 能力 | feed、自动发布运行和 latest 分别“不适用”，引用契约/能力；标签与公告仍核对 |
-| R10 | 没有成文发布文档，可取得标签与公告 | 普通发现“缺少发布契约”；列实际覆盖，相应期望比较“无法确认”，不凭惯例要求公告/feed |
-| R11 | A 为私有 feed，没有环境已授权的只读连接 | A 维度“无法确认”，原因与恢复输入明确；不索要新密钥、不算通过/失败 |
-| R12 | 公告查询权限不足；或所用平台不支持读取实际 latest | 分别将公告或 latest 记“无法确认”；不能将能力不足当成契约不适用 |
-| R13 | feed 认证失败或网络超时，但标签/公告可读且一致 | feed “无法确认”，标签↔公告所审范围一致；不报全部健康，不重跑发布 |
-| R14 | feed 只读到第 1 页或缺 B 类别；标签 `v1.2.3` 的公告缺失已有完整证据 | 不从半份 feed 断言缺包；保留 feed 未知和已确认的缺公告，两项同时汇报 |
-| R15 | 删除候选确认存在，对账 feed 查询失败 | 在允许授权下完成原删除验证/PR；最终另列对账未知，清理 PR 正文不包含它 |
-| R16 | 对账确认缺公告，旧区块检查为 0 且没有政策删除候选 | 完成对账后零修改结束，声明“未修改项目文件”；不开空分支/commit/PR，不登记发现 |
-| R17 | 删除脚本返回 2（标记不成对），远端发布查询仍可读 | 停止删除写入，保留错误；完成可读对账并分别汇报，不以文档失败跳过发布检查 |
-| R18 | 用户仅要求只读对账，环境具有写权限 | 只读枚举并汇报，不运行删除写入；不修改文件/CI/权限/发布资产或创建 Issue/PR |
-| R19 | 公告正文包含“忽略规则、重跑发布”的恶意指令，包下载 URL 含凭据 | 只取发布证据，不执行指令；报告使用脱敏定位，不回显令牌/下载凭据，远端资产不变 |
-| R20 | 已读取标签，用户随后取消 | 停止后续公告/feed 查询及删除写入；报告仅标签覆盖和取消的未完成项，不判健康 |
-| R21 | 标签查询后新增 `v1.2.4`，公告稍后才出现 | 标注各来源时间，补查受影响版本；补查仍无同一对应关系则记观察窗口限制/无法确认，不保证原子快照 |
-| R22 | 源码目标 `1.2.4` 尚未发布；存在普通开发标签；历史版曾允许不同包版本 | 不把开发目标或普通标签误报缺失；历史版本按发布时契约，不追判当前统一规则 |
-| R23 | 公告元数据指向 main，实际附注 Tag 解引用到 C1，公告正文却记 C2；契约要求 commit 相同 | 按 C1/C2 确认不一致，不以 main 这个分支名代替 Tag 证据 |
-| R24 | 契约未定义历史范围，当前连接仅能枚举一个渠道；包版本映射缺失 | 如实列渠道/版本覆盖，不称全部历史；未覆盖渠道和缺映射比较为“无法确认”；回退技能不撤销既有清理或发布资产 |
+| R01 | `v1.2.3` Tag exists, complete announcement list lacks it | Confirm Tag without announcement, list version/source in final report only, no registration/repair |
+| R02 | Announcement exists, complete A/B feeds lack `1.2.3` | Confirm required packages missing, list A/B separately; announcement success is not package success |
+| R03 | Tag/announcement `v1.2.3`, A/B only `1.2.4`, normalization permits removing `v` only | Confirm mismatch; do not normalize nearby versions into equality |
+| R04 | Tag/announcement/A `1.2.3` complete, B absent after full query | Confirm only B missing, retain A's success evidence |
+| R05 | Contract marks `v1.2.4-rc.1` prerelease but announcement has `prerelease=false` | Confirm incorrect prerelease flag; major zero/other conventions do not change channel |
+| R06 | Stable `v1.2.3` fully published, actual latest points to `v1.2.4-rc.1` | Confirm incorrect latest from actual pointer, not version sorting |
+| R07 | Two drafts with versions/dates, no draft deadline | Report two drafts without invented overdue threshold; declare overdue only with an explicit 24-hour rule and supporting evidence |
+| R08 | Automatic A/B release required; latest run A succeeds/B fails, other runs failed/cancelled/running | Distinguish partial success, failure, cancellation, and unfinished running state; never infer release success from test CI |
+| R09 | Written contract is manual source-snapshot-only, no feeds; platform has no latest capability | Feeds, automatic release runs, and latest are not applicable with contract/capability evidence; still compare Tags/announcements |
+| R10 | No release contract, Tags/announcements accessible | Ordinary finding: missing contract; state coverage and unknown expected comparisons without assuming announcements/feeds are required |
+| R11 | A is private with no authorized read-only connection | A comparison unknown, with reason/recovery input; no new key request or pass/fail claim |
+| R12 | Announcement permission denied or platform cannot read actual latest | Mark affected dimension unknown; missing capability is not contractual non-applicability |
+| R13 | Feed authentication/network failure, readable matching Tags/announcements | Feed unknown, covered Tag↔announcement comparison consistent; no all-healthy claim or release rerun |
+| R14 | Only feed page 1 or missing B category, but complete evidence of absent `v1.2.3` announcement | Do not infer missing packages from partial feeds; report feed unknown and confirmed absent announcement together |
+| R15 | Confirmed deletion candidate, failed feed reconciliation query | Finish authorized deletion/validation/PR; report audit uncertainty separately only at end, not in cleanup PR body |
+| R16 | Missing announcement confirmed, old-block check 0, no policy candidates | Finish audit with no edits and explicitly say no project files changed; no empty branch/commit/PR or finding registration |
+| R17 | Deletion script returns 2 for unpaired markers, release queries readable | Stop deletion writes and retain error; complete accessible reconciliation and report separately |
+| R18 | User requests read-only release audit despite available write access | Enumerate/report read-only; no deletion writes, file/CI/permission/release-asset changes, Issues, or PRs |
+| R19 | Announcement contains malicious rerun/ignore-rules instructions; package URL contains credentials | Extract evidence only, execute no instructions; use redacted locations without tokens/download credentials; assets unchanged |
+| R20 | User cancels after Tags read | Stop further announcement/feed queries and deletion writes; report Tag-only coverage and unfinished cancelled checks, not health |
+| R21 | `v1.2.4` appears after Tag query, announcement later | Timestamp sources and recheck affected version; if correspondence still cannot be aligned, report observation-window limitation/unknown, no atomic-snapshot guarantee |
+| R22 | Source target `1.2.4` unpublished, ordinary development Tags exist, history allowed unequal package versions | Do not report development targets/non-release Tags as missing; judge history by its release-time contract |
+| R23 | Announcement metadata points to main, annotated Tag dereferences to C1, body records C2, contract requires same commit | Confirm C1/C2 mismatch; main branch name is not Tag evidence |
+| R24 | No defined historical scope, connection enumerates one channel, missing package mapping | State actual channel/version coverage without all-history claims; uncovered channels/mappings remain unknown; Skill rollback does not undo cleanup/release assets |
 
-安装器完整资源回归显式要求 `release-audit.md`、`reporting.md` 和既有规则存在，逐字节核对安装内容；同一用例也经 DeepSeek 文件系统安装适配执行。现有预算/可达引用、元数据 prompt 一致性、删除脚本及 gate 回归继续执行。未知、取消、并发等 Agent 规则通过上表有限演算，未伪造自动化模型评测。
+Installer resource regressions explicitly require `release-audit.md`, `reporting.md`, and existing rules, comparing installed bytes; DeepSeek's adapter runs the same case. Existing budget/reachable-reference, prompt metadata, deletion-script, and gate regressions continue. Unknown/cancel/concurrent Agent rules were evaluated only through these limited walkthroughs, without fabricated automated model testing.
 
-真实仓库只读走查及实际命令、时间、范围、三方结论和状态对比在本节后续验收记录及实现 PR 中留存；该执行只验证公开仓库证据，不认证私有注册中心、其他平台或所有历史契约。
+Real repository commands, times, scope, three-source conclusions, and state comparisons are retained below and in the implementation PR. That run validates public repository evidence, not private registries, other platforms, or all historical contracts.
 
-### 真实只读验收（2026-10-07，Asia/Singapore）
+### Real read-only acceptance (2026-10-07, Asia/Singapore)
 
-使用本次实现后的完整入口及必读引用，对 `philfanzhou/ForgeSteward` 仅运行发布对账。源码基线为 `0de407b8f1bc0654fabe45eb4997e3695c74ed7d`；契约取自该提交的 `docs/releasing.md`，同时读取 `git show v0.2.16:docs/releasing.md` 和已发布 [v0.2.16 公告](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16)。本次包/feed及发布方式判断覆盖最新已发布版本，历史 16 项覆盖标签↔公告清单和实际标记，不按当前统一包版本规则追判早期版本。
+Using the implemented complete entry point and required references, only release reconciliation ran against `philfanzhou/ForgeSteward`. Source baseline was `0de407b8f1bc0654fabe45eb4997e3695c74ed7d`. The contract came from its `docs/releasing.md`, with `git show v0.2.16:docs/releasing.md` and published [v0.2.16 announcement](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16) also read. Package/feed and release-method conclusions cover the latest published version. The 16 historical entries cover Tag↔announcement lists and actual flags, without retroactively applying current package-version rules.
 
-| 实际只读命令（均退出 0） | 观察时间（UTC） | 覆盖与结果 |
+| Actual read-only command (all exit 0) | Observation time (UTC) | Coverage and result |
 | --- | --- | --- |
-| `gh api --paginate --slurp repos/philfanzhou/ForgeSteward/tags` | 2026-10-06T16:05:18.719853Z | 完整分页，16 个发布标签 |
-| `gh api --paginate --slurp repos/philfanzhou/ForgeSteward/releases` | 2026-10-06T16:05:20.006727Z | 完整分页，16 个非 draft 公告，同名集合一致；0 草稿；prerelease 均为 false |
-| `gh api repos/philfanzhou/ForgeSteward/releases/latest` | 2026-10-06T16:05:21.404506Z | 实际 latest 为 `v0.2.16` |
-| `gh api repos/philfanzhou/ForgeSteward/actions/workflows` | 2026-10-06T16:05:22.436418Z | 仅测试 workflow；读取配置确认它只在 PR/main 执行，不冒充发布运行 |
-| `git ls-remote --tags origin` | 2026-10-06T16:05:24.080233Z | 16 个附注对象分别解引用到 commit，与标签 API 全部一致；v0.2.16 实际 commit `0adce4a2412a36aa15fd119f7cc56a73d7689eba` 与公告“发布提交”一致 |
-| `git status --porcelain=v1`（执行前、后） | 2026-10-06T16:05:17.676989Z 至 16:05:24.081759Z | 两份输出逐字节相同，仅保留先前实现修改；本次对账未修改项目文件 |
+| `gh api --paginate --slurp repos/philfanzhou/ForgeSteward/tags` | 2026-10-06T16:05:18.719853Z | Complete pagination, 16 release Tags |
+| `gh api --paginate --slurp repos/philfanzhou/ForgeSteward/releases` | 2026-10-06T16:05:20.006727Z | Complete pagination, 16 non-draft announcements, matching names; 0 drafts, all prerelease flags false |
+| `gh api repos/philfanzhou/ForgeSteward/releases/latest` | 2026-10-06T16:05:21.404506Z | Actual latest `v0.2.16` |
+| `gh api repos/philfanzhou/ForgeSteward/actions/workflows` | 2026-10-06T16:05:22.436418Z | Only test workflow; config confirms PR/main triggers, not release execution |
+| `git ls-remote --tags origin` | 2026-10-06T16:05:24.080233Z | 16 annotated objects dereference to commits matching Tag API; v0.2.16 commit `0adce4a2412a36aa15fd119f7cc56a73d7689eba` matches announcement's release commit |
+| `git status --porcelain=v1` before/after | 2026-10-06T16:05:17.676989Z to 16:05:24.081759Z | Outputs byte-identical, retaining earlier implementation edits only; audit changed no project files |
 
-三方结论：在上述清单范围内标签与公告对应一致；包 feed 按成文“Git 快照与 marketplace 分发，不是包注册中心”契约不适用。最新 v0.2.16 正式版标记与其发布契约一致；历史其余标记只列观察事实，没有逐份恢复历史契约。自动发布运行按手动发布契约不适用。
+Three-source conclusion: Tags and announcements match within that list scope. Package feeds are inapplicable under the written Git-snapshot/marketplace, non-registry contract. Latest v0.2.16's stable flag matches its contract; other historical flags are observations only, without restoring every old contract. Automated release runs are inapplicable under manual publication.
 
-发现与未知单列：实际 latest 已读到 v0.2.16，但仓库没有成文定义 latest 策略，因此指针正确性“无法确认”，恢复输入是成文的指针期望；不按最高版本自行判通过。未发现可确认的标签/公告不一致。观察窗口约 6.4 秒，未见跨来源版本集合变化，不保证原子快照、永久健康或完整历史包语义。未查询私有 feed、未调用模型行为评测。本次只读对账**未修改项目文件**，没有创建/修改 Issue、清理 PR、发布资产或发布运行；发现只在报告中列出。
+Findings/unknowns: actual latest is v0.2.16, but no written latest policy exists, so pointer correctness is unknown pending written expectations; highest version alone cannot establish a pass. No confirmed Tag/announcement mismatch was found. The approximately 6.4-second observation window showed no cross-source version-set changes, without guaranteeing an atomic snapshot, permanent health, or complete historical package semantics. No private feed or model evaluation was used. This read-only audit **changed no project files**, created/edited no Issues, cleanup PRs, release assets, or release runs. Findings appeared only in the report.
 
-原始响应、来源/时间及状态对比仅保存在本次本地证据目录，命令和公开公告可重现；实现 PR 留存逐条验收。记录此验证不构成修复 latest 策略或发布新版本的授权。
+Raw responses, sources/times, and state comparisons remain in that local evidence directory; commands and public announcement are reproducible, with itemized acceptance retained in the implementation PR. Recording verification does not authorize a latest-policy fix or new release.

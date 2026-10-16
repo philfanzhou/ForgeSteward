@@ -5,27 +5,27 @@ description: Review the existing open change requests, then run a bounded number
 
 # Work Cycle
 
-## 规则加载
+## Load the rules
 
-开始前完整读取 [启动与低频检查](references/startup.md)、[子 Agent 生命周期与恢复](references/agents.md) 、[轮次、交接与终止](references/cycles.md) 、[已完成项先往下走](references/concurrency.md)、[并发时的本地验证](references/verification.md)、[运行记录与耗时](references/run-record.md)、[其他 Agent 安装检查与升级](references/agent-check.md) 和 [最终汇报](references/report.md)。这些文件是本技能必需规则，路径以本 `SKILL.md` 所在目录为基准。这些规则文件的读取结果截断时分段补读到末尾（不适用于 CI 日志、测试输出等其他工具结果）；文件缺失或不可读时说明路径并停止受影响操作。上下文压缩后重新读取缺失的当前阶段规则。
+Before starting, read [Startup and infrequent checks](references/startup.md), [Subagent lifecycle and recovery](references/agents.md), [Cycles, handoffs, and stopping](references/cycles.md), [Move completed items forward](references/concurrency.md), [Concurrent local verification](references/verification.md), [Run records and timing](references/run-record.md), [Other Agent installations and upgrades](references/agent-check.md), and [Final report](references/report.md) in full. These are required rules; resolve paths from this `SKILL.md`. Read truncated rule-file results in further sections through the end (not CI logs, test output, or other tool results). Identify missing/unreadable paths and stop affected actions. After compaction, reload missing current-stage rules.
 
-各阶段子 Agent 必须从自己实际安装的技能目录完整读取对应 `SKILL.md` 及该入口要求的引用文件；本编排技能不复制或替代五个技能的业务规则。
+Each stage subagent must read its actual installed skill's `SKILL.md` and all references required by that entry in full. This orchestrator does not duplicate or replace the five skills' business rules.
 
-## 输入与授权
+## Input and authorization
 
-用户明确调用本技能时，执行完整的准备、实施、审查、必要修复及符合门禁时的合并。唯一可选输入是一个正整数，表示最多运行多少个工作周期；省略时默认 **10**。不要求用户另选模式或逐阶段再次确认。没有有效轮数时请求一个正整数，不猜测。仅提到本技能、隐式匹配或询问用法，不构成执行及合并授权。
+Explicit invocation runs preparation, implementation, review, necessary repairs, and eligible merges. The sole optional input is a positive integer limiting work cycles; default to **10** when omitted. Do not ask for another mode or repeated stage confirmations. For an invalid count, request a positive integer instead of guessing. Mentioning the skill, implicit matching, or asking about usage does not authorize execution or merging.
 
-显式调用授予本次完整流程所需的 Issue 更新、实现分支、commit、push、Change Request、Review Feedback 和符合条件的合并权限；仍遵守实际托管平台权限、必要检查与审批、分支保护及所属仓库规范。不得绕过门禁，不能把提交、等待 CI 或修复推送说成已合并。用户明确停止时停止；本技能不增加其他调用参数或默认的人工确认点。
+Invocation authorizes the Issue updates, implementation branches, commits, pushes, Change Requests, Review Feedback, and eligible merges needed for this full run. Still obey actual platform permissions, required checks/approvals, branch protection, and owning-repository conventions. Never bypass conditions or describe a commit, CI wait, or repair push as merged. Stop when the user explicitly stops; add no invocation parameters or default human-confirmation steps.
 
-## 必须使用子 Agent
+## Subagents are required
 
-编排 Agent 只负责预检、低频检查判定、派发、等待、核对交接和最终汇总。每次实际调用 `check-workflow`、`prepare-work`、`execute-work`、`review-and-merge`、`fix-feedback`，**必须**创建负责该阶段的子 Agent，让该子 Agent 加载并执行对应技能；不能由编排 Agent 在自身上下文代做，也不能只让子 Agent 提供建议后由编排 Agent 代做。后续再审查同样创建新的审查子 Agent。阶段完成后等待其结果，保存简短、可追溯的交接，再启动依赖它的阶段。运行时支持时，已完成的项按 [已完成项先往下走](references/concurrency.md) 提前进入下一阶段：一个 Change Request 同一时间只归一个阶段，各阶段使用独立工作区，共享进度记录只由编排 Agent 写；不支持时逐阶段串行。
+The orchestrator only prechecks, decides on infrequent checks, dispatches, waits, verifies handoffs, and summarizes. Every actual `check-workflow`, `prepare-work`, `execute-work`, `review-and-merge`, or `fix-feedback` invocation **must** create a stage subagent that loads and executes that skill. The orchestrator may not do the work itself or have a subagent advise while it acts. Every later review also requires a new review subagent. Await stage results, save a concise traceable handoff, then start dependent stages. When runtime support permits, follow [Move completed items forward](references/concurrency.md): a Change Request belongs to only one stage at a time; stages use separate workspaces; only the orchestrator writes shared progress. Otherwise run stages sequentially.
 
-启动前确认运行环境提供创建和等待子 Agent 的能力，并确认五个阶段技能均可由子 Agent 读取，且与本插件使用相同的统一版本。确认能力或技能缺失时记录具体缺口并停止，不悄悄退化为单 Agent 执行。额度较低、接近限制的提醒不构成能力缺失；实际调用失败先按 [生命周期与恢复规则](references/agents.md) 核对状态并有限恢复，不因一次失败直接结束。不同 Agent 的子 Agent API 属于各自适配层，本技能不指定某个平台命令。子 Agent 只继承本次显式调用的范围和仓库授权，执行自身技能的完整门禁。
+Before starting, confirm the runtime can create and wait for subagents and that all five stage skills are readable and share this plugin's unified version. Record confirmed capability/skill gaps and stop; never silently fall back to a single agent. Low-quota or near-limit warnings are not missing capabilities. For actual call failures, inspect status and attempt bounded recovery under [Lifecycle and recovery](references/agents.md); do not stop after one failure. Agent-specific subagent APIs belong in adapters; this skill mandates no platform command. Subagents inherit only this invocation's scope and repository authorization and enforce their own skill's full requirements.
 
-## 总体顺序
+## Overall order
 
-1. 按 [启动与低频检查](references/startup.md) 对目标仓库判定是否启动一次 `check-workflow` 子 Agent。普通提交、候选文件变化、Change Request 的创建或合并都不触发它。它不占工作周期。运行记录开始后按 [其他 Agent 安装检查](references/agent-check.md) 做一次只读检查，不等它结束即可继续。
-2. 启动时先冻结并处理已有的开放 Change Request 队列，按 [轮次、交接与终止](references/cycles.md) 派发审查、必要修复和复审子 Agent；这一步不占工作周期，也不依赖 `prepare-work` 是否返回 Issue。没有开放项时跳过。
-3. 最多运行指定周期数。每周期依次派发准备、执行、审查，存在范围内必修反馈时派发修复，再派发必要的复审。详细阶段交接、第三轮终审和停止条件见 [轮次、交接与终止](references/cycles.md)。
-4. `prepare-work` 返回 `[]` 时立即停止新增周期，即使尚未达到上限；一个 Issue/Change Request 暂停不阻止同轮其他项及后续独立工作。最后按实际远端状态核对后，按 [最终汇报](references/report.md) 生成并贴出汇报，不按轮数推定交付；汇报问到其他 Agent 的安装或升级时，只在用户明确同意后按[安装检查与升级](references/agent-check.md)处理。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。转述子 Agent 的结果时改写成日常说法，不原样照搬。
+1. Use [Startup and infrequent checks](references/startup.md) to decide whether the target needs one `check-workflow` subagent. Ordinary commits, candidate-file changes, and Change Request creation/merging do not trigger it. It does not count as a cycle. After starting the run record, perform one read-only [Agent installation check](references/agent-check.md), without waiting for it before continuing.
+2. At startup, freeze and handle existing open Change Requests through review, necessary repair, and re-review subagents under [Cycles, handoffs, and stopping](references/cycles.md). This does not count as a cycle or depend on prepare-work returning Issues. Skip if none are open.
+3. Run at most the requested cycles. Each dispatches preparation, execution, review, required in-scope repairs, and necessary re-review in order. See [Cycles, handoffs, and stopping](references/cycles.md) for detailed handoffs, third-round final review, and stopping.
+4. Stop starting cycles immediately when prepare-work returns `[]`, even below the limit. A paused Issue/Change Request does not block independent items in that cycle or later work. Check actual remote state and generate/post the [Final report](references/report.md); never infer delivery from cycle counts. If the report asks about other Agent installations/upgrades, act only after explicit user consent under [Installation checks and upgrades](references/agent-check.md). Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts. Restate subagent results in everyday language instead of copying them verbatim.

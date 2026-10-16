@@ -1,71 +1,70 @@
-# 发布规范
+# Release policy
 
-## 版本与交付物
+## Versions and deliverables
 
-ForgeSteward 通过 Git 仓库快照和 Agent 各自的 marketplace 分发，不是 npm、PyPI 或 NuGet 包注册中心。当前没有自动打 Tag、上传包或生成 Release 的流水线；已有 CI 只在 PR 和 main 推送时运行测试。本规范先采用维护者授权的手动发布，不把推送任意分支等同于发布。
+ForgeSteward is distributed through Git repository snapshots and Agent marketplaces, not npm, PyPI, or NuGet registries. There is currently no automated pipeline for creating Tags, uploading packages, or creating Releases; existing CI runs tests on PRs and main pushes. This policy uses maintainer-authorized manual releases. Pushing an arbitrary branch is not publication.
 
-| 标识 | 管理内容 | 事实来源 |
+| Identifier | Managed contents | Source of truth |
 | --- | --- | --- |
-| 仓库 Tag `vX.Y.Z` | 整个仓库，包括市场索引、全部插件、安装器和文档 | 已审查 main 提交上的附注 Tag |
-| 统一版本 `X.Y.Z` | 所有插件的完整包内容及本次仓库发布 | 根目录 `VERSION`；全部插件的三份 `plugin.json` 版本必须与其一致 |
-| GitHub Release | 版本对应表、实际提交 SHA、变更说明、验证和边界 | 同名 Tag 的发布页面 |
+| Repository Tag `vX.Y.Z` | Entire repository, including marketplace indexes, every plugin, installers, and docs | Annotated Tag on a reviewed main commit |
+| Unified version `X.Y.Z` | Complete contents of every plugin package and this repository release | Root `VERSION`; all three `plugin.json` manifests per plugin must match |
+| GitHub Release | Version mapping table, actual commit SHA, changes, verification, and limitations | Release page for the matching Tag |
 
-仓库与所有插件采用统一版本：`VERSION` 为 `X.Y.Z` 时，全部插件的包版本均为 `X.Y.Z`，发布 Tag 必须为 `vX.Y.Z`；候选版后缀也须完全一致。该规则在 `0.2.2` 开发基线引入，当前未发布目标以 `VERSION` 为准，历史发布记录不改写。仓库级安装器随仓库 Tag 固定，目前没有独立安装器包版本。独立安装不等于独立升版，用户仍可仅安装其中一个插件；本项目未提供任意混搭各插件历史版本的解析器。
+The repository and all plugins share one version: when `VERSION` is `X.Y.Z`, all package versions are `X.Y.Z` and the release Tag must be `vX.Y.Z`; prerelease suffixes must also match exactly. This rule began in the `0.2.2` development baseline. `VERSION` determines the current unreleased target; historical release records remain unchanged. Repository installers are pinned with the repository Tag and have no separate package version. Independent installation does not mean independent versioning. Users may still install only one plugin; the project offers no resolver for arbitrary mixes of historical plugin versions.
 
-## 升版规则
+## Version bump rules
 
-- 仓库发布使用 `vX.Y.Z`；候选版可用 `vX.Y.Z-rc.N`，GitHub 标为 prerelease。`0.x` 阶段仍属早期接口，不代表 1.0 稳定承诺；首个正式编号为 `v0.2.0`，不追补不存在的历史 Tag。
-- 版本号由用户决定，Agent 不得自行升版，以 [AGENTS.md 的统一版本规则](../AGENTS.md#统一版本) 为准。用户要求升版但没有指定目标版本时只递增最后一位，其他位或候选版渠道由用户明确指定；变化规模不构成跨位升版的理由。不兼容变化必须在版本说明中写清迁移，不以 patch 编号暗示兼容。
-- 根据整次发布的变化确定一个版本，同步更新 `VERSION` 和全部插件清单；即使某个插件功能未变，或只有根目录 README、安装器变化，也必须统一升版。开发提交可以继续使用尚未发布的目标版本，不要求逐提交升版。Agent 修改仓库内容时不自动升版，只在用户明确要求时修改版本号，见 [AGENTS.md 的统一版本规则](../AGENTS.md#统一版本)。
-- 插件的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 同步名称及版本。Claude / ZCode 共用市场的 `plugins[].version` 是 ZCode 更新检测所需的派生值，不是独立版本源；统一清单后执行 `python3 scripts/sync_marketplace.py --write`，发布前运行 `--check`。Codex 市场格式不变。所有引用仍指向同快照内的相对路径，不通过索引版本单独切换插件代码。
-- 同一已发布插件版本不得对应不同包内容；后续仓库 Release 不重用旧插件版本，即使功能未变也更新版本字段。尤其 Claude 的显式版本影响缓存更新，不应靠移动 Tag 或只改市场版本来绕过缓存。参见 [Claude 版本规则](https://code.claude.com/docs/en/plugin-marketplaces#version-resolution-and-release-channels)。
-- 已发布 Tag 不移动、不覆盖、不删除再重建；修复发布新版本。附注 Tag 默认不等于密码学签名；需要签名时另行配置，不能将本规范冒充服务端 Tag 保护规则。
+- Repository releases use `vX.Y.Z`; candidates may use `vX.Y.Z-rc.N`, marked prerelease on GitHub. The `0.x` series remains an early interface, not a 1.0 stability promise. The first numbered release was `v0.2.0`; do not invent earlier Tags.
+- Users decide versions; Agents must not bump them independently. Follow [AGENTS.md's unified version rules](../AGENTS.md#unified-version). A requested bump without a target increments only the last component; other components or prerelease channels require explicit user choice. Change size does not justify changing another component. Document migration for incompatible changes rather than implying compatibility from a patch number.
+- Choose one version for the entire release and update `VERSION` and all plugin manifests together, even if a plugin's functionality is unchanged or only the root README/installer changed. Development commits may keep an unreleased target; no per-commit bump is required. Agents change versions only on explicit user request, following [AGENTS.md](../AGENTS.md#unified-version).
+- Keep each plugin's `plugin.json`, `.codex-plugin/plugin.json`, and `.claude-plugin/plugin.json` names and versions synchronized. Shared Claude/ZCode marketplace `plugins[].version` is derived metadata for ZCode update detection, not a separate version source. After synchronizing manifests, run `python3 scripts/sync_marketplace.py --write`, then `--check` before release. Codex marketplace format stays unchanged. References remain relative paths within the same snapshot; index versions do not independently switch plugin source.
+- A published plugin version must never identify different package contents. Later repository Releases do not reuse old plugin versions, even for unchanged functionality. Claude's explicit version in particular affects cache updates; do not move Tags or change only marketplace metadata to bypass caching. See [Claude version rules](https://code.claude.com/docs/en/plugin-marketplaces#version-resolution-and-release-channels).
+- Never move, overwrite, or delete and recreate published Tags; release a new version for fixes. Annotated Tags are not cryptographic signatures by default. Configure signing separately if needed; this policy does not substitute for server-side Tag protection.
 
-## 发布步骤与门禁
+## Release steps and requirements
 
-1. 维护者确定版本及授权。在工作分支准备变更，新增 `docs/releases/<tag>.md` 的版本对应表、变更、迁移、验证边界；同一 PR 把 README 开头、安装总表和各 Agent 安装/升级/卸载命令里的版本号改成新的 `VERSION`。新增、改名插件或某个 Agent 的命令变化时，先改 work-cycle 技能包内的 `scripts/agents.json`，再按它同步 README。`tests/test_agent_catalog.py` 校验 README 与 `VERSION`、插件目录和 `agents.json` 一致，漏改时测试失败并指出缺少的插件或不一致的版本。该 PR 合并后立即按下面的步骤打 Tag、发 Release；README 已说明以 Releases 页面为准、Tag 发布前的短暂时间里该版本可能还看不到。由于 `VERSION` 只在发版时修改，README 不会长期指向未发布的版本。历史表不随当前插件升版而改写。
-2. 核对 `VERSION`、全部插件的三份 manifest、共用市场的派生版本及完整资源，全部包版本必须相同且等于 `VERSION`，执行 `python3 scripts/sync_marketplace.py --check`。人工核对目标 Tag 恰为 `v` 加 `VERSION`，本次 Release 对应表全部插件版本相同；同时对照上次发布记录确认使用新版本。CI 的元数据测试校验源码中的版本一致性，不代替远端 Tag 和 Release 对应表的发布核对。
-3. 提交并审查 PR。执行 `python3 scripts/check_skill_limits.py --check`、`python3 -m unittest discover -s tests -v`、`git diff --check`、相对文档链接和版本表核对；执行可用的 Agent 校验。PR 的三个 OS 安装器检查及固定 OpenCode 发现检查必须通过。若 Agent 包有变化，补充受影响 Agent 的安装验证；明确未做模型行为验证。
-4. 通过仓库保护合并，禁止向 main 直接推送或绕过检查。记录审查 head、实际 main 合并提交和 CI 链接；等待该 main 提交的四个检查通过，若合并后源码不同则补验。
-5. 使用只读查询核对目标 Tag/Release 不存在；已存在时核对目标而非覆盖。只对上一步确切的已验证提交创建附注 Tag，推送这一条 Tag，不执行批量 `--tags` 推送。发布命令应使用已解析的明确 SHA，不能在 main 后续移动后重新猜测目标。
-6. 推送后回读远端 Tag：附注对象与其指向的 commit 是两个不同 SHA，需解引用到 commit 并与审查记录核对。使用 `gh release create <tag> --verify-tag` 关联已有 Tag，不让平台静默从最新 main 创建标签。
-7. Release 标题只写 Tag 名，例如 `v0.2.18`，不加项目名或其他文字。Release 正文使用中文，列出确切 commit SHA、对应表、安装链接、CI、兼容性和迁移。当前只发布 Git 快照及 GitHub 自动源码归档，不宣称提供独立构建包或全 Agent 端到端行为认证。
-8. 复核远端 Tag、Release 的 tagName/draft/prerelease 状态及链接；在 PR 留存交接。仅清理本任务已合并且无独有工作的分支/临时目录，不触及用户安装。
+1. Obtain the maintainer's version choice and authorization. Prepare changes on a working branch and add `docs/releases/<tag>.md` with the mapping table, changes, migration, and verification boundaries. In the same PR update versions in the README opening, installation table, and each Agent's installation/upgrade/uninstall commands to the new `VERSION`. For added/renamed plugins or changed Agent commands, update work-cycle's bundled `scripts/agents.json` first, then synchronize README. `tests/test_agent_catalog.py` checks README against `VERSION`, plugin directories, and `agents.json`, identifying missing plugins or mismatched versions. After merge, immediately Tag and publish using the steps below. README says Releases are authoritative and the new version may briefly be unavailable before the Tag is published. Since `VERSION` changes only for releases, README should not point at an unpublished version long term. Do not rewrite historical tables when current plugins are bumped.
+2. Check `VERSION`, every plugin's three manifests, shared-marketplace derived versions, and complete resources. Every package version must match `VERSION`. Run `python3 scripts/sync_marketplace.py --check`. Manually confirm the target Tag is exactly `v` plus `VERSION` and every plugin in the new Release mapping table has that version. Compare the previous release record to confirm a new version. CI metadata tests check source consistency, not the remote Tag and Release mapping.
+3. Submit and review the PR. Run `python3 scripts/check_skill_limits.py --check`, `python3 -m unittest discover -s tests -v`, `git diff --check`, relative-document link checks, and version-table checks; run available Agent validation. All three OS installer checks and pinned OpenCode discovery checks must pass. For changed Agent packages, add affected-Agent installation verification and explicitly disclose the absence of model-behavior testing.
+4. Merge through repository protection without direct main pushes or bypassing checks. Record the reviewed head, actual main merge commit, and CI links. Wait for all four checks on that main commit to pass; verify again if the merged source differs.
+5. Query read-only to confirm the target Tag/Release does not exist. If it exists, verify its target instead of overwriting it. Create an annotated Tag only on the exact verified commit from the previous step and push that single Tag, never bulk `--tags`. Use a resolved explicit SHA in release commands; do not guess again after main moves.
+6. Reread the remote Tag after pushing. Its annotated object and target commit have different SHAs: dereference to the commit and compare with the review record. Use `gh release create <tag> --verify-tag` to associate the existing Tag, rather than letting the platform silently create one from latest main.
+7. Use only the Tag name as the Release title, such as `v0.2.18`, with no project name or extra text. Write the Release body in English, including the exact commit SHA, mapping table, installation links, CI, compatibility, and migration. Current releases contain Git snapshots and GitHub's automatic source archives; do not claim standalone build packages or end-to-end certification across all Agents.
+8. Verify remote Tag and Release tagName/draft/prerelease state and links, and leave the handoff on the PR. Clean only this task's merged branches/temporary directories with no unique work; do not touch user installations.
 
-以上 `<tag>` 是参数占位符，不是可直接执行的 shell 文本。维护者执行前须填入经过核对的值。
+`<tag>` above is a parameter placeholder, not directly executable shell text. Fill in verified values before running commands.
 
-## 状态、失败与回退
+## State, failure, and rollback
 
-- 仓库里的版本文档是发布输入，不代表已发布。以远端 Tag 和非 draft 的同名 GitHub Release 共同确认完成。Release 正文记录完整提交 SHA；同一提交内的文档不写自身提交 SHA，避免循环依赖。
-- Tag 已推送而 Release 创建失败：保留 Tag，核对目标后重试同一个 Release，不重新打 Tag。返回结果不确定时先查询，避免重复创建。
-- 发现发布内容有问题：标明已知问题、建议用户回退，另开修复 PR 并发新版本；不要删除已有版本掩盖问题。版本说明更正须注明勘误，不能改变 Tag 的源码身份。
-- 用户回退安装见 [固定版本安装](versioned-installation.md)。回退技能不自动撤销其已产生的代码、项目规则或托管平台操作。
+- Version documents in the repository are release inputs, not proof of publication. Confirm completion using both the remote Tag and matching non-draft GitHub Release. The Release body records the full commit SHA; documents in that same commit do not include their own SHA, avoiding circular dependence.
+- If Tag push succeeds but Release creation fails, retain the Tag, verify its target, and retry the same Release without retagging. Query first after an uncertain result to avoid duplicate creation.
+- If released contents are faulty, disclose known problems, recommend rollback, and open a fix PR followed by a new version. Do not delete existing versions to hide problems. Corrections to release notes must be marked as errata and cannot change the Tag's source identity.
+- See [fixed-version installation](versioned-installation.md) for user rollback. Rolling back a Skill does not undo code, project rules, or hosting-platform actions it already produced.
 
-## 当前发布输入
+## Current release input
 
-当前源码目标为 `0.2.23`，发布输入见 [对应表与说明](releases/v0.2.23.md)。是否已发布以远端同名 Tag 与非 draft Release 为准。版本号只在用户明确要求时修改，见[统一版本规则](../AGENTS.md#统一版本)。
+The current source target is `0.2.23`; see its [mapping table and notes](releases/v0.2.23.md). Publication is determined by the matching remote Tag and non-draft Release. Change versions only on explicit user request; see [unified version rules](../AGENTS.md#unified-version).
 
-## 发布记录
-
-- [v0.2.22 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.22)；[对应表与说明](releases/v0.2.22.md)
-- [v0.2.21 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.21)；[对应表与说明](releases/v0.2.21.md)
-- [v0.2.20 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.20)；[对应表与说明](releases/v0.2.20.md)
-- [v0.2.19 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.19)；[对应表与说明](releases/v0.2.19.md)
-- [v0.2.18 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.18)；[对应表与说明](releases/v0.2.18.md)
-- [v0.2.17 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.17)；[对应表与说明](releases/v0.2.17.md)
-- [v0.2.16 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16)；[对应表与说明](releases/v0.2.16.md)
-- [v0.2.15 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.15)；[对应表与说明](releases/v0.2.15.md)
-- [v0.2.14 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.14)；[对应表与说明](releases/v0.2.14.md)
-- [v0.2.13 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.13)；[对应表与说明](releases/v0.2.13.md)
-- [v0.2.12 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.12)；[对应表与说明](releases/v0.2.12.md)
-- [v0.2.11 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.11)；[对应表与说明](releases/v0.2.11.md)
-- [v0.2.10 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.10)；[对应表与说明](releases/v0.2.10.md)
-- [v0.2.9 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.9)；[对应表与说明](releases/v0.2.9.md)
-- [v0.2.8 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.8)；[对应表与说明](releases/v0.2.8.md)
-- [v0.2.7 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.7)；[对应表与说明](releases/v0.2.7.md)
-- [v0.2.6 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.6)；[对应表与说明](releases/v0.2.6.md)
-- [v0.2.5 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.5)；[对应表与说明](releases/v0.2.5.md)
-- [v0.2.4 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.4)；[对应表与说明](releases/v0.2.4.md)
-- [v0.2.3 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3)；[原准备文档](releases/v0.2.3.md)保留当时状态及历史对应表，实际发布记录以 Release 为准。
-- [v0.2.1 对应表与说明](releases/v0.2.1.md)
-- [v0.2.0 对应表与说明](releases/v0.2.0.md)
+## Release records
+- [v0.2.22 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.22); [mapping table and notes](releases/v0.2.22.md)
+- [v0.2.21 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.21); [mapping table and notes](releases/v0.2.21.md)
+- [v0.2.20 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.20); [mapping table and notes](releases/v0.2.20.md)
+- [v0.2.19 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.19); [mapping table and notes](releases/v0.2.19.md)
+- [v0.2.18 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.18); [mapping table and notes](releases/v0.2.18.md)
+- [v0.2.17 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.17); [mapping table and notes](releases/v0.2.17.md)
+- [v0.2.16 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.16); [mapping table and notes](releases/v0.2.16.md)
+- [v0.2.15 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.15); [mapping table and notes](releases/v0.2.15.md)
+- [v0.2.14 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.14); [mapping table and notes](releases/v0.2.14.md)
+- [v0.2.13 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.13); [mapping table and notes](releases/v0.2.13.md)
+- [v0.2.12 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.12); [mapping table and notes](releases/v0.2.12.md)
+- [v0.2.11 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.11); [mapping table and notes](releases/v0.2.11.md)
+- [v0.2.10 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.10); [mapping table and notes](releases/v0.2.10.md)
+- [v0.2.9 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.9); [mapping table and notes](releases/v0.2.9.md)
+- [v0.2.8 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.8); [mapping table and notes](releases/v0.2.8.md)
+- [v0.2.7 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.7); [mapping table and notes](releases/v0.2.7.md)
+- [v0.2.6 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.6); [mapping table and notes](releases/v0.2.6.md)
+- [v0.2.5 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.5); [mapping table and notes](releases/v0.2.5.md)
+- [v0.2.4 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.4); [mapping table and notes](releases/v0.2.4.md)
+- [v0.2.3 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.3); its [original preparation document](releases/v0.2.3.md) preserves the state and historical mapping table at that time; the Release is authoritative for actual publication.
+- [v0.2.1 mapping table and notes](releases/v0.2.1.md)
+- [v0.2.0 mapping table and notes](releases/v0.2.0.md)

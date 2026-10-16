@@ -1,4 +1,4 @@
-"""校验统一版本、显示名称及稳定的安装和调用标识。"""
+"""Check unified versions, display names, and stable install/invocation identifiers."""
 
 import json
 from pathlib import Path
@@ -22,7 +22,7 @@ class PluginMetadataTests(unittest.TestCase):
         version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
         self.assertRegex(version, r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-rc\.(?:0|[1-9]\d*))?$")
         plugins = sorted(path for path in (REPO / "plugins").iterdir() if path.is_dir())
-        self.assertTrue(plugins, "必须至少存在一个插件，禁止空集合通过版本检查")
+        self.assertTrue(plugins, "At least one plugin must exist; an empty set must not pass version checks")
         for plugin in plugins:
             for relative in ("plugin.json", ".codex-plugin/plugin.json", ".claude-plugin/plugin.json"):
                 with self.subTest(plugin=plugin.name, manifest=relative):
@@ -38,7 +38,7 @@ class PluginMetadataTests(unittest.TestCase):
                 self.assertEqual(manifest["interface"]["displayName"], expected)
                 skill = plugin / "skills" / ("forge-steward-" + name)
                 metadata = (skill / "agents/openai.yaml").read_text(encoding="utf-8")
-                # 项目约定的双引号标量也是 JSON 字符串；完整 YAML 由 Agent 校验器校验。
+                # The project's double-quoted scalars are also JSON strings; Agent validators check full YAML.
                 values = re.findall(r'^  display_name: (".*")\s*$', metadata, re.MULTILINE)
                 self.assertEqual(len(values), 1)
                 self.assertEqual(json.loads(values[0]), expected)

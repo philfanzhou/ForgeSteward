@@ -1,20 +1,20 @@
-# 固定版本安装、升级与回退
+# Installing, upgrading, and rolling back fixed versions
 
-当前版本的安装、升级、卸载以 README 的[支持的 Agent 与安装方式](../README.md#supported-agents-and-installation)为准，五个 Agent 的命令都在那里；选择其他已发布版本见[升级并只保留所选版本](../README.md#upgrade-and-keep-only-the-selected-version)，卸载核对见[卸载与核验](../README.md#uninstall-and-verify)。本页补充固定版本、作用域及回退边界，其中以 `v0.2.1` 为例的命令是历史版本的写法，不是当前推荐的安装方式；升级 Agent 程序本身不等于升级固定 Tag 的技能。
+For installation, upgrades, and uninstall of the current release, use the README's [supported Agents and installation](../README.md#supported-agents-and-installation), which contains commands for all five Agents. To choose another published version, see [upgrade and keep only the selected version](../README.md#upgrade-and-keep-only-the-selected-version); for removal checks, see [uninstall and verify](../README.md#uninstall-and-verify). This page adds pinning, scope, and rollback boundaries. Commands using `v0.2.1` illustrate a historical version, not the currently recommended installation. Upgrading the Agent application does not upgrade Skills pinned to a Tag.
 
-## 先选择版本
+## Choose a version first
 
-从 [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择已经发布的 Tag，并阅读对应表和迁移说明。下例使用 `v0.2.1`；在 Tag/Release 发布完成前不可将示例视作可用远端版本。
+Choose a published Tag from [GitHub Releases](https://github.com/philfanzhou/ForgeSteward/releases) and read its mapping table and migration notes. Examples below use `v0.2.1`; an example is not an available remote version until its Tag and Release are published.
 
-项目要求统一版本：发布 Tag `vX.Y.Z` 对应全部插件包版本 `X.Y.Z`，包括功能未变的插件。源码根目录 `VERSION` 记录目标版本，不代表已发布；安装仍须选择已发布的 Tag。此规则在 `0.2.2` 开发基线引入，当前目标以 `VERSION` 为准，历史版本以原对应表为准；示例 `v0.2.1` 的四个插件也均为 `0.2.1`。`find-work@forge-steward` 中的 `@` 后面是市场名称，不支持将它直接替换成包版本号。本仓库两个市场都从快照内的相对路径加载插件，因此选择 Tag 固定整份市场，而不是独立解析每个插件的历史版本。仍可只安装一个技能；若需要不同快照的插件混搭，需要另外设计分发来源，不能靠修改缓存实现。
+The project requires a unified version: release Tag `vX.Y.Z` corresponds to package version `X.Y.Z` for every plugin, including those with unchanged functionality. The root `VERSION` records a source target, not publication; installation still requires a published Tag. This rule began in the `0.2.2` development baseline. Use `VERSION` for the current target and original mapping tables for historical versions; all four plugins in example `v0.2.1` were also `0.2.1`. In `find-work@forge-steward`, the portion after `@` is the marketplace name, not a replaceable package version. Both marketplaces load plugins from relative paths in one snapshot, so choosing a Tag pins the entire marketplace rather than resolving each plugin's historical versions independently. A single Skill can still be installed. Mixing plugins from different snapshots requires separately designed distribution sources, not cache edits.
 
-固定 Tag 后不应自动跟随 main。Tag 按项目规范不可移动；若需要更强的可复现性，应记录 Release 正文给出的完整 commit SHA，并与实际 Git checkout 核对。首次发布以前不存在 `v0.1.x` Tag，不能凭插件曾用过的版本号推定远端存在同名 Tag。
+A pinned Tag should not follow main automatically. Project policy prohibits moving Tags. For stronger reproducibility, record the full commit SHA in the Release body and compare it with the actual Git checkout. No `v0.1.x` Tags existed before the first release; former plugin version numbers do not establish that matching remote Tags exist.
 
 ## Codex
 
-### 首次安装
+### First installation
 
-在终端执行，要求 CLI 支持 `plugin marketplace add --ref`（已核对 `0.154.0` 帮助）：
+Run in a terminal with a CLI supporting `plugin marketplace add --ref` (help checked in `0.154.0`):
 
 ```bash
 codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
@@ -23,30 +23,30 @@ codex plugin marketplace list
 codex plugin list --json
 ```
 
-需要其他技能时，将 `find-work` 换为 `check-workflow`、`review-and-merge`、`fix-feedback` 分别安装。新会话使用 `$forge-steward-find-work`。市场的 ref 支持 Git 分支、Tag 或提交；精确 SHA 可替换 `v0.2.1`，应使用 Release 的完整 SHA。依据：[Codex 市场配置](https://learn.chatgpt.com/docs/config-file/config-reference)、本机 `codex plugin marketplace add --help`。
+To install other Skills, replace `find-work` with `check-workflow`, `review-and-merge`, or `fix-feedback` individually. Use `$forge-steward-find-work` in a new session. Marketplace refs support Git branches, Tags, and commits; a precise SHA can replace `v0.2.1`, using the Release's full SHA. Sources: [Codex marketplace configuration](https://learn.chatgpt.com/docs/config-file/config-reference) and local `codex plugin marketplace add --help`.
 
-### 切换已经配置的市场
+### Switching an existing marketplace
 
-1. 停止使用相关技能的会话，记录已安装插件、原 ref、配置层级和缓存内用户修改。若来源由管理员或项目配置控制，先按其规则处理，不绕过策略。
-2. 按 [卸载文档](../README.md#uninstall-and-verify) 移除该市场下已安装的插件。只移除确实安装的项，不触及其他市场同名插件。
-3. 移除旧的 `forge-steward` 市场配置，再添加目标 ref；不要假设再次 add 同名市场必然替换旧配置。
+1. Stop sessions using these Skills and record installed plugins, the old ref, configuration layers, and user edits in caches. Follow administrator or project policies for controlled sources; do not bypass them.
+2. Follow the [uninstall documentation](../README.md#uninstall-and-verify) to remove installed plugins from this marketplace. Remove only installed entries and leave same-named plugins from other marketplaces untouched.
+3. Remove the old `forge-steward` marketplace configuration, then add the target ref. Do not assume adding the same name again replaces existing configuration.
 
 ```bash
-# 先完成上面的插件卸载与备份，再执行：
+# Complete the plugin removal and backups above first:
 codex plugin marketplace remove forge-steward
 codex plugin marketplace add philfanzhou/ForgeSteward --ref v0.2.1
 codex plugin add find-work@forge-steward
 ```
 
-4. 按记录重新安装需要的其他插件。使用 `marketplace list` 核对实际来源/ref，`plugin list --json` 核对安装状态/版本，检查相应缓存中的 manifest 和技能目录，并在新会话验证调用名。仅在可安装目录看到插件不等于已经安装。
+4. Reinstall other needed plugins from the record. Use `marketplace list` to verify actual source/ref and `plugin list --json` to verify installation/version. Inspect corresponding cached manifests and Skill directories and verify invocation names in a new session. Appearing in an installable catalog does not mean a plugin is installed.
 
-升级和回退都使用上述流程，只是选择不同的已发布 ref。无需修改插件的版本字段来强迫客户端更新；如果不同内容竟然使用同一包版本，属于发布缺陷，应先由维护者纠正。
+Upgrade and rollback use the same process with different published refs. Do not edit plugin version fields to force client updates. Different contents carrying the same package version are a release defect for the maintainer to correct first.
 
 ## Claude Code
 
-### 首次安装
+### First installation
 
-在终端执行（已核对 Claude Code `2.1.269` 命令帮助和官方文档）：
+Run in a terminal (checked against Claude Code `2.1.269` help and official documentation):
 
 ```bash
 claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1
@@ -55,13 +55,13 @@ claude plugin marketplace list
 claude plugin list
 ```
 
-也可以在 Claude 会话中使用 `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.1` 和 `/plugin install find-work@forge-steward`。新会话调用 `/find-work:forge-steward-find-work`。GitHub 来源的 `@ref` 支持分支/Tag；Git URL 使用 `#ref`。市场 ref 与插件来源的 SHA 字段是不同层级，不将插件来源 JSON 的 `sha` 当成 marketplace add 的参数。依据：[市场 ref 与版本规则](https://code.claude.com/docs/en/plugin-marketplaces)。
+Within Claude, `/plugin marketplace add philfanzhou/ForgeSteward@v0.2.1` and `/plugin install find-work@forge-steward` are also available. In a new session invoke `/find-work:forge-steward-find-work`. GitHub `@ref` supports branches/Tags; Git URLs use `#ref`. Marketplace refs and plugin-source SHA fields belong to different layers; the plugin-source JSON `sha` is not a marketplace-add argument. Source: [marketplace refs and version rules](https://code.claude.com/docs/en/plugin-marketplaces).
 
-### 切换或回退
+### Switching or rolling back
 
-先记录该市场下全部插件与安装作用域、市场声明所在作用域和受影响项目，备份用户修改，按卸载文档处理 `user`、各项目的 `project`/`local` 安装。升级时若需保留插件持久数据，对插件卸载使用 `--keep-data`，并另外备份重要数据。**移除市场会连带卸载该市场插件，不能当作只切换一个技能的无副作用操作。** 市场声明与插件安装作用域是两个维度；当前 CLI 的 marketplace remove 省略 `--scope` 会移除所有作用域的声明。
+First record all marketplace plugins and installation scopes, the scopes declaring the marketplace, and affected projects. Back up user changes and follow uninstall instructions for `user` and each project's `project`/`local` installations. To retain persistent plugin data during upgrades, uninstall with `--keep-data` and separately back up important data. **Removing a marketplace also uninstalls its plugins; it is not a side-effect-free way to switch one Skill.** Marketplace declarations and plugin installation scopes are separate dimensions. In the checked CLI, omitting `--scope` from marketplace remove removes declarations from every scope.
 
-以下仅适用于市场与插件都只在 `user` 作用域安装的情形，且已完成插件卸载：
+The following applies only when both marketplace and plugins are installed solely in `user` scope, after plugin removal is complete:
 
 ```bash
 claude plugin marketplace remove forge-steward --scope user
@@ -69,15 +69,15 @@ claude plugin marketplace add philfanzhou/ForgeSteward@v0.2.1 --scope user
 claude plugin install find-work@forge-steward --scope user
 ```
 
-混合作用域需要在各原项目目录按记录显式选择 `--scope project` 或 `--scope local` 处理对应声明；不要假定从一个项目运行 user 命令能清理其他项目。协调共享配置变更，管理员控制的配置交由其管理者处理。重新安装记录中的其他插件，在相应项目恢复原作用域；检查市场 ref、安装版本和新会话调用。保持 Tag 不变时刷新市场仍跟随该 ref，不会切回 main。显式包版本相同会使更新被跳过，不能把“刷新成功”当成已切换内容的证据。重复选择同一个 Tag 且版本、内容一致时无需重装；切换到新 Release 时，全部已选插件都应更新为该 Release 的统一版本。
+For mixed scopes, handle each declaration from its original project directory, explicitly choosing `--scope project` or `--scope local` according to the record. Do not assume a user command from one project cleans other projects. Coordinate shared configuration changes; administrators handle administrator-controlled settings. Reinstall other recorded plugins in their original project scopes and check marketplace refs, installed versions, and new-session invocation. Refreshing a marketplace with an unchanged Tag keeps that ref rather than switching to main. Equal explicit package versions cause updates to be skipped, so successful refresh is not evidence of changed contents. Rechoosing the same Tag with identical version and contents needs no reinstall. On a new Release, update all selected plugins to its unified version.
 
-如果需要精确 commit 而非 Tag，可先克隆独立、干净的完整仓库，checkout Release SHA，然后通过 `claude plugin marketplace add /absolute/path/to/ForgeSteward` 添加本地市场；先处理同名旧市场。保留整个 checkout，不仅下载 marketplace.json，因为其插件路径是相对仓库的。不要在使用期间修改这个 checkout。
+For an exact commit rather than a Tag, clone a separate clean full repository, check out the Release SHA, and add the local marketplace with `claude plugin marketplace add /absolute/path/to/ForgeSteward`, handling the old same-named marketplace first. Keep the entire checkout, not just marketplace.json, because plugin paths are repository-relative. Do not modify the checkout while it is in use.
 
 ## OpenCode
 
-### 首次安装固定快照
+### First installation from a fixed snapshot
 
-在 macOS/Linux 的终端执行；下面的目录必须尚不存在，有源码工作区时使用另一个目录而非覆盖：
+Run in a macOS/Linux terminal. The destination must not exist; use a separate directory instead of overwriting an existing source workspace:
 
 ```bash
 mkdir -p "$HOME/code"
@@ -85,7 +85,7 @@ git clone --branch v0.2.1 https://github.com/philfanzhou/ForgeSteward.git "$HOME
 git -C "$HOME/code/ForgeSteward-v0.2.1" rev-parse HEAD
 ```
 
-核对 HEAD 与 Release SHA 一致，再从要维护的目标项目目录执行：
+Confirm HEAD matches the Release SHA, then run from the project to maintain:
 
 ```bash
 python3 "$HOME/code/ForgeSteward-v0.2.1/scripts/opencode.py" install find-work --project .
@@ -93,60 +93,60 @@ python3 "$HOME/code/ForgeSteward-v0.2.1/scripts/opencode.py" status find-work --
 opencode debug skill
 ```
 
-全部安装使用 `--all`，用户级使用 `--user`；用户级应保留安装时的 `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME`。Windows 使用 Git 同样选择快照，通过 `py -3 "C:\path\ForgeSteward-v0.2.1\scripts\opencode.py" install find-work --project .` 运行安装器，替换为实际路径。
+Use `--all` for all entries and `--user` for user scope. Retain the installation's `OPENCODE_CONFIG_DIR` / `XDG_CONFIG_HOME` for user scope. On Windows select the same Git snapshot, then run `py -3 "C:\path\ForgeSteward-v0.2.1\scripts\opencode.py" install find-work --project .`, substituting the actual path.
 
-### 切换现有源码 checkout 与安装副本
+### Switching an existing source checkout and installed copies
 
-以下使用已有 `$HOME/code/ForgeSteward`。先检查是否存在本地工作：
+This example uses an existing `$HOME/code/ForgeSteward`. Check for local work first:
 
 ```bash
 git -C "$HOME/code/ForgeSteward" status --short
 git -C "$HOME/code/ForgeSteward" fetch origin --tags
 ```
 
-确认工作区干净且无需要保留的分支工作后，再执行以下命令；否则新建独立 checkout。将 `v0.2.1` 替换为所选已发布 Tag 或完整 SHA：
+Proceed only after confirming a clean workspace and no branch work to preserve; otherwise create a separate checkout. Replace `v0.2.1` with the selected published Tag or full SHA:
 
 ```bash
 git -C "$HOME/code/ForgeSteward" checkout --detach v0.2.1
 git -C "$HOME/code/ForgeSteward" rev-parse HEAD
-# 在目标项目目录执行；只选择实际已安装的技能：
+# Run in the target project; select only installed Skills:
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" update find-work --project .
 python3 "$HOME/code/ForgeSteward/scripts/opencode.py" status find-work --project .
 opencode debug skill
 ```
 
-- checkout 只改变源码，不自动更新安装副本；`update` 才按当前源码显式替换，允许降级，未安装的项用 `install`。
-- `update --all` 要求当前 checkout 的全部技能都已安装；只安装部分时按名称更新。新版移除或改名的技能需另按原安装名称卸载，不能认为 update 会清除不在新 catalog 中的旧项。
-- `.forge-steward-install.json` 记录插件版本、复制时的源码提交及内容摘要；内容和版本完全相同时幂等不改收据，因此其 commit 不一定改为刚选择的 Tag SHA。此时核对内容摘要及当前 checkout，不将旧收据提交误判为内容不一致。
-- 技能副本有用户修改、收据损坏或归属不明时会拒绝覆盖。先备份和人工确认差异，不删除收据或使用强制覆盖绕过保护。旧名/其他目录残留按卸载文档单独检查。
-- 回退到首版之前的提交不保证存在同一安装器或调用接口，须先读那份快照文档；不要把未来脚本当作所有历史版本都支持的契约。
+- Checkout changes source only. `update` explicitly replaces installed copies from that source and allows downgrades; use `install` for missing entries.
+- `update --all` requires every Skill in the current checkout to be installed. Update by name for a subset. Separately uninstall removed or renamed Skills using their original names; update does not remove old entries absent from the new catalog.
+- `.forge-steward-install.json` records plugin version, source commit at copying, and content digests. Identical contents and version leave the receipt unchanged, so its commit may not become the newly selected Tag SHA. Check digests and the current checkout instead of treating an older receipt commit as a content mismatch.
+- User edits, corrupt receipts, or unclear ownership block overwriting. Back up and review differences manually; do not delete receipts or force overwrites to bypass protection. Inspect old names and other directories separately as described in uninstall documentation.
+- Commits before the first release may not provide the same installer or invocation interface. Read that snapshot's documentation first; later scripts are not a contract for every historical version.
 
-OpenCode 仍按自己的技能搜索目录发现技能；`status` 只核对本安装器的选定范围，实际发现还可能受用户级、兼容路径、祖先路径及重复副本影响。依据：[OpenCode 技能发现](https://opencode.ai/docs/skills/)。
+OpenCode still discovers Skills through its own search directories. `status` checks only the installer's selected scope; user, compatibility, ancestor, and duplicate paths may affect actual discovery. Source: [OpenCode Skill discovery](https://opencode.ai/docs/skills/).
 
 ## DeepSeek Harness
 
-从 `v0.2.15` 起提供文件系统安装适配。使用包含 `scripts/deepseek.py` 的独立干净 checkout，以已发布 Tag 或完整审阅 commit 固定源码，再显式 update 已安装子集；旧 `v0.2.1` 不含该入口。版本降级、收据与冲突恢复、DSH_HOME/项目 Git 根及卸载边界见 [DeepSeek 安装维护](deepseek-installer.md#显式更新固定源码及回退)。客户端升级不会更新技能；不同作用域和兼容根需分别检查。
+Filesystem installation support starts at `v0.2.15`. Use a separate clean checkout containing `scripts/deepseek.py`, pin it to a published Tag or fully reviewed commit, then explicitly update the installed subset. Old `v0.2.1` lacks that entry point. See [DeepSeek installation and maintenance](deepseek-installer.md#explicit-updates-pinned-source-and-rollback) for downgrades, receipts, conflict recovery, DSH_HOME/project Git roots, and uninstall boundaries. Client upgrades do not update Skills; inspect each scope and compatibility root separately.
 
 ## ZCode
 
-ZCode 与 Claude Code 一样用 GitHub 地址加版本号固定市场来源：内置 CLI 执行 `node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@vX.Y.Z`，再逐个 `plugins install <插件>@forge-steward`。2026-10-11 已在隔离环境用内置 CLI `0.16.9` 实际验证，Tag 换成旧版本后装到的也是旧版本。当前版本的完整命令见 [README 的 ZCode 一节](../README.md#zcode)。
+Like Claude Code, ZCode pins marketplaces with a GitHub address plus version: run bundled CLI `node "$ZCODE_CLI" plugins marketplace add philfanzhou/ForgeSteward@vX.Y.Z`, then `plugins install <plugin>@forge-steward` for each plugin. This was verified on 2026-10-11 in an isolated environment with bundled CLI `0.16.9`: selecting an older Tag installed the older version. Full current commands are in the [README's ZCode section](../README.md#zcode).
 
-切换或回退：先记录安装子集和旧来源，逐个 `plugins uninstall <插件>@forge-steward --force --keep-data`（`--force` 只是跳过确认提示），再 `plugins marketplace remove forge-steward`（只移除市场不会卸载插件），然后添加所选 Tag 并重装，核对 `plugins list --json` 中的版本和新任务中的来源；失败时按同样步骤装回旧 Tag。早期以本地 checkout 为来源的安装，按此步骤换成 GitHub 来源后不再依赖该目录。桌面界面操作未实测，详见 [ZCode 固定版本与回退](zcode.md#固定版本与回退)。
+To switch or roll back, record the installed subset and source, uninstall each using `plugins uninstall <plugin>@forge-steward --force --keep-data` (`--force` only skips confirmation), then run `plugins marketplace remove forge-steward` (marketplace removal alone does not uninstall plugins). Add the selected Tag and reinstall. Check versions with `plugins list --json` and sources in a new task. On failure, use the same process to restore the old Tag. Earlier local-checkout marketplace installations no longer depend on that directory once switched to GitHub this way. Desktop UI operations were not tested; see [ZCode fixed versions and rollback](zcode.md#fixed-versions-and-rollback).
 
-市场版本仅用于更新检测，由 `VERSION` 派生，不选择另一份源码。`plugins update` 会跟随市场指向的版本，包括降级，但不会补装新增插件。回退和升级均需处理手工导入副本、退役 `find-work` 及其他作用域，见 [卸载与只保留目标版本](zcode.md#卸载与只保留目标版本)。
+Marketplace versions are derived from `VERSION` for update detection only; they do not select different source. `plugins update` follows the marketplace's version, including downgrades, but does not install newly added plugins. Both upgrade and rollback must handle manual imports, retired `find-work`, and other scopes; see [uninstalling and keeping only the target version](zcode.md#uninstalling-and-keeping-only-the-target-version).
 
-## prepare-work 与 execute-work 的改名迁移
+## prepare-work and execute-work rename migration
 
-`v0.2.3` 起移除旧 `find-work` 并改为 `prepare-work`、`execute-work`，步骤见 [迁移说明](prepare-execute-migration.md)。本文固定 `v0.2.1` 的示例保留历史名称；选择新版时同时按其名称映射更新安装子集，不能只替换 Tag 后继续安装退役名称。
+From `v0.2.3`, old `find-work` is replaced by `prepare-work` and `execute-work`; see [migration notes](prepare-execute-migration.md). This page's pinned `v0.2.1` examples preserve historical names. For newer versions, update the installed subset using that version's name mapping; do not only replace the Tag and keep installing retired names.
 
-## 从 v0.2.0 升级
+## Upgrading from v0.2.0
 
-目标为 `v0.2.1` 时，四个插件包均从 `0.2.0` 升至 `0.2.1`，主要改变 Codex 插件/技能的显示元数据。安装 ID、技能调用名、默认 prompt、SKILL.md 及安装器行为不变。旧 Tag 不会自动获得修复；按上文切换市场 ref 或源码并显式更新。若需回退，用相同流程选择仍保留的 `v0.2.0`，核对其[历史对应表](releases/v0.2.0.md)。完整变更见 [v0.2.1 对应表](releases/v0.2.1.md)。
+When targeting `v0.2.1`, all four plugin packages move from `0.2.0` to `0.2.1`, mainly changing Codex plugin/Skill display metadata. Installation IDs, invocation names, default prompts, SKILL.md, and installer behavior remain unchanged. Old Tags do not receive fixes automatically; switch marketplace refs or source and explicitly update as above. Roll back the same way to retained `v0.2.0`, checking its [historical mapping table](releases/v0.2.0.md). Full changes are in the [v0.2.1 mapping table](releases/v0.2.1.md).
 
-## 完成标准
+## Completion criteria
 
-源 ref/SHA 与预期一致、选定插件版本符合 Release 对应表、实际安装内容与来源一致，并在新会话显示正确调用名。保留原版本和恢复记录；失败时报告实际已完成的卸载/安装，不把缓存刷新或命令退出当成完整切换。切换技能不自动回滚已修改的项目规则、代码、Issue、PR、评论或凭据。
+The source ref/SHA must match expectations, selected plugin versions must match the Release mapping table, actual installed contents must match the source, and a new session must show correct invocation names. Keep the old version and recovery record. On failure, report actual uninstall/install progress, not cache refresh or command exit as a completed switch. Switching Skills does not automatically undo project rules, code, Issues, PRs, Comments, or credentials already changed.
 
-“只保留新版”首先要求实际发现来源中不再有旧版副本：逐个核对环境、作用域和手工路径，不能以选择器只显示一个名字证明没有重复。磁盘清理另行核验：Codex 卸载命令声明清理对应本地缓存；Claude Code 旧版缓存有后台清理宽限期；OpenCode update 替换选中的受管目录，但不删除其他作用域、退役名称和手工副本；ZCode 插件卸载与导入副本、缓存及远端同步分别处理。不要把这些行为统一宣传为立即零残留。
+“Keep only the new version” first means no old copies remain among actual discovery sources. Check each environment, scope, and manual path; a selector showing one name does not prove there are no duplicates. Verify disk cleanup separately. Codex uninstall declares removal of the corresponding local cache; Claude Code has a background-cleanup grace period for old caches; OpenCode update replaces selected managed directories but leaves other scopes, retired names, and manual copies; ZCode handles plugin removal separately from imports, caches, and remote synchronization. Do not claim immediate zero leftovers across all of them.
 
-需要立即清理磁盘时，停止相关会话，列明确切旧路径，核对 ForgeSteward 归属及所有配置/作用域的引用；受管安装用对应卸载命令，确认无人引用的缓存或手工副本先移出全部发现路径备份，复核后再删除。不得按宽泛通配符删除共享目录。旧源码 clone 与安装副本分开处理：OpenCode、DeepSeek Harness 的已装副本不依赖安装时的 clone，GitHub 来源的市场也不依赖本地目录；仍以本地目录为来源的市场所依赖的 checkout 必须保留，换成 GitHub 来源后才能删除。详见 README 的[仅保留目标版本核验清单](../README.md#verify-that-only-the-intended-version-remains)。
+For immediate disk cleanup, stop related sessions, list exact old paths, and confirm ForgeSteward ownership and references from every configuration/scope. Use the manager's uninstall command for managed installations. Move confirmed unreferenced caches or manual copies outside all discovery paths as backups, verify, then delete. Do not delete shared directories with broad wildcards. Treat source clones separately from installed copies: OpenCode and DeepSeek Harness copies do not depend on the original clone, nor do GitHub-source marketplaces depend on local directories. A checkout still used as a local marketplace source must remain until switched to GitHub. See the README's [checklist for keeping only the intended version](../README.md#verify-that-only-the-intended-version-remains).

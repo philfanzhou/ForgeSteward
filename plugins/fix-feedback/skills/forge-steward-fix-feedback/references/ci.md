@@ -1,17 +1,17 @@
-## 读日志与等待检查
+## Read logs and wait for checks
 
-本文件只规定怎么读检查结果、怎么等检查跑完。等待上限、无关失败只重跑一次、超时记为等待外部等判定仍按原规则，不因本文件改变。
+This file governs only reading results and waiting for checks. Existing rules still determine wait limits, one retry for unrelated failures, and external-wait status after timeout.
 
-### 读失败原因
+### Find the failure
 
-1. 先找出失败的检查和失败的那一步，只读这一步的日志，从报错处往前看。GitHub 上例如 `gh run view <运行编号> --log-failed`，再按报错截取附近内容。
-2. 不够定位原因时再逐段往前扩，或读相关的其他步骤。“只看末尾”不是限制，需要时可以读到任何位置，但不把整份日志一次读入。
-3. 本地测试输出同样先看失败项；仓库或测试框架已有只显示失败的选项时优先用。
-4. 写进 Change Request 或 Issue 的只摘报错的几行和运行链接，不贴整段日志，不带密钥、令牌。
+1. Identify the failed check and step. Read that step's log, working backward from the error. For example on GitHub, use `gh run view <run-id> --log-failed`, then extract the nearby error context.
+2. If insufficient, expand backward in sections or read relevant other steps. “Read the end first” is not a limit: inspect any position needed, but never load the entire log at once.
+3. For local test output, also start with failures; prefer existing repository/framework options that show failures only.
+4. In Change Requests/Issues, quote only the few error lines and run link, never full logs, secrets, or tokens.
 
-### 等检查跑完
+### Wait for completion
 
-1. 优先用平台“跑完才返回”的方式，例如 GitHub 上 `gh pr checks <编号> --watch --interval 60`、`gh run watch <运行编号> --exit-status --interval 60`。这类命令在非终端里每次刷新都会重新打印整张表，所以丢弃它的输出，只看退出状态；结束后再查一次，只读最终结果。
-2. 单次调用超过执行工具的时长上限时，改为后台运行或分段继续，每段仍只看退出状态；总等待时间仍按原等待上限计算。
-3. 命令报告还没有任何检查时，按原规则的“迟迟未开始运行”处理：隔不少于 1 分钟再看，超过等待上限记为等待外部检查。
-4. 平台没有“跑完才返回”的方式时，每隔不少于 1 分钟查一次，每次只取汇总（还有几项在跑、几项失败），不读整张表；跑完后再读一次完整结果。
+1. Prefer platform commands that return when checks finish, such as GitHub's `gh pr checks <number> --watch --interval 60` or `gh run watch <run-id> --exit-status --interval 60`. Non-terminal refreshes repeatedly print the whole table, so discard that output and inspect only the exit status. Once finished, query once for final results.
+2. If a call exceeds the execution tool's duration limit, run it in the background or resume in segments, still reading only exit status per segment. Count all segments toward the original total wait limit.
+3. If no checks exist yet, use the existing “not starting” rule: check again no sooner than 1 minute later and mark waiting for external checks after the limit.
+4. Without a wait-until-finished command, query at intervals of at least 1 minute, fetching only counts of running/failed checks rather than the full table. Read the full final result once after completion.
