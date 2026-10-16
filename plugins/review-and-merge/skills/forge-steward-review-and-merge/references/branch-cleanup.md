@@ -58,7 +58,7 @@ List only long-lived branches named in documentation/CI, such as `develop` or `r
 
 ### Report
 
-Use clear, everyday Chinese for final user replies/reports and questions requiring a user decision, unless the user explicitly requests another language. Internal handoffs and run records may stay in English. Hosting-platform content follows the owning repository's language rules, otherwise English. Report:
+Use everyday English unless the user or repository specifies another language:
 
 - Deleted branches: remote/local, name, deletion-time commit, reason, recovery (request page when available; otherwise recreate from recorded commit).
 - Retained/list-only branches and reasons; removed/retained worktrees and reasons; count deferred to next run.

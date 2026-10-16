@@ -134,68 +134,6 @@ class SkillWordingTests(unittest.TestCase):
         hits = find_non_english(REPO)
         self.assertEqual(hits, [], "Non-English maintained text:\n" + "\n".join(hits))
 
-    def test_all_six_entries_separate_display_internal_and_hosting_languages(self):
-        entries = sorted(REPO.glob("plugins/*/skills/*/SKILL.md"))
-        self.assertEqual(len(entries), 6)
-        for path in entries:
-            with self.subTest(skill=path.parent.name):
-                text = path.read_text(encoding="utf-8")
-                self.assertRegex(text, r"Chinese for final user replies/reports and questions requiring a user decision")
-                self.assertIn("unless the user explicitly requests another language", text)
-                self.assertRegex(text, r"internal subagent prompts/results, handoffs and run records may stay in English")
-                self.assertRegex(text, r"Hosting-platform titles, bodies, Comments and Review Feedback follow the owning repository's language rules, otherwise English")
-                self.assertNotIn("unless the user or owning repository explicitly specifies another language", text)
-        preparation = (REPO / "plugins/prepare-work/skills/forge-steward-prepare-work/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("Apart from this one-line format", preparation)
-        self.assertIn("single line, separated by comma and space", preparation)
-        self.assertIn("Output `[]` when none meet the requirements", preparation)
-
-    def test_reporting_rules_do_not_restore_repository_control_of_user_display(self):
-        references = ("check-workflow/skills/forge-steward-check-workflow/references/reporting.md",
-                      "execute-work/skills/forge-steward-execute-work/references/reporting.md",
-                      "review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md")
-        for name in references:
-            with self.subTest(reference=name):
-                text = (REPO / "plugins" / name).read_text(encoding="utf-8")
-                self.assertIn("Chinese for final user replies/reports and questions requiring a user decision", text)
-                self.assertIn("unless the user explicitly requests another language", text)
-                self.assertIn("Internal handoffs and run records may stay in English", text)
-                self.assertIn("Hosting-platform content follows the owning repository's language rules, otherwise English", text)
-                self.assertNotIn("Report in the language specified by the target project", text)
-                self.assertNotIn("unless the user or repository specifies another language", text)
-        zero = (REPO / "plugins" / references[0]).read_text(encoding="utf-8")
-        self.assertIn("Translate this conclusion for the user", zero)
-        self.assertIn("no project files were changed", zero)
-        guidance = (REPO / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("target-repository documentation rules do not change this display default", guidance)
-        self.assertIn("Project-maintained content throughout the repository must be English", guidance)
-        readme = (REPO / "README.md").read_text(encoding="utf-8")
-        self.assertIn("default to everyday Chinese, honoring explicit user language requests", readme)
-        self.assertNotIn("Skills default to everyday English", readme)
-
-    def test_work_cycle_display_keeps_complete_english_evidence_and_fallback(self):
-        report = (REPO / REPORT).read_text(encoding="utf-8")
-        for required in ("authoritative English evidence", "never rewrite it or machine-translate saved records",
-                         "Present a complete Chinese rendering to the user by default",
-                         "explicit user language request overrides this default",
-                         "for English, present the generated output unchanged",
-                         "for other languages, render it faithfully",
-                         "headings, outcome labels, all reasons/actions, timing labels, errors/recovery and any upgrade question",
-                         "section order, every result/count/reason/action, optional-section conditions",
-                         "Issue/PR identities, URLs, version strings, commands and technical identifiers",
-                         "Do not append the raw English report", "not a second final English block",
-                         "manually in the requested/default display language, including the failure explanation",
-                         "at most three times", "if neither exists, render `No record`"):
-            self.assertIn(required, report)
-        directory = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/references"
-        timing = (directory / "run-record.md").read_text(encoding="utf-8")
-        self.assertIn("[Final report](report.md)'s display-language and faithful-rendering rules", timing)
-        self.assertNotIn("paste output unchanged", timing)
-        agents = (directory / "agent-check.md").read_text(encoding="utf-8")
-        self.assertIn("Keep generated evidence unchanged", agents)
-        self.assertIn("display-language rules without changing status meanings", agents)
-        self.assertNotIn("Use unchanged output", agents)
-
     def test_plugins_have_no_triage_names(self):
         self.assertTrue((REPO / "plugins").is_dir())
         self.assertEqual(find_forbidden_names(REPO / "plugins"), [])

@@ -22,6 +22,6 @@ Try `python3 --version`, `py -3 --version`, then `python --version`; use the fir
 2. Before each dispatch record `started`; after confirmed completion record `finished` or `failed`. Stages are `check-workflow`, `prepare`, `implement`, `review`, `fix`, `merge`, `cleanup`. Task identifiers match [Resource locks](verification.md).
 3. Give subagents the run identifier and `task-dir` evidence directory. Require `event` records for `wait-start`/`wait-end` during CI, lock, approval, and other external waits. Each subagent's evidence/handoff files belong in its own directory.
 4. Save [Cycles, handoffs, and stopping](cycles.md)'s short orchestration handoff as run-directory `handoff.json`, populating [Final report](report.md)'s required fields. Read it first after compaction/interruption.
-5. At completion run `report` and present it using [Final report](report.md)'s display-language and faithful-rendering rules. It reads handoff/events, takes timings from `summary`, and saves run-directory `report.md`. See [Final report](report.md) for invalid-data retries and manual fallback.
+5. At completion run `report` and paste output unchanged. It reads handoff/events, takes timings from `summary`, and saves run-directory `report.md`. See [Final report](report.md) for invalid-data retries and manual fallback.
 
 If the script cannot run or exits `2`, explain in the conversation handoff and continue. Record failure must not interrupt delivery. Do not relocate evidence to `/tmp`; a conversation handoff is acceptable.
