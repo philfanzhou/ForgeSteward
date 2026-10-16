@@ -346,3 +346,53 @@ The decision review also checked nonregular/unreadable paths, broken/cyclic syml
 The diff gate was reviewed with four finite changes: policy deletion (allowed), exact retained append plus source deletion (allowed), rewritten retained prose (rejected), and an unrelated added project rule (rejected). A heading without retained content or source deletion before verified append is also rejected. Migration-only input M06 follows the same cleanup-branch/PR route as policy deletion; safe migration keeps the no-change gate open even when the legacy script returns 0. Check-only never enters that delivery route; local-only stops at the local diff. Cancellation stops further writes and accurately separates completed and incomplete pairs. These are instruction/delivery walkthrough outcomes, not an executed hosting-platform integration test.
 
 Packaging regression explicitly requires the new migration reference in installed check-workflow resources; existing byte-for-byte resource comparisons also cover it for filesystem adapters. Skill budgets, prompt equality, marketplace checks and the complete suite are required implementation checks. Runtime-dependent skips remain skips; neither static success nor these walkthroughs proves all clients load instructions correctly. Release reconciliation retains its read-only scope and separate final-report-only findings.
+
+
+## English collaboration defaults (#126)
+
+The current source extends the historical 0.2.7 deletion-only decision with a second narrow exception: configure one fixed English collaboration default in an existing root instruction entry. This is a shared project convention useful outside ForgeSteward invocation, rather than another copy of changing Skill workflow policy. It complements #125's entry consolidation; policy deletion runs first, migration second, language inspection third. Historical release decisions above remain history. VERSION stays 0.2.24; no release or installation change is included.
+
+The independently bundled [language rules](../plugins/check-workflow/skills/forge-steward-check-workflow/references/collaboration-language.md) are authoritative for the fixed heading/prose, semantic coverage table, safe destination precedence, separable edits, unresolved conflicts and verification. The default covers Issue and Change Request titles/bodies, Comments, Discussions and Review Feedback replies. It honors explicit maintainer requests and quoted code/log/external-text exceptions. Complete equivalent coverage can reside in checked candidate files. Partial English coverage supplies only the surfaces it actually covers; it triggers one fixed section for the remaining coverage, never another complete duplicate. No keyword classifier or model-compliance guarantee is introduced.
+
+### Finite source walkthroughs and outcomes
+
+E01–E30 used individual temporary Git repositories, explicit input bytes and predetermined operations selected by reading the decision table. Original file digests/mtime, selected operations/reasons, resulting digests/mtime and tracked diffs are retained with implementation evidence. Appends assert the original byte prefix and exact fixed section; replacements assert exact old/new bytes; retained cases assert no byte/mtime changes. Reinspection of every completed state writes nothing. These are finite instruction walkthroughs, not a general language processor, independent Agent/model execution or a consumer hosting integration test.
+
+| ID | Finite input | Observed selected result |
+| --- | --- | --- |
+| E01 | Root AGENTS.md with only a Python convention | Append the exact fixed section; preserve prefix |
+| E02 | Complete equivalent root English rule | No addition or duplicate |
+| E03 | Complete English rule only in CONTRIBUTING.md | Existing candidate coverage recognized; root unchanged |
+| E04 | English Issue-title rule only | Preserve it; append fixed section once for missing coverage |
+| E05 | Separate root Chinese collaboration sentence | Remove only that sentence; supply fixed section; record exact original/source |
+| E06 | `Docs and Issues are written in Chinese` | Retain `Docs are written in Chinese`; fixed English section covers collaboration |
+| E07 | Separate Chinese documentation, Spanish code-comment, French commit-message and Chinese collaboration rules | Replace collaboration only; other convention bytes remain |
+| E08 | Documentation and Issues must use identical language chosen together for each release | Retain inseparable shared obligation; report maintainer decision and unresolved coverage |
+| E09 | Chinese collaboration rule only in CONTRIBUTING.md | Retain external rule; no competing root addition |
+| E10 | Independent Chinese root rule plus external Chinese rule | Replace root portion safely; report external conflict unresolved |
+| E11 | Only root CLAUDE.md | Add to existing CLAUDE.md; no AGENTS.md creation |
+| E12 | Only .claude/CLAUDE.md supplies root entry | Add there; no other entry created |
+| E13 | README only, no instruction entry | Report missing entry/recovery; no file creation |
+| E14 | AGENTS.md symlink to another file | Preserve link and target; report unsafe destination |
+| E15 | Non-UTF-8 root entry | Retain/report undecodable entry |
+| E16 | Untracked root entry | No write authorization through it |
+| E17 | Directory named AGENTS.md | Retain/report nonregular entry |
+| E18 | Inline/fenced examples and explicitly quoted external Chinese instruction | Preserve example bytes; add actual rule separately |
+| E19 | Fixed rule with explicit override and quoted-text exception | Complete coverage; no write; explicit alternative request is supported |
+| E20 | CLAUDE import plus Build and Chinese collaboration text | Verify byte-preserving migration first; delete source; replace moved collaboration at its new root location, retain Build text |
+| E21 | Safe replacement input, check-only | Report proposed replacement; all bytes/mtime unchanged |
+| E22 | Missing rule, local-only | Verified local addition only; no delivery command |
+| E23 | Missing rule, delivery blocked after local addition | Preserve completed uncommitted diff; report exact stopping point |
+| E24 | Completed fixed-section state inspected again | No duplicate section, timestamp, branch, commit or PR |
+| E25 | Fixed heading with unrelated decision instruction | Retain/report heading collision rather than duplicate or rewrite |
+| E26 | Unsafe preferred AGENTS.md plus regular CLAUDE.md | No lower-priority write; both unchanged |
+| E27 | All collaboration surfaces use English but no override/quoted exception | Partial equivalence; one fixed section supplies missing guarantees |
+| E28 | Partial external English plus conflicting external Chinese rule | Keep conflict visible; no root override added |
+| E29 | Existing destination BOM and CRLF | Preserve original prefix; fixed prose uses destination newlines |
+| E30 | Complete English rule plus a separate root Chinese rule | Remove only conflict; reuse existing English coverage without a duplicate |
+
+Additional decision review covered unreadable/unwritable entries, ambiguous parsing, root-only dedicated language sections and explicit earlier maintainer retention: unsafe operations remain unchanged; a dedicated collaboration-only section can be replaced as a unit without leaving empty headings, while unrelated section content remains. An explicit maintainer alternative-language request is honored by the fixed default and does not change repository configuration. Cancellation stops further writes; verified completed operations remain recoverable and unfinished operations are reported without claiming completion.
+
+The final diff gate admits policy deletions, #125's exact migration operations, and this fixed section/separable language exception. It rejects unrelated new project rules, translating documentation, changing commit-message language, editing external conflicts, arbitrary paraphrases of the fixed rule and creating a missing entry. A language-only input keeps the no-change gate open and follows the same fixed cleanup branch, verification, commit, push and actual PR/MR creation path as policy deletion. Check-only bypasses that write/publication path; a completed rerun starts no empty delivery. The cleanup PR must quote replaced text/source lines and unresolved decisions separately from deletions/migrations. These route and PR-body outcomes were reviewed against the instructions; no consumer repository PR was fabricated for a rule walkthrough.
+
+The new reference is explicitly included in installer resource expectations and existing byte-for-byte packaging comparisons. Required checks are Skill budgets (including simulated CRLF), the complete suite, marketplace consistency and whitespace. Existing metadata/prompt equality, resource, wording and link checks apply; no implementation-mirroring keyword test was added. Environment-dependent skips are reported as skips. Release reconciliation remains read-only with findings only in the separate final report. Combined parent #124 acceptance is supported by #125's M01–M26 migration record plus E01–E30, especially E20; neither static checks nor these finite cases certify arbitrary Agent/model behavior.
