@@ -1,13 +1,16 @@
 """Verify work-cycle run records: location, concurrent events, timing summary and pruning."""
 
 from datetime import datetime, timedelta, timezone
+from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -19,6 +22,98 @@ spec.loader.exec_module(record)
 
 def git(*arguments, cwd):
     subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True)
+
+
+def run_concurrent(commands, timeout=30):
+    """Start all writers before waiting, and reap every child even on interruption."""
+    processes = []
+    try:
+        for command in commands:
+            processes.append(subprocess.Popen(command, stdout=subprocess.PIPE,
+                                              stderr=subprocess.PIPE, text=True))
+        results = []
+        for process in processes:
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired as error:
+                raise AssertionError("Writer timed out; earlier results: %r; current stderr: %r" %
+                                     (results, error.stderr)) from error
+            results.append(subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr))
+        return results
+    finally:
+        # Stop all live writers first; never leave one writing into a removed fixture.
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+        for process in processes:
+            try:
+                process.communicate(timeout=5)
+            finally:
+                process.stdout.close()
+                process.stderr.close()
+
+
+class ConcurrentChildTests(unittest.TestCase):
+    def setUp(self):
+        self.children = []
+        popen = subprocess.Popen
+        self.popen = popen
+
+        def launch(*args, **kwargs):
+            child = popen(*args, **kwargs)
+            self.children.append(child)
+            return child
+
+        self.patch = mock.patch.object(subprocess, "Popen", side_effect=launch)
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def assert_reaped(self):
+        self.assertTrue(self.children)
+        for child in self.children:
+            self.assertIsNotNone(child.poll())
+            self.assertTrue(child.stdout.closed)
+            self.assertTrue(child.stderr.closed)
+
+    def test_nonzero_child_preserves_stderr_and_reaps_later_children(self):
+        results = run_concurrent([[sys.executable, "-c", "import sys; sys.stderr.write('initial error'); sys.exit(2)"],
+                                  [sys.executable, "-c", "print('later writer')"]])
+        with self.assertRaisesRegex(AssertionError, "initial error"):
+            self.assertEqual([r.returncode for r in results], [0, 0], repr(results))
+        self.assert_reaped()
+
+    def test_launch_failure_reaps_started_children(self):
+        with self.assertRaises(OSError):
+            run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"],
+                            [str(Path(__file__).parent / "missing-event-writer")]])
+        self.assert_reaped()
+
+    def test_timeout_reaps_all_children(self):
+        with self.assertRaisesRegex(AssertionError, "Writer timed out"):
+            run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"]] * 2, timeout=0.1)
+        self.assert_reaped()
+
+    def test_timeout_preserves_an_earlier_child_error(self):
+        with self.assertRaisesRegex(AssertionError, "initial error"):
+            run_concurrent([[sys.executable, "-c", "import sys; sys.stderr.write('initial error'); sys.exit(2)"],
+                            [sys.executable, "-c", "import time; time.sleep(60)"]], timeout=1)
+        self.assert_reaped()
+
+    def test_interruption_reaps_all_children(self):
+        real_communicate = self.popen.communicate
+        interrupted = False
+
+        def communicate(child, *args, **kwargs):
+            nonlocal interrupted
+            if not interrupted:
+                interrupted = True
+                raise KeyboardInterrupt()
+            return real_communicate(child, *args, **kwargs)
+
+        with mock.patch.object(self.popen, "communicate", new=communicate):
+            with self.assertRaises(KeyboardInterrupt):
+                run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"]] * 2)
+        self.assert_reaped()
 
 
 class RunRecordTests(unittest.TestCase):
@@ -83,18 +178,163 @@ class RunRecordTests(unittest.TestCase):
         self.assertEqual((review["result"], review["seconds"]), ("running", None))
 
     def test_concurrent_events_are_all_recorded_as_whole_lines(self):
+        # Require every wave to succeed; repeated contention exposes short lock transitions.
+        for wave in range(20):
+            with self.subTest(wave=wave):
+                run_id = self.start()["run_id"]
+                command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", run_id,
+                           "--stage", "implement", "--status", "started", "--detail", "x" * 900]
+                results = run_concurrent([command + ["--task", "implement-%d" % index] for index in range(8)])
+                diagnostics = "\n".join("writer %d: exit %s; stdout=%r; stderr=%r" %
+                                        (index, result.returncode, result.stdout, result.stderr)
+                                        for index, result in enumerate(results))
+                self.assertEqual([result.returncode for result in results], [0] * 8, diagnostics)
+                path = record.run_dir(record.runs_root(self.repo), run_id)
+                self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
+                                 ["implement-%d" % index for index in range(8)])
+
+    @unittest.skipUnless(sys.platform == "win32", "Requires native Windows directory deletion semantics")
+    def test_event_waits_for_windows_pending_directory_deletion(self):
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                      wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                      wintypes.LPVOID, wintypes.DWORD]
+        kernel.SetFileInformationByHandle.restype = wintypes.BOOL
         run_id = self.start()["run_id"]
-        command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", run_id,
-                   "--stage", "implement", "--status", "started", "--detail", "x" * 900]
-        processes = [subprocess.Popen(command + ["--task", "implement-%d" % index], stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, text=True) for index in range(8)]
-        for process in processes:
-            self.assertEqual(process.wait(), 0)
-            process.stdout.close()
-            process.stderr.close()
         path = record.run_dir(record.runs_root(self.repo), run_id)
-        self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
-                         ["implement-%d" % index for index in range(8)])
+        guard = path / ".events.lock"
+        guard.mkdir()
+        # Explicit legacy delete disposition keeps the directory pending deletion.
+        # Recent Windows versions can unlink immediately with ordinary rmdir.
+        handle = kernel.CreateFileW(str(guard), 0x00010000, 7, None, 3, 0x02000000, None)
+        self.assertNotEqual(handle, ctypes.c_void_p(-1).value, ctypes.WinError(ctypes.get_last_error()))
+        mkdir = record.os.mkdir
+        observed = []
+
+        def create(*args, **kwargs):
+            nonlocal handle
+            try:
+                return mkdir(*args, **kwargs)
+            except PermissionError as error:
+                if args[0] == str(guard):
+                    observed.append(error.winerror)
+                    if handle is not None:
+                        kernel.CloseHandle(handle)
+                        handle = None
+                raise
+
+        try:
+            delete = ctypes.c_ubyte(1)
+            self.assertTrue(kernel.SetFileInformationByHandle(handle, 4, ctypes.byref(delete),
+                                                             ctypes.sizeof(delete)),
+                            ctypes.WinError(ctypes.get_last_error()))
+            stderr = io.StringIO()
+            with mock.patch.object(record.os, "mkdir", side_effect=create):
+                with redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+                    result = record.main(["--repo", str(self.repo), "event", "--run", run_id,
+                                          "--task", "windows-writer", "--stage", "implement", "--status", "started"])
+            self.assertEqual(result, 0, stderr.getvalue())
+            self.assertEqual(set(observed), {5}, "Expected real ERROR_ACCESS_DENIED from pending deletion")
+            self.assertEqual([event["task"] for event in record.read_events(path)], ["windows-writer"])
+            self.assertFalse(guard.exists())
+        finally:
+            if handle is not None:
+                kernel.CloseHandle(handle)
+
+    def test_event_retries_transient_windows_guard_access_denied(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        guard = path / ".events.lock"
+        mkdir = record.os.mkdir
+        error = PermissionError(13, "Windows guard pending deletion", str(guard))
+        error.winerror = 5
+        denied = False
+
+        def create(*args, **kwargs):
+            nonlocal denied
+            if args[0] == str(guard) and not denied:
+                denied = True
+                raise error
+            return mkdir(*args, **kwargs)
+
+        with mock.patch.object(record.os, "mkdir", side_effect=create):
+            with mock.patch.object(record.time, "sleep") as sleep:
+                record.add_event(path, "writer", "implement", "started", None, None, datetime.now(timezone.utc))
+        sleep.assert_called_once_with(0.01)
+        self.assertEqual([event["task"] for event in record.read_events(path)], ["writer"])
+        self.assertFalse(guard.exists())
+
+    def test_unavailable_guard_times_out_without_appending_or_removing_it(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        guard = path / ".events.lock"
+        guard.mkdir()
+        mkdir = record.os.mkdir
+        windows_error = PermissionError(13, "Windows guard access denied", str(guard))
+        windows_error.winerror = 5
+        for error in (FileExistsError(17, "guard already held", str(guard)), windows_error):
+            with self.subTest(error=error):
+                def create(*args, **kwargs):
+                    if args[0] == str(guard):
+                        raise error
+                    return mkdir(*args, **kwargs)
+
+                with mock.patch.object(record.os, "mkdir", side_effect=create):
+                    with mock.patch.object(record.time, "monotonic", side_effect=[100, 111]):
+                        with self.assertRaisesRegex(ValueError, "Timed out waiting for") as raised:
+                            record.add_event(path, "blocked", "implement", "started", None, None,
+                                             datetime.now(timezone.utc))
+                self.assertIs(raised.exception.__cause__, error)
+                self.assertIn(str(error), str(raised.exception))
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
+                self.assertTrue(guard.is_dir())
+
+    def test_unrelated_guard_errors_fail_immediately_and_preserve_events(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        guard = path / ".events.lock"
+        mkdir = record.os.mkdir
+        for error in (PermissionError(13, "unrelated permission denied"), OSError(5, "I/O failure")):
+            with self.subTest(error=error):
+                def create(*args, **kwargs):
+                    if args[0] == str(guard):
+                        raise error
+                    return mkdir(*args, **kwargs)
+
+                with mock.patch.object(record.os, "mkdir", side_effect=create):
+                    with mock.patch.object(record.time, "sleep") as sleep:
+                        with self.assertRaises(OSError) as raised:
+                            record.add_event(path, "denied", "implement", "started", None, None,
+                                             datetime.now(timezone.utc))
+                self.assertIs(raised.exception, error)
+                sleep.assert_not_called()
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
+                self.assertFalse(guard.exists())
+
+    def test_failed_append_releases_only_its_owned_guard_and_keeps_prior_lines(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        for operation in ("open", "write"):
+            with self.subTest(operation=operation):
+                with mock.patch.object(record.os, operation, side_effect=PermissionError("append denied")):
+                    with self.assertRaisesRegex(PermissionError, "append denied"):
+                        record.add_event(path, "denied", "implement", "started", None, None,
+                                         datetime.now(timezone.utc))
+                self.assertFalse((path / ".events.lock").exists())
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
 
     def test_prune_keeps_newest_runs_and_ignores_foreign_directories(self):
         root = record.runs_root(self.repo)
