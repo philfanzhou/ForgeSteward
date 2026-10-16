@@ -13,7 +13,7 @@ These references are required rules. Resolve paths relative to this `SKILL.md`, 
 
 ## Purpose and authorization
 
-Workflow policy belongs only in ForgeSteward's prepare-work, execute-work, review-and-merge, and fix-feedback skills: conditions for starting Issues, task size, Change Request scope, feedback classification and rounds, repair scope, merging and closing tasks, handoffs, and authorization. A second set in the project, whether identical, stricter, or looser, creates conflicting sources and becomes outdated as skills change. Remove that second source.
+Workflow policy belongs only in ForgeSteward's prepare-work, execute-work, review-and-merge, and fix-feedback skills: Issue start conditions, task size, Change Request scope, feedback classification/rounds, repair scope, merge/task closure, handoffs and authorization. Project copies, whatever their strictness or author, create conflicting sources and grow stale as skills change. Remove them.
 
 For version-controlled project files, delete workflow policy. The sole addition exception is the verbatim consolidation of tracked root Claude instructions into an existing root `AGENTS.md` under [Claude entry migration](references/agent-entrypoints.md); add no new rules, marked blocks, reading instructions, Agent entries, or replacement clauses. Preserve conventions that the project still needs and the skills explicitly leave to the repository; see [Project conventions](references/skill-owned-rules.md#project-conventions-preserve). Also check the hosting platform's automatic source-branch deletion setting read-only and record enabled, disabled, or unknown; do not change repository settings. Actual post-merge branch cleanup belongs to `review-and-merge`; this skill neither merges nor deletes branches.
 

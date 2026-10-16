@@ -2,7 +2,7 @@
 
 ## Principle
 
-ForgeSteward's four skills alone define workflow policy. Project policies neither supplement nor replace them. check-workflow removes this second source, preserving conventions explicitly left to the repository.
+ForgeSteward's four skills alone define workflow policy. Remove project copies, which neither supplement nor replace it; preserve repository conventions.
 
 After deletion, constraints apply only on skill invocation. Other conversations/contributors no longer find them in project documents. This is intentional, not a retention reason.
 
