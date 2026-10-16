@@ -295,3 +295,54 @@ Three-source conclusion: Tags and announcements match within that list scope. Pa
 Findings/unknowns: actual latest is v0.2.16, but no written latest policy exists, so pointer correctness is unknown pending written expectations; highest version alone cannot establish a pass. No confirmed Tag/announcement mismatch was found. The approximately 6.4-second observation window showed no cross-source version-set changes, without guaranteeing an atomic snapshot, permanent health, or complete historical package semantics. No private feed or model evaluation was used. This read-only audit **changed no project files**, created/edited no Issues, cleanup PRs, release assets, or release runs. Findings appeared only in the report.
 
 Raw responses, sources/times, and state comparisons remain in that local evidence directory; commands and public announcement are reproducible, with itemized acceptance retained in the implementation PR. Recording verification does not authorize a latest-policy fix or new release.
+
+## Root Claude entry consolidation (#125)
+
+This source revision introduces a narrow exception to the historical 0.2.7 deletion-only decision above. It moves retained project instructions into an existing root `AGENTS.md`; it adds no copy of Skill workflow policy. Project conventions remain useful outside Skill invocation and do not acquire the duplicated-policy staleness problem. Existing policy deletion runs first. Collaboration-language rules are preserved, including conflicts; [#126](https://github.com/philfanzhou/ForgeSteward/issues/126) separately owns English defaults. No version, release, installation, setting, or this repository's own instruction entry changed.
+
+The required, independently bundled [migration rules](../plugins/check-workflow/skills/forge-steward-check-workflow/references/agent-entrypoints.md) define root `CLAUDE.md` before `.claude/CLAUDE.md`, exact source headings, byte-preserving retained paragraphs, import/reference resolution, append verification before source deletion, interruption recovery, and no-write reruns. The legacy remover remains a block-removal CLI: exit 0 is not a complete migration decision. Existing malformed-block errors still stop cleanup writes. No production migration helper or separate protocol was added.
+
+### Compatibility evidence and limits
+
+On 2026-10-16, the official [Claude memory documentation](https://code.claude.com/docs/en/memory#agents-md) confirmed direct AGENTS.md loading from v2.1.277, enabled built-in support and instruction-mode/session conditions, including the first session after some upgrades. Root and ancestor `CLAUDE.md`, `.claude/CLAUDE.md`, or `CLAUDE.local.md` can prevent default fallback. Source removal therefore does not guarantee loading. Restoring root `CLAUDE.md` containing `@AGENTS.md` supports older or restricted sessions; maintainers choose that rollback. This Skill changes no user/global settings and scans no personal files.
+
+The same source's [import rules](https://code.claude.com/docs/en/memory#import-additional-files) establish source-relative resolution and literal code examples. Retaining a path string is insufficient when moving it changes its target, especially from `.claude/`. Direct AGENTS.md loading also differs for instruction hooks, additional directories and external-import approval. Preserved imports can still require previous approval. These are documentation-based compatibility conclusions, not independent client/model execution or a guarantee for arbitrary sessions. Other Agents' import interpretation is not made equivalent by consolidation; see [existing loading verification boundaries](skill-compatibility.md).
+
+### Finite repository walkthroughs
+
+M01–M26 were walked through against the final rules using individual temporary Git repositories. Each input was written as explicit bytes, tracked, and inspected; the reviewer selected each action from the rule, then performed that fixed action and asserted retained bytes, original destination prefix, source deletion, or unchanged bytes/mtime. For appends, assertions ran before unlinking. Completed-state inspection performed no subsequent write. M23 additionally executed the unchanged block remover. Raw input repositories, selected actions/reasons and diffs are retained with the implementation run evidence; the PR records its location. The fixture driver only performs predetermined case actions: it does not implement a general migration or test Agent judgment. No independent Agent/model, consumer cleanup PR, or remote publication ran for these scenarios.
+
+| ID | Finite input | Observed selected result |
+| --- | --- | --- |
+| M01 | Only tracked CLAUDE.md, no root AGENTS.md | No migration; no target created; bytes/mtime unchanged |
+| M02 | Root AGENTS.md, no tracked Claude source | No change or empty delivery |
+| M03 | Root CLAUDE.md has blank lines and `@./AGENTS.md` | Delete source only; target untouched |
+| M04 | `.claude/CLAUDE.md` has `@../AGENTS.md` | Delete root-resolving import-only source |
+| M05 | Root CLAUDE.md symlinks exactly to root AGENTS.md | Unlink source only, preserve target bytes |
+| M06 | Root import plus own Build section | Omit standalone import; append exact section under fixed root-source heading, then delete source |
+| M07 | Exact existing paragraph plus own paragraph | Omit only duplicate bytes; append remaining paragraph |
+| M08 | Root says Python, source says Ruby | Move Ruby text unchanged; report both exact conventions for maintainer decision |
+| M09 | Both root sources have own text | Append root then `.claude` payload under their distinct fixed headings; delete verified sources |
+| M10 | Fenced and inline `@AGENTS.md` examples | Preserve both as literal payload; do not treat as effective root imports |
+| M11 | Root source imports existing `@docs/rules.md` | Preserve import and its target identity |
+| M12 | `.claude` source imports `@rules.md` | Retain/report: destination would change the import target |
+| M13 | `.claude` source imports bare `@AGENTS.md`, with `.claude/AGENTS.md` present | Retain/report: not a root import and would change target |
+| M14 | Destination BOM/CRLF; source BOM and mixed newlines | Preserve destination prefix and complete source BOM/newline payload; no normalization |
+| M15 | Non-UTF-8 source | Retain/report undecodable source, no writes |
+| M16 | Source symlink points to another file | Preserve link and both file targets; report unsupported move |
+| M17 | Unclosed source fence | Retain/report ambiguous parsing |
+| M18 | Effective root import embedded in prose | Retain/report: omission would require rewriting retained prose |
+| M19 | README has a live link to source | Retain/report rather than break link or rewrite referrer |
+| M20 | Nested pair and tracked CLAUDE.local.md | Report unchanged scope/loading blockers; no fallback promise |
+| M21 | Safe own-content input, check-only | Plan only; all files/mtime unchanged, no branch/commit/PR |
+| M22 | Safe own-content input, local-only | Coherent local append/delete diff; no commit/push/PR |
+| M23 | Root AGENTS.md consists solely of legacy block; source imports it | Actual remover deletes both; do not recreate AGENTS.md for migration |
+| M24 | Verified payload already appended, source not yet deleted | Omit exact duplicate and delete source only; no second heading/content |
+| M25 | Source paragraph entirely duplicated in target | Delete source only; no empty heading |
+| M26 | Source paragraph differs only in case | Keep and append; semantic/case normalization is not exact deduplication |
+
+The decision review also checked nonregular/unreadable paths, broken/cyclic symlinks, unresolved imports/links, and source-specific heading collisions: all retain/report without partial migration. Untracked local instructions are outside modification scope. For interrupted unverified appends, preserve the source and recovery bytes and report the pair incomplete; M24 applies only after byte verification. A completed run has no remaining migrated source, so repeated inspection adds no heading or content and starts no branch/commit/PR. Byte/mtime checks here cover fixed inspections rather than arbitrary Agent reruns.
+
+The diff gate was reviewed with four finite changes: policy deletion (allowed), exact retained append plus source deletion (allowed), rewritten retained prose (rejected), and an unrelated added project rule (rejected). A heading without retained content or source deletion before verified append is also rejected. Migration-only input M06 follows the same cleanup-branch/PR route as policy deletion; safe migration keeps the no-change gate open even when the legacy script returns 0. Check-only never enters that delivery route; local-only stops at the local diff. Cancellation stops further writes and accurately separates completed and incomplete pairs. These are instruction/delivery walkthrough outcomes, not an executed hosting-platform integration test.
+
+Packaging regression explicitly requires the new migration reference in installed check-workflow resources; existing byte-for-byte resource comparisons also cover it for filesystem adapters. Skill budgets, prompt equality, marketplace checks and the complete suite are required implementation checks. Runtime-dependent skips remain skips; neither static success nor these walkthroughs proves all clients load instructions correctly. Release reconciliation retains its read-only scope and separate final-report-only findings.
