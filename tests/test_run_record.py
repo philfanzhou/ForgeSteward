@@ -1,7 +1,9 @@
 """Verify work-cycle run records: location, concurrent events, timing summary and pruning."""
 
 from datetime import datetime, timedelta, timezone
+from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -177,6 +179,54 @@ class RunRecordTests(unittest.TestCase):
                 path = record.run_dir(record.runs_root(self.repo), run_id)
                 self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
                                  ["implement-%d" % index for index in range(8)])
+
+    @unittest.skipUnless(sys.platform == "win32", "Requires native Windows directory deletion semantics")
+    def test_event_waits_for_windows_pending_directory_deletion(self):
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                      wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        guard = path / ".events.lock"
+        guard.mkdir()
+        # Retain a delete-sharing handle after the previous writer removes its guard.
+        # Windows keeps this directory pending deletion until that handle closes.
+        handle = kernel.CreateFileW(str(guard), 0, 7, None, 3, 0x02000000, None)
+        self.assertNotEqual(handle, ctypes.c_void_p(-1).value, ctypes.WinError(ctypes.get_last_error()))
+        mkdir = record.os.mkdir
+        observed = []
+
+        def create(*args, **kwargs):
+            nonlocal handle
+            try:
+                return mkdir(*args, **kwargs)
+            except PermissionError as error:
+                if args[0] == str(guard):
+                    observed.append(error.winerror)
+                    kernel.CloseHandle(handle)
+                    handle = None
+                raise
+
+        try:
+            guard.rmdir()
+            stderr = io.StringIO()
+            with mock.patch.object(record.os, "mkdir", side_effect=create):
+                with redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+                    result = record.main(["--repo", str(self.repo), "event", "--run", run_id,
+                                          "--task", "windows-writer", "--stage", "implement", "--status", "started"])
+            self.assertEqual(result, 0, stderr.getvalue())
+            self.assertEqual(observed, [5], "Expected real ERROR_ACCESS_DENIED from pending deletion")
+            self.assertEqual([event["task"] for event in record.read_events(path)], ["windows-writer"])
+            self.assertFalse(guard.exists())
+        finally:
+            if handle is not None:
+                kernel.CloseHandle(handle)
 
     def test_prune_keeps_newest_runs_and_ignores_foreign_directories(self):
         root = record.runs_root(self.repo)
