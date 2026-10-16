@@ -1,89 +1,88 @@
-# 准备与执行场景验收
+# Preparation and execution acceptance scenarios
 
-本矩阵针对 `0.2.3` 的两个独立技能；`0.2.9` 目标补充 prepare-work 在上限内填满批次的规则（P15–P17）；`0.2.10` 目标补充拆分出的 task 继承冻结身份、全清单轻量分诊与长耗时调查延后、主线等待期间推进其余候选，以及输出前重判解除条件已满足的未入选候选（P18–P21）。`0.2.11` 目标改为批次优先用存量填满：区分存量与周期新增并分层准备、每轮复查存量阻塞、区分技术前置与排期顺序、邻近发现归并登记，以及子项全关父项的结项核对（P22–P28）；execute-work、review-and-merge、fix-feedback 同步采用归并登记规则。`0.2.12` 目标补充按阶段加载规则与截断恢复（P29–P31）。`0.2.17` 目标增加自动化安全告警只读入口，走查记录见下文 P32–P43。它通过有限输入人工对照规则和交接结果，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。格式校验、安装发现及文件一致性验证另行记录，不能证明 Agent 必然遵循所有步骤。
+This matrix covers the two independent Skills introduced in `0.2.3`. Target `0.2.9` added filling preparation batches up to the limit (P15–P17). Target `0.2.10` added inherited frozen identity for split tasks, lightweight screening of the full list before lengthy investigations, progress on other candidates during mainline waits, and reevaluation before output when previously unmet conditions are resolved (P18–P21). Target `0.2.11` prioritized filling batches from the baseline backlog: separate baseline and cycle-new work, revisit baseline blockers each round, distinguish technical prerequisites from scheduling order, consolidate adjacent findings, and verify parent closure when all children are closed (P22–P28). execute-work, review-and-merge, and fix-feedback adopted the same consolidation rules. Target `0.2.12` added stage-based loading and truncation recovery (P29–P31). Target `0.2.17` added read-only automated security alert checks (P32–P43 below). These are manual comparisons of limited inputs with written rules and handoffs, not modifications to the example repositories or model-behavior evaluations. Format, installation discovery, and file-equality checks are recorded separately and do not prove every Agent follows every step.
 
-| 编号 | 输入 | 准备或执行的预期结果 |
+| ID | Input | Expected preparation or execution result |
 | --- | --- | --- |
-| P01 | 旧主线 A 需先做实验一，再根据结果做实验二；小项 B 已 ready | prepare 连续完成两个可执行实验并收敛方案，不在一轮后输出调查 prompt 或交给 unblock；A 满足门禁后可与 B 入选 |
-| P02 | A 的最小实验失败，但存在未试的授权路径 | 根据失败证据继续下一条路径；不能把第一次失败当作外部阻塞 |
-| P03 | A 确需外部权限，已有申请及无新变化；B 可独立实施 | 原 A 保存已尝试路径、负责角色、解除条件；过程中交接具体问题，继续准备 B，不重复空转 |
-| P04 | 没有 ready，但还有可执行调查；另有空队列对照 | 前者继续调查，不提前输出 `[]`；空队列核对后过程中说明，最终 `[]` |
-| P05 | 所有候选确实等待外部决定 | 先保存具体阻塞和恢复动作；最终仅 `[]`，不附摘要或无动作 prompt |
-| P06 | 现有 ready 标签但缺代码审计和邻近问题归属 | 完整读相关成员、测试和契约，去重分诊并持久化后才入选；标签不能替代证据 |
-| P07 | 原审计完整；最新主线分别只有无关文档或改变相关契约 | 前者复用，后者补查受影响完整成员和测试；不反复全仓审计 |
-| P08 | A、B 各自有清楚范围，但 B 必须使用 A 尚未实现的代码 | B 不入独立 ready 清单，不以提交顺序伪装已满足依赖 |
-| P09 | 新开放 PR 出现在准备结束前并覆盖 A | 输出前复核排除 A，保留原冻结候选范围；不生成重复实现队列 |
-| P10 | 同一跟踪仓库中 A 由产品仓实现、B 由库仓实现 | 原 Issue 保存实现归属与主线；最终一行原编号，execute 分别读取代码所属仓库，不复制 task |
-| P11 | 两个跟踪仓库存在相同编号，或不同平台同名仓库 | 使用能唯一定位的限定标识或原 Issue URL，同一行；不能仅输出两个含糊的 `#12` |
-| P12 | 只读请求；A 已有完整交接，B 缺必要验收记录 | A 可入选；B 过程中说明缺口，不发布也不假装交接完成；最终只含 A |
-| P13 | Issue 写入返回超时 | 先回读确认，未持久化的必要记录不视为完成；不盲目重复发布 |
-| P14 | 准备结束有三项入选 | 最终严格为 `#123, #145, #167` 等一行列表，没有标题、代码块、解释、换行或 prompt |
-| P15 | 冻结清单有 20 个开放 Issue；主线 A 推进到 ready，B 已 ready，C–H 只缺可自主补齐的审计、验收或模板栏目，其余确有开放实现或外部阻塞 | 不在 A、B 后结束；补齐 C–H 并逐项判定门禁，最终输出 A–H 共 8 项，过程中说明其余候选的未入选原因 |
-| P16 | 30 个候选中有 14 项能准备到 ready；对照用户要求本轮 5 项 | 前者按排序输出前 10 项；后者输出 5 项，用户数量优先 |
-| P17 | 仅 3 项满足门禁，其余候选均为 tracker、依赖未合并前置或真实外部阻塞 | 最终输出这 3 项；不降低门禁、不为凑数拆分 Issue 或纳入冻结后新 Issue，过程中记录其余原因 |
-| P18 | 冻结候选 F 审计后达到 feature 级，拆为 tracker F 与 task F1→F2→F3；另有他人在冻结后新建的 Issue G | F 不入选；F1 继承冻结身份，满足门禁后入选；F2、F3 因依赖未合并前置不入选并记录；G 不纳入 |
-| P19 | 25 个候选；排序第 2、3 项需多轮长耗时实验，其后 12 项只缺可补齐的审计或栏目，另有若干已有开放实现或属于 tracker | 先全清单分诊并直接排除后者；第 2、3 项保存证据与下一动作后先推进其后候选；批次未满时回到第 2、3 项；不因投入大直接排除，最终按排序输出 |
-| P20 | 主线 A 的下一步实验需等待长耗时环境构建 | 等待期间推进其余候选，构建完成后回到 A；不把等待判为外部阻塞，也不因已推进其他项放弃 A |
-| P21 | B 因缺用户决定未入选，用户在过程中作答；C 的前置在本轮合并；上限尚未填满 | 输出前重判 B、C，满足门禁则入选，仍受上限约束；冻结后新出现的 Issue 不纳入 |
-| P22 | 周期基线有 28 个存量 task；本轮冻结清单另有 6 个周期新增（审计发现的取消优先级缺陷、CI 偶发失败等）均可 ready；存量中有 4 项经复查可 ready | 先把全部存量推进到 ready 或记录具体不能入选原因，输出 4 个存量项在前；仅在存量处理完仍有空位时准备周期新增补足，过程中说明存量未填满的原因 |
-| P23 | 存量 A 标记 blocked，上轮记录的解除条件是前置 X、Y 关闭；X、Y 已在本轮前关闭 | 分诊不因阻塞标记排除 A；核对后按授权移除过时标记并深入准备，满足门禁则入选 |
-| P24 | 存量 B 的平台依赖只表达批次先后，B 可基于最新主线独立实施；对照 C 的依赖有维护者写明的理由 | B 按授权改为非阻塞关联并记录依据后判定门禁；C 保持顺序 |
-| P25 | 存量 D 依赖尚在审查的 Change Request | 本轮完成 D 的审计、方案和验收准备并写明合并后复核范围，D 不入选；前置合并后下一轮只补查差异 |
-| P26 | 准备存量 E 时在 5 条调用路径发现同类取消优先级缺陷，另有一个已开放的同类 Issue；还发现一项可选整洁改进 | 追加路径和证据到已有同类 Issue，不新建；整洁改进只记录在 E；E 的 ready 不以新建 Issue 为前提；新登记项计为周期新增 |
-| P27 | Epic F 的子项全部关闭；对照 Epic G 子项全关但父级验收仍缺一项具体端到端验证 | F 验收有证据时按授权关闭并单列父级结项；G 写明差额，没有对应 Issue 时拆出 task，该 task 继承存量身份 |
-| P28 | 存量 H 因缺少前置能力，本轮拆出前置 task H0 并建立依赖关联；另有与存量无关的新需求 I 在冻结后创建 | H0 继承存量身份，满足门禁可在本轮入选；I 不纳入；tracker 更新存量剩余、存量入选、本轮新建及周期新增入选计数 |
-| P29 | Codex 自动注入 prepare-work；目标仓库与技能安装目录不同 | 入口低于字节预算；从技能目录读取队列与门禁后才准备，遇到阻塞和交接分别读取对应规则，保留 P01–P28 的行为和单行输出 |
-| P30 | 引用文件读取结果被截断；对照引用文件缺失或无读取权限 | 前者分段补读到末尾再判定；后者说明具体路径和影响，不依赖入口摘要继续受影响的准备或判 ready |
-| P31 | 准备中压缩上下文，恢复时只保留队列和证据位置 | 不重置冻结队列；按当前阶段重新读取缺失规则，遵守交接与恢复要求 |
-| E01 | 仅安装 execute，没有 prepare 会话；输入十项，第 2 项外部受阻 | 保留完整十项顺序，读原 Issue，记录第 2 项后继续第 3–10 项，独立主线分支和 PR，不合并 |
-| E02 | 只有 skill 调用无清单；对照输入 `[]` | 缺失清单时请求输入，不擅自找工作；空清单时无代码或 PR 操作 |
-| E03 | 用户给 `#12` 但跟踪仓库不明 | 先澄清身份，不能按当前实现仓库猜测 |
-| E04 | 执行时 A 已有开放实现或已经完全交付 | 核对覆盖，记录已有实现或无需修改，继续后项；不接管他人分支、不创建空 PR |
-| E05 | 执行前审计缺失或相关契约已变化 | 自主补查可解决缺口，不强制用户重新调用 prepare；真实阻塞则记录后继续 |
-| E06 | 前项 PR 已提交但未合并；后项实际依赖它 | 后项明确等待条件，不能叠加代码；其他独立项继续 |
-| E07 | 第三项完成时压缩上下文 | 保存全队列、提交、验收、review 轮次及下一步；恢复后继续剩余，不重置基线 |
-| E08 | 用户明确限制本地修改；对照仅讨论技能名称 | 前者按限制保留本地交付，不推送；后者不推定有实现或外部写入授权 |
-| E09 | 新发现邻近缺陷或原任务验收遗漏 | 去重、区分原保证内修复与邻近债务，原遗漏回链记返工；不自动扩张队列 |
-| E10 | CI 为外部故障，或推送结果不确定 | 前者保留未验收与恢复条件并继续独立后项；后者查询远端再重试；不假报成功 |
+| P01 | Existing mainline task A needs experiment one, then experiment two based on its result; small B is ready | Preparation completes both available experiments and settles the plan, without returning an investigation prompt after one round or handing off to unblock; A may join B once all requirements are met |
+| P02 | A's minimal experiment fails, but another authorized path is untried | Continue along the next path using failure evidence; the first failure is not an external blocker |
+| P03 | A truly requires external access, with a recorded request and no change; B is independent | Save attempted paths, responsible role, and unblock conditions on A; explain the concrete external need during progress and continue B without idle repetition |
+| P04 | Nothing is ready but investigation remains possible; compare an empty queue | Continue investigating in the first case instead of returning `[]`; verify the empty queue, explain during progress, then return `[]` |
+| P05 | Every candidate truly awaits an external decision | Save concrete blockers and resumption actions first; finish with only `[]`, without a summary or unactionable prompt |
+| P06 | A ready label exists but code audit and adjacent-issue ownership are missing | Read complete relevant members, tests, and contracts; deduplicate, classify, and persist findings before selection; labels are not evidence |
+| P07 | Original audit is complete; latest main changes either unrelated docs or a relevant contract | Reuse the first; inspect affected complete members/tests for the second without repeating a whole-repository audit |
+| P08 | A and B have clear scopes but B needs A's unimplemented code | B cannot enter an independent ready list; submission order does not satisfy dependencies |
+| P09 | A new open PR covering A appears before preparation ends | Recheck before output and exclude A, retaining the original frozen candidate boundary; do not generate duplicate implementation work |
+| P10 | A and B are tracked in one repository but implemented in product and library repositories | Record implementation repository and main branch on each original Issue; return original identifiers on one line; execution reads each owning repository without duplicating tasks |
+| P11 | Two tracking repositories share an Issue number, or platforms share repository names | Use uniquely resolving qualified identifiers or original Issue URLs on one line, not ambiguous duplicate `#12` values |
+| P12 | Read-only request; A has a complete handoff and B lacks required acceptance records | A may qualify; explain B's gap during progress without publishing or pretending it is saved; return A only |
+| P13 | An Issue write times out | Reread before retrying; required records not persisted are incomplete; do not blindly publish duplicates |
+| P14 | Three items qualify at preparation end | Return strictly one line such as `#123, #145, #167`, without heading, code block, explanation, newline, or prompt |
+| P15 | Frozen queue has 20 open Issues; A becomes ready, B is ready, C–H only need autonomous audit/acceptance/template completion; others have open implementations or external blockers | Continue beyond A/B, complete C–H and check each; return all 8 A–H and explain excluded candidates during progress |
+| P16 | 14 of 30 candidates can become ready; compare a user-requested limit of 5 | Return the first 10 in priority order by default, or 5 when requested; user count takes precedence |
+| P17 | Only 3 qualify; others are trackers, depend on unmerged prerequisites, or have real external blockers | Return 3 without weakening requirements, splitting just to fill the batch, or adding post-freeze Issues; record other reasons during progress |
+| P18 | Frozen F is feature-sized and splits into tracker F plus F1→F2→F3; another person creates G after freeze | Exclude F; F1 inherits frozen identity and may qualify; F2/F3 wait for unmerged prerequisites with recorded reasons; exclude G |
+| P19 | Of 25 candidates, positions 2/3 need long multi-round experiments; 12 later items need manageable audit/template work; some have open implementations or are trackers | Screen the whole list first and directly exclude the latter; save evidence/next actions for 2/3 and advance later candidates, returning to 2/3 if capacity remains; effort alone cannot exclude them; output stays ordered |
+| P20 | A's next experiment awaits a lengthy environment build | Advance other candidates while waiting, then return to A; the wait is not an external blocker and other progress does not justify abandoning A |
+| P21 | B was excluded pending a user decision that arrives during the run; C's prerequisite merges; capacity remains | Reevaluate B/C before output and include them if eligible within the limit; still exclude new post-freeze Issues |
+| P22 | Cycle baseline has 28 tasks; frozen list also has 6 cycle-new findings, such as cancellation priority bugs and flaky CI, all potentially ready; 4 baseline tasks can become ready | Advance every baseline item to ready or a concrete exclusion reason first; output the 4 baseline tasks first. Prepare cycle-new items only after baseline processing leaves room; explain why baseline did not fill the batch |
+| P23 | Baseline A is blocked until X/Y close; both closed before this round | Do not exclude A solely by label; verify, remove the stale label when authorized, prepare fully, and select if eligible |
+| P24 | B's platform dependency expresses scheduling only and B can be implemented on latest main; C's ordering has an explicit maintainer rationale | When authorized, make B's link nonblocking and record evidence before checking eligibility; preserve C's order |
+| P25 | Baseline D depends on a Change Request still under review | Finish D's audit, plan, and acceptance preparation, recording post-merge recheck scope; do not select D yet; after merge, inspect only differences next round |
+| P26 | Preparing E reveals one cancellation-priority bug across 5 paths, an existing matching Issue, and optional cleanup | Append paths/evidence to the matching Issue without creating another; record cleanup only on E; E's readiness must not depend on new Issue creation; new registrations count as cycle-new |
+| P27 | Epic F's children are all closed; G's are also closed but one parent end-to-end acceptance check is missing | Close F when evidence and authorization permit and count parent closure separately; record G's gap and create a task if none exists, inheriting baseline identity |
+| P28 | Baseline H lacks a prerequisite capability and splits out H0 this round; unrelated new I appears after freeze | H0 inherits baseline identity and may qualify this round; exclude I; tracker records baseline remaining/selected, newly created, and cycle-new selected counts |
+| P29 | Codex injects prepare-work automatically; target repository differs from Skill installation directory | Entry stays below budget; read queue/readiness rules from the Skill directory before preparation, then blocker/handoff rules when needed; preserve P01–P28 and one-line output |
+| P30 | A reference read is truncated; compare a missing or unreadable reference | Reread chunks to the end before deciding; for missing/unreadable files report exact path and impact and stop affected preparation/readiness decisions rather than relying on an entry summary |
+| P31 | Context compacts during preparation, retaining only queue/evidence locations | Preserve the frozen queue; reread missing current-stage rules and follow handoff/recovery requirements |
+| E01 | Only execute is installed, with no prepare session; ten inputs, item 2 externally blocked | Retain all ten in order, read original Issues, record item 2 then continue 3–10 on independent mainline branches/PRs without merging |
+| E02 | Skill invocation has no list; compare explicit `[]` | Request a missing list without discovering work independently; an empty list causes no code or PR operations |
+| E03 | User supplies `#12` with no known tracking repository | Clarify identity instead of guessing from the current implementation repository |
+| E04 | A already has an open implementation or is fully delivered | Verify coverage, record existing implementation/no change needed, and continue; do not take over another person's branch or create an empty PR |
+| E05 | Pre-implementation audit is missing or a relevant contract changed | Fill solvable gaps autonomously without requiring another prepare invocation; record real blockers and continue |
+| E06 | Earlier PR is submitted but unmerged; later item depends on it | Record the later item's waiting condition, do not stack code, and continue other independent work |
+| E07 | Context compacts after item three | Save full queue, commits, acceptance, review rounds, and next action; resume remaining work without resetting baseline |
+| E08 | User explicitly limits work to local changes; compare discussion of a Skill name only | Respect local-only delivery without pushing; merely discussing the name grants neither implementation nor external-write authorization |
+| E09 | An adjacent defect or original acceptance omission is discovered | Deduplicate, distinguish repairs within original guarantees from adjacent debt, and backlink omissions as rework; do not expand the queue automatically |
+| E10 | CI has an external failure, or a push result is uncertain | Preserve unverified state/resumption conditions and continue independent items for CI; query remote before retrying uncertain pushes; do not report false success |
 
-上述场景已逐项对照两个技能的入口及配套引用文件，未发现要求准备阶段生成 prompt、首个 PR 后结束整批或自行合并的出口。实际运行偏差应保留输入、技能版本、输出和远端状态用于后续修订。
+Each scenario was compared against both Skills' entries and references. No path was found that requires preparation to generate a prompt, ends the batch after the first PR, or merges autonomously during execution. Preserve input, Skill version, output, and remote state for any real-run deviation and later revision.
 
-## 自动化安全告警走查（0.2.17）
+## Automated security alert walkthroughs (0.2.17)
 
-2026-10-06，按[只读告警规则](../plugins/prepare-work/skills/forge-steward-prepare-work/references/security-alerts.md)、[冻结与初筛](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-screening.md)及[登记门禁](../plugins/prepare-work/skills/forge-steward-prepare-work/references/readiness.md)逐项人工演算。结果模型沿用 [Issue #49](https://github.com/philfanzhou/ForgeSteward/issues/49)的唯一结果表，不另设调度状态。共用输入为授权仓库 R、主线 M、冻结时间 t0、可独立 ready 的存量 A/B（本轮清单 `[A, B]`）；告警查询快照为 t1，除行内说明外允许必要 Issue 更新。以下“产物”是规则推演得到的记录与操作清单，未真实调用扫描平台、发布模拟 Issue、读取敏感值或评测模型行为。
+On 2026-10-06 these cases were manually evaluated against [read-only alert rules](../plugins/prepare-work/skills/forge-steward-prepare-work/references/security-alerts.md), [freeze and screening](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-screening.md), and [registration requirements](../plugins/prepare-work/skills/forge-steward-prepare-work/references/readiness.md). The result model remains [Issue #49](https://github.com/philfanzhou/ForgeSteward/issues/49)'s single result table, with no extra scheduling states. Shared input is authorized repository R, main M, freeze time t0, independently ready baseline A/B (this round's list `[A, B]`), and alert-query snapshot t1. Necessary Issue updates are permitted unless stated otherwise. The records/actions below are rule walkthrough outputs; no scanning platform was called, simulated Issue published, sensitive value read, or model behavior evaluated.
 
-| 编号 | 输入与事件 | 人工演算的产物与结果 |
+| ID | Input and events | Manually derived records and result |
 | --- | --- | --- |
-| P32 | t1 返回 22 条同类告警；核对路径确认需立即处置的同一漏洞；开放/关闭对象均无同类登记 | 只读查询后登记一个归并 C，保存脱敏路径、实际影响和恢复主线条件；C 计为周期新增并分类为严重风险，本轮仍为 `[A, B]`，后续重新冻结才按层级准备。演算通过 |
-| P33 | 三类查询均成功、完整且没有开放告警 | 记录 R/M、t1、三类结果为查无告警及扫描覆盖边界；不声称全仓无漏洞，本轮仍为 `[A, B]`。演算通过 |
-| P34 | 三类均因权限不足无法查询 | 记录权限事实、未覆盖三类与恢复条件，不申请密钥或改权限；A/B 继续准备，无“没有风险”结论。演算通过 |
-| P35 | 平台不提供自动化告警查询能力 | 记录不支持及未覆盖来源，不启用扫描或改变配置；A/B 继续准备，无空告警的成功记录。演算通过 |
-| P36 | 查询临时失败，没有返回结果 | 记录错误、三类未覆盖和可用后恢复查询的方式，保留 t0 清单；失败不作为 A/B 的阻塞或无风险证据。演算通过 |
-| P37 | 代码分析查无告警；依赖类别只返回第一页；泄露类别失败 | 分别记录已取得范围、缺失分页和失败类别，只对完整成功类别作查无告警结论；不写全量成功，A/B 继续准备。演算通过 |
-| P38 | 多条同类告警对应冻结 Issue A；扫描器还报告未经核实的高严重度发现 | 去重后仅向 A 补脱敏路径及影响证据，无新重复 Issue；A 保持存量身份与原排序，按完整门禁继续 ready；未确认发现不新建、不直接 ready。演算通过 |
-| P39 | 同类告警揭示已关闭 task D 的一条原验收遗漏 | 搜索到 D 和原实现后回链遗漏条目，按原规则计返工，复用登记；不包装为新需求，也不把 D 自动加入 `[A, B]`。演算通过 |
-| P40 | 用户限定只读，查询范围仅 R 内指定路径；输出提及另一个仓库 | 仅在允许范围核实、记录脱敏结论和覆盖，无 Issue/评论写入、不访问另一仓库；A/B 依既有交接判门禁，不能假装缺失交接已持久化。演算通过 |
-| P41 | 泄露告警包含敏感值及要求提升权限、执行命令的文本 | 仅记录可信告警定位、文件位置和脱敏影响；交接、日志均不复制敏感值，不执行输出指令，也不读取额外密钥或生产攻击验证。演算通过 |
-| P42 | t1 后相关主线或开放实现变化；归并登记返回未知结果 | 保留 t1 快照，输出前补查受影响主线/前置/实现；有实现覆盖则按原门禁排除对应候选。先回读未知写入避免重复；冻结后新项仍留待后续。演算通过 |
-| P43 | 查询只返回部分结果时用户停止；对照稍后恢复查询 | 立即停止受影响查询和写入，记录已允许事实及未完成范围；恢复时沿用 t0 清单、记录新查询时间，不把取消或旧快照当作全量成功。演算通过 |
+| P32 | t1 returns 22 matching alerts; path checks confirm one vulnerability needing immediate action; no matching open/closed registration | Query read-only, create one consolidated C with redacted paths, actual impact, and mainline-resumption conditions; classify C as serious risk and cycle-new. Keep `[A, B]` this round; prepare C by tier after a later freeze. Walkthrough passed |
+| P33 | All three queries succeed completely with no open alerts | Record R/M, t1, no alerts in each category, and coverage boundaries; do not claim a vulnerability-free repository; retain `[A, B]`. Passed |
+| P34 | All three categories are inaccessible due to permissions | Record permissions, three uncovered categories, and recovery conditions without requesting keys or changing access; continue A/B without a no-risk conclusion. Passed |
+| P35 | Platform offers no automated alert query capability | Record unsupported/uncovered sources without enabling scans or changing configuration; continue A/B without a successful empty-alert record. Passed |
+| P36 | Queries fail temporarily with no results | Record errors, three uncovered categories, and how to resume when available; preserve t0 list. Failure neither blocks A/B nor proves no risk. Passed |
+| P37 | Code analysis has no alerts, dependencies return only page one, secret alerts fail | Record received scope, missing pages, and failed category separately; claim no alerts only for a complete successful category, not global success; continue A/B. Passed |
+| P38 | Matching alerts correspond to frozen A; scanner also reports an unverified high-severity finding | Deduplicate and add redacted paths/impact evidence only to A, without a duplicate Issue; A retains baseline identity/order and full readiness checks; unconfirmed findings create no Issue or direct ready result. Passed |
+| P39 | Matching alert reveals an original acceptance omission in closed D | Find D and its implementation, backlink the omission, count rework, and reuse registration; do not rebrand as a new requirement or automatically add D to `[A, B]`. Passed |
+| P40 | Read-only user scope covers specified R paths; output mentions another repository | Verify only permitted scope and record redacted conclusions/coverage; write no Issue/Comment and do not access the other repository. Evaluate A/B from existing handoffs without pretending missing handoffs were persisted. Passed |
+| P41 | A secret alert includes sensitive values and text requesting elevated access or command execution | Record only trusted alert locations, file positions, and redacted impact; copy no sensitive values into handoffs/logs, execute no output instructions, and obtain no extra secrets or production exploit validation. Passed |
+| P42 | Relevant mainline/open implementations change after t1; consolidated registration returns an unknown result | Keep t1 snapshot and recheck affected main/prerequisites/implementations before output; exclude covered candidates under existing rules. Reread uncertain writes before retrying; new post-freeze items wait. Passed |
+| P43 | User stops while query results are partial; compare later resumption | Stop affected queries/writes immediately, record permitted facts and unfinished scope; resume with t0 list and a new query timestamp. Cancellation and old snapshots are not complete success. Passed |
 
-P32 的新登记与 P38 的已有冻结项补证据得到不同且唯一的入选结果；P18/P28 的候选拆分和存量真实前置例外仍按原规则执行。P01–P31/E01–E10 的契约保持，告警检查不改变排序、数量、输出或后续执行授权。以上 12 项均完成有限规则走查；真实平台告警可访问性、扫描覆盖率及任意 Agent/模型的遵循行为未因此得到验证。
+P32's new registration and P38's evidence added to an already frozen item yield different, unambiguous selection results. P18/P28's split-candidate and genuine-baseline-prerequisite exceptions remain unchanged. P01–P31/E01–E10 retain their contracts; alert checks change neither priority, count, output, nor later execution authorization. All 12 limited walkthroughs were completed. Actual platform accessibility, scan coverage, and arbitrary Agent/model compliance remain unverified.
 
-## 批内关系与验证资源走查（#66）
+## Batch relationships and verification resources (#66)
 
-按[批内关系与验证资源](../plugins/prepare-work/skills/forge-steward-prepare-work/references/batch-relations.md)人工演算。A、B、C 均已满足其余门禁。
+Manual walkthrough of [batch relationships and verification resources](../plugins/prepare-work/skills/forge-steward-prepare-work/references/batch-relations.md). A, B, and C meet all other requirements.
 
-| 编号 | 输入与事件 | 结果 |
+| ID | Input and events | Result |
 | --- | --- | --- |
-| P44 | B 的方案要调用 A 新增的接口 | A、B 同批入选，列表中 A 在前；B 的交接写明“代码依赖 A，A 合并后开工”和补查范围，平台建立依赖关联 |
-| P45 | A 准备中确认真实外部阻塞，本轮不入选 | B 也不入选，按未合并前置的原规则记录；列表不含 A、B |
-| P46 | A、C 无代码依赖，但都要改依赖锁文件 | 标为改动重叠，列表中靠前者先做，靠后者等其合并后开工 |
-| P47 | 无法确定 A、C 是否会改到同一模块 | 按改动重叠处理，不因此排除任何一项 |
-| P48 | 只有 A 一项入选 | 关系写“无”，仍写明预计改动范围和验证所需共享资源 |
-| P49 | 本地集成测试固定使用 5432 端口的本地数据库，仓库配置可指定数据库名但不能改端口 | 验证资源写“本地数据库（可按任务指定数据库名）、固定端口 5432 需排队”；不为隔离修改仓库配置 |
-| P50 | 查不清测试会占用哪些资源 | 写“整套本地测试需排队” |
-| P51 | 单独调用 execute-work 处理 `A, B`，A 的 PR 尚未合并 | A 照常实现；B 按原规则记为等待前置合并，不在 A 的分支上叠加 |
-| P52 | B 开工时 A 已合并，但 A 实际合并的接口与 B 方案不同 | 实现者按补查范围发现差异，更新原 Issue 或记录阻塞，不自行另定方案 |
+| P44 | B's plan calls an interface added by A | Select A/B in one batch with A first; B's handoff says it depends on A's code and starts after A merges, includes recheck scope, and records the platform dependency |
+| P45 | A has a real external blocker and is not selected this round | Exclude B too, record the unmerged prerequisite under existing rules, and omit both from the list |
+| P46 | A/C have no code dependency but both change a dependency lockfile | Mark overlapping changes; earlier listed item goes first and the later starts after merge |
+| P47 | Unclear whether A/C change the same module | Treat as overlap without excluding either item solely for uncertainty |
+| P48 | Only A qualifies | Record relationships as none, still specifying expected changes and shared verification resources |
+| P49 | Integration tests use a local database on fixed port 5432; repository settings allow separate database names but not ports | Record task-specific database names as possible and fixed port 5432 as requiring a queue; do not change repository configuration for isolation |
+| P50 | Test resource use cannot be determined | Record that the entire local suite must queue |
+| P51 | Standalone execute-work receives `A, B`; A's PR remains unmerged | Implement A normally; record B waiting for prerequisite merge without stacking it on A's branch |
+| P52 | A merged before B starts, but the merged interface differs from B's plan | Discover the difference within recorded recheck scope, update the original Issue or record a blocker; do not invent a replacement plan unilaterally |
 
-最终输出仍只是一行编号；以上信息都写在各 Issue 的交接中。
-
+Final output remains one line of identifiers; all this information belongs in each Issue's handoff.

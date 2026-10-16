@@ -1,49 +1,49 @@
-# 技能工作流政策场景验收
+# Skill-owned workflow policy acceptance scenarios
 
-本矩阵针对 `0.2.7` 把工作流政策收归技能后迁入的规则：四个技能不再采用仓库另行规定的同类工作流规则，并新增 feature 级拆分、复杂协议或状态任务的语义模型、第三次审查或修复前的逐 commit 审计。`0.2.13` 起第三次修复推送后允许一次终审，符合门禁则合并，仍有范围内必修问题才暂停该项。它通过有限输入人工对照正文，不实际修改场景中的业务仓库，也不宣称完成模型行为评测。`0.2.8` 目标补充 execute-work 的改名与 secret 扫描边界，以及 review-and-merge 合并后的本地主线更新、分支删除与 worktree 记录清理（E14–E15、R07–R10）；`0.2.10` 目标改为合并后无论是否由本轮创建都删除本地源分支，并在仓库未启用合并后自动删除源分支时提示用户决定（R11–R14）。`0.2.14` 起合并后对符合安全条件的本仓远端源分支自动清理，不修改仓库设置（R15–R18）。check-workflow 的删除行为见 [Check Workflow 接入验收](check-workflow-scenarios.md#027-删除与技能重复的项目规则)。
+This matrix covers rules migrated into Skills in `0.2.7`: four Skills no longer adopt equivalent repository-defined workflows, and add feature-sized splitting, semantic models for complex protocol/state tasks, and per-commit audits before a third review or repair. Since `0.2.13`, the third repair push receives one final review, merging if eligible and pausing only items with remaining required in-scope problems. These are limited manual comparisons with written rules, not changes to example business repositories or model-behavior evaluations. Target `0.2.8` added execute-work's rename/secret-scan boundaries and review-and-merge's post-merge local-main update, branch deletion, and worktree-record cleanup (E14–E15, R07–R10). Target `0.2.10` deleted local source branches regardless of which session created them and asked the user about disabled automatic source deletion (R11–R14). Since `0.2.14`, eligible same-repository remote source branches are cleaned automatically without changing settings (R15–R18). For check-workflow removal behavior see [Check Workflow acceptance](check-workflow-scenarios.md#027-removing-project-rules-that-duplicate-skills).
 
-迁移说明：旧版本在自动删除设置停用时保留远端源分支并提示用户处理；`0.2.14` 起，明确调用审查合并或完整工作周期后，已合并且满足安全核对的本仓远端源分支会自动删除。需要保留某个分支时，应在调用时明确指定。设置本身不会被修改；不确定归属、保护状态、head 或共用情况时保留分支并报告。
+Migration: older versions retained remote source branches when automatic deletion was disabled and asked the user to handle them. From `0.2.14`, explicit review-and-merge or a full work-cycle invocation automatically deletes merged same-repository remote source branches that pass safety checks. Explicitly name any branch to retain when invoking. Settings stay unchanged; uncertain ownership, protection, head, or shared use means retain and report.
 
-| 编号 | 技能 | 输入 | 预期结果 |
+| ID | Skill | Input | Expected result |
 | --- | --- | --- | --- |
-| K01 | prepare-work | 仓库规则要求 ready 前必须经两名维护者评审，技能门禁已全部满足 | 按技能门禁判定，不采用仓库同类门禁；平台审批或分支保护仍单独遵守 |
-| K02 | prepare-work | 仓库 Issue 模板要求填写“兼容性影响”栏目 | 按模板栏目填写，属于项目约定 |
-| K03 | prepare-work | 一个 Issue 同时新增三个公共协议端点并改动两个有状态产物和数据迁移 | 判为 feature 级；不能收敛为单一切片时拆为 tracker 与有依赖的 task，tracker 不入选 |
-| K04 | prepare-work | 复杂状态任务只有描述性文字，没有事件 × 产物 × 结果等模型，文档 lint 与 CI 全绿 | 不入选；补齐唯一语义模型和端到端场景后再判定，形式检查不作为闭合证据 |
-| K05 | prepare-work | 简单文案修复，不涉及协议或状态 | 语义模型写明不适用及理由，不因新规则增加负担 |
-| K06 | prepare-work | 维护者在多轮往返后撤销 Issue 的 ready，交回准备阶段 | 先拆分或重建语义模型，不以补一条验收恢复 ready |
-| K07 | prepare-work | 仓库已由 check-workflow 删除项目自写的 ready 条件；认证任务只写了成功验收和“保证”，没有非保证、调用方责任及失败、密钥结果 | 不入选；按技能门禁补齐验收维度（不适用写理由）、非保证、调用方责任和适用输入，不依赖项目文档是否仍有该要求 |
-| K08 | prepare-work | 任务改动数据库表，已读实现与测试，未读迁移历史和部署路径 | 审计未完成，不入选；补读后记录基线和证据 |
-| K09 | prepare-work | 前置 Issue 已关闭，但平台依赖关联仍显示阻塞，或 ready 标签在门禁不满足时已存在 | 更正依赖关联；门禁不满足时不入选，并按授权移除过时的 ready 标签 |
-| K10 | prepare-work | Issue 模板的“已知邻近问题”栏目留空；审计发现两个既有缺陷，其中一个已有 Issue | 栏目留空不入选；链接已有 Issue，另一个按授权创建并链接，确认没有时写“无” |
-| K11 | prepare-work | 一个 task 同时新增一个接口组和一项独立数据迁移，未达到 feature 级阈值 | 拆为两个独立 Issue，不因未达 feature 级而合并为单一 task |
-| E11 | execute-work | 实施中发现实际范围达到 feature 级且无法收敛 | 停止该项，更新或拆分跟踪，不把新项加入冻结队列，继续其余独立项 |
-| E12 | execute-work | 仓库 PR 模板要求中文正文，仓库规则另写“一个 PR 可关闭多个相关 Issue” | 按模板写正文；每个 Change Request 只关闭一个原 Issue，以技能为准 |
-| E13 | execute-work | 以文档交付的目标协议设计 | Change Request 记录实际演算的端到端场景和结果，不以链接或 CI 通过代替 |
-| E14 | execute-work | 修复一个函数的边界错误时，发现相邻变量和函数命名不佳 | 不在本项改名，只做验收所需的最小修改；需要时另行分诊登记 |
-| E15 | execute-work | 以文档交付的目标设计，secret 扫描、文档 lint 与 CI 全绿，但没有演算端到端场景 | secret 扫描同样不作为语义正确的证据；补齐实际演算的场景和结果后再提交 |
-| R01 | review-and-merge | 仓库规定可选建议必须全部修完才合并 | 可选建议不阻塞合并，以技能为准；必要检查与审批仍按仓库执行 |
-| R02 | review-and-merge | Change Request 关联 tracker，或单一 task 实际达到 feature 级 | 列为范围内阻塞，不合并 |
-| R03 | review-and-merge | 已完成 2 轮往返，本次审查发现两个 commit 无法追溯到验收 | 列为范围内阻塞，要求移出并另行登记 |
-| R04 | review-and-merge | 第 3 次修复已推送、当前 head 尚未终审，仍有跨文档状态矛盾 | 只对该 head 做一次终审，记录具体验收差额并暂停该项；继续审查和合并其他独立项，不要求第 4 次自动修复 |
-| R15 | review-and-merge | 第 3 次修复已推送、当前 head 尚未终审，验收及平台门禁全部成立 | 终审通过后直接合并，不因累计 3 轮而跳过 |
-| R16 | review-and-merge | 第 3 次修复后的终审已记录范围内必修问题；下一周期再次看到同一 head | 跳过该项，不重复审查或评论；其他 Change Request 继续处理 |
-| R05 | review-and-merge | 换会话继续；平台时间线显示 2 轮往返，交接记录写 1 轮 | 取较大值 2 轮，照常审查并先逐 commit 审计，不归零 |
-| R06 | review-and-merge | 往返已满 3 轮，用户本轮明确点名要求审查该项 | 按正常流程审查，输出注明轮次 |
-| R07 | review-and-merge | 合并完成，本地 `main` 落后于远端且工作区干净 | 用 `git merge --ff-only origin/main` 快进；不能快进或工作区有未提交改动时保留原状并报告，不重置 |
-| R10 | review-and-merge | 合并完成，当前检出的是已合并的功能分支，本地 `main` 落后于远端 | 不在功能分支上执行 `git merge --ff-only origin/main`；在检出 `main` 的干净工作区中快进 |
-| R08 | review-and-merge | squash 合并后，本地源分支 `git branch -d` 报告未完全合并 | 不据此判定未合并；核对平台合并状态且本地 head 与已合并 Change Request 的 head 一致后才强制删除，不一致时保留并报告 |
-| R09 | review-and-merge | 本轮创建的 worktree 目录已移除，`git worktree list` 仍有残留记录 | 执行 `git worktree prune` 清理残留记录 |
-| R11 | review-and-merge | 合并完成；本地源分支由之前的会话创建，工作区干净，head 与已合并 Change Request 一致 | 不因非本轮创建而保留，切换到主线后删除本地分支 |
-| R12 | review-and-merge | 合并完成；本地源分支有未推送的独有提交或未提交改动 | 保留本地分支并报告，不强制删除 |
-| R13 | review-and-merge | 合并完成；仓库未启用合并后自动删除源分支，远端源分支仍在 | 不修改仓库设置；按 R15 的安全条件自动删除，条件不满足时报告并继续冻结清单 |
-| R14 | review-and-merge | 合并完成；仓库已启用合并后自动删除源分支 | 回读确认远端源分支状态；仍存在时按 R15 的安全条件清理 |
-| R15 | review-and-merge | 合并完成，自动删除设置停用；本仓远端源分支 head 与合并时一致，未受保护且没有其他开放 Change Request 使用 | 删除远端分支并回读；本地源分支满足条件时也删除，不要求另一次人工授权 |
-| R16 | review-and-merge | 合并后远端源分支又有新提交，或被另一开放 Change Request 使用 | 保留远端及仍被使用的本地分支，报告具体条件；不因原 Change Request 已合并而强删 |
-| R17 | review-and-merge | 来源是 fork、保护状态不明或删除权限不足 | 不删除不确定或无权限的分支；记录原因，继续处理其他冻结项 |
-| R18 | review-and-merge | 自动删除设置已启用且平台已删除远端分支 | 回读确认并记录平台清理结果；安全清理可继续处理本地分支 |
-| X01 | fix-feedback | 已完成 2 轮往返，又收到必修意见；分支含一个与验收无关的重构 commit | 先暂停写代码并审计，移出该改动并登记后续 Issue，再修复必修项；推送后满 3 轮，交给 review-and-merge 终审 |
-| X02 | fix-feedback | 往返已满 3 轮，仍有必修意见 | 跳过自动修复：不修改、不推送、不回复线程；未终审的新 head 交给 review-and-merge，终审仍有问题才等待人工处理 |
-| X03 | fix-feedback | 仓库规定 Review 预算为五轮 | 不采用仓库预算，按技能规则满 3 轮往返后跳过 |
+| K01 | prepare-work | Repository requires two maintainer reviews before ready; Skill requirements are all met | Use Skill readiness rules rather than equivalent repository workflow rules; still independently honor platform approvals and branch protection |
+| K02 | prepare-work | Issue template requires compatibility-impact field | Fill the field as a project convention |
+| K03 | prepare-work | One Issue adds three public protocol endpoints, changes two stateful outputs, and migrates data | Classify as feature-sized; if it cannot become one slice, split into tracker and dependent tasks; never select the tracker |
+| K04 | prepare-work | Complex state task has prose only, no event × output × result model; docs lint and CI are green | Exclude until a single semantic model and end-to-end scenarios are complete; format checks do not prove completeness |
+| K05 | prepare-work | Simple wording fix with no protocol/state | Mark semantic model not applicable with a reason, without unnecessary work |
+| K06 | prepare-work | Maintainer withdraws ready after repeated exchanges and returns the Issue to preparation | Split or rebuild the semantic model first, rather than restoring ready by adding one criterion |
+| K07 | prepare-work | check-workflow removed project-authored ready rules; authentication task has only success criteria/guarantees, no non-guarantees, caller duties, failure, or secret outcomes | Exclude; complete applicable acceptance dimensions with reasons for exclusions, non-guarantees, caller duties, and inputs under Skill rules, regardless of project docs |
+| K08 | prepare-work | Task changes database tables; implementation/tests read, migration history/deployment paths unread | Audit is incomplete; exclude until read and baseline/evidence recorded |
+| K09 | prepare-work | Prerequisite Issue is closed but platform link still blocks, or ready label exists despite unmet requirements | Correct dependency links; exclude ineligible items and remove stale ready labels when authorized |
+| K10 | prepare-work | Known-adjacent-issues template field is empty; audit finds two existing defects, one already tracked | Empty field prevents selection; link the existing Issue and create/link the other when authorized, or write none when absence is confirmed |
+| K11 | prepare-work | One task adds an interface group and an independent data migration, below the feature threshold | Split into two independent Issues; being below the threshold does not make them one task |
+| E11 | execute-work | Implementation reveals feature-sized scope that cannot be reduced | Stop that item, update/split tracking without adding new items to the frozen queue, and continue independent items |
+| E12 | execute-work | Target PR template explicitly requires Chinese; another repository rule allows one PR to close multiple related Issues | Honor the template's language; each Change Request still closes only one original Issue under Skill rules |
+| E13 | execute-work | Target protocol design is delivered as documentation | Record actual end-to-end scenario walkthroughs/results on the Change Request, not just links or green CI |
+| E14 | execute-work | Fixing a function boundary reveals poorly named adjacent variables/functions | Avoid unrelated renames; make only acceptance-required changes and separately assess/register follow-up when needed |
+| E15 | execute-work | Target design docs pass secret scanning, lint, and CI but lack end-to-end walkthroughs | Secret scanning also does not prove semantic correctness; complete actual scenarios/results before submission |
+| R01 | review-and-merge | Repository requires every optional suggestion fixed before merge | Optional advice does not block under Skill rules; still follow required checks and approvals |
+| R02 | review-and-merge | Change Request links a tracker or a supposedly single task is feature-sized | Record an in-scope blocker and do not merge |
+| R03 | review-and-merge | Two exchanges completed; current review finds two commits unrelated to acceptance | Block as in-scope, require removing them and registering separately |
+| R04 | review-and-merge | Third repair pushed, head not finally reviewed, cross-document state contradictions remain | Review that head once, record concrete acceptance gaps, pause it, and continue other independent reviews/merges; no fourth automatic repair |
+| R15 | review-and-merge | Third repair pushed, head not finally reviewed, all acceptance/platform requirements met | Merge after final review; do not skip merely because three rounds elapsed |
+| R16 | review-and-merge | Final review after third repair recorded required in-scope problems; next cycle sees same head | Skip without repeat review/comments; continue other Change Requests |
+| R05 | review-and-merge | New session: platform timeline shows two exchanges, handoff says one | Use the higher count, two, review normally and first audit every commit; never reset |
+| R06 | review-and-merge | Three exchanges reached; user explicitly requests this item's review now | Review normally and disclose the round count |
+| R07 | review-and-merge | Merged; local `main` is behind remote and workspace clean | Fast-forward with `git merge --ff-only origin/main`; if impossible or dirty, preserve and report without reset |
+| R10 | review-and-merge | Merged; checked-out branch is the merged feature branch, local `main` behind remote | Do not run `git merge --ff-only origin/main` on the feature branch; fast-forward in a clean workspace checking out `main` |
+| R08 | review-and-merge | After squash merge, local `git branch -d` says not fully merged | Do not infer no merge; verify platform merge and matching local/merged-PR heads before force deletion; otherwise preserve/report |
+| R09 | review-and-merge | Worktree created this round was removed but remains in `git worktree list` | Run `git worktree prune` to clear stale records |
+| R11 | review-and-merge | Merged source branch was created in an earlier session, clean, and matches merged Change Request head | Do not retain solely because another session created it; switch to main and delete locally |
+| R12 | review-and-merge | Merged local source branch has unique unpushed commits or uncommitted changes | Preserve and report without force deletion |
+| R13 | review-and-merge | Merged; automatic source deletion disabled and remote branch remains | Do not alter settings; delete under R15's safety conditions, otherwise report and continue the frozen list |
+| R14 | review-and-merge | Merged; automatic source deletion enabled | Reread remote branch state; if still present, clean under R15's safety conditions |
+| R15 | review-and-merge | Merged, automatic deletion disabled; same-repository remote head unchanged since merge, unprotected, unused by other open Change Requests | Delete remote and reread; also delete eligible local source branch, without another authorization request |
+| R16 | review-and-merge | Remote source has new commits after merge or another open Change Request uses it | Preserve remote and any still-used local branch, reporting the condition; do not force-delete merely because the original Change Request merged |
+| R17 | review-and-merge | Source is a fork, protection unknown, or deletion permission missing | Preserve uncertain/unauthorized branches, record why, and continue other frozen items |
+| R18 | review-and-merge | Automatic deletion enabled and platform already removed remote branch | Reread and record platform cleanup; safe local cleanup may continue |
+| X01 | fix-feedback | Two exchanges done, more required feedback, and an unrelated refactor commit exists | Pause coding for an audit; remove that change and register follow-up, then fix required items. Third push goes to review-and-merge for final review |
+| X02 | fix-feedback | Three exchanges reached and required feedback remains | Skip automatic repair: no edits, push, or thread reply. Send an unreviewed new head to review-and-merge; wait for human handling only if final review still finds problems |
+| X03 | fix-feedback | Repository sets a five-round review budget | Use Skill rules and stop automatic repair after three exchanges rather than adopting the repository budget |
 
-上述场景按四份技能的现行入口及引用规则对照。实际运行偏差应保留输入、技能版本、输出和远端状态用于后续修订。
+These scenarios were compared with the four Skills' current entries/references. Preserve input, Skill version, output, and remote state for any real-run deviations and later revision.

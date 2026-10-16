@@ -1,36 +1,36 @@
-## work-cycle 运行汇报
+## work-cycle report
 
-结论：合并 2 个 PR，4 项需要你处理。共跑 2 轮（上限 10），没有可做的 Issue 而停止。
+Conclusion: 2 PRs merged; 4 items need your action. Completed 2 cycles (limit 10); Stopped because no Issues were ready.
 
-### 需要你处理
-1. PR [#105](https://example.test/pr/105) 等你审批：检查全部通过，仓库要求维护者批准；下一步：在 PR 页面批准。
-2. PR [#108](https://example.test/pr/108) 已暂停：第三次修复后终审仍有必修问题 详见 PR 评论；下一步：人工处理后重新运行。
-3. Issue #88 已暂停：“导出格式”没定，已在 Issue 里提问；下一步：回答后重新运行。
-4. 本机默认 Python 低于 3.9，建议升级。
+### Needs your action
+1. PR [#105](https://example.test/pr/105) Awaiting your approval: All checks passed; repository requires maintainer approval; Next: Approve on the PR page.
+2. PR [#108](https://example.test/pr/108) Paused: Final review after the third repair still found required fixes See PR comments; Next: Resolve manually and rerun.
+3. Issue #88 Paused: Export format is undecided; asked in the Issue; Next: Answer and rerun.
+4. Default local Python is older than 3.9; upgrade recommended.
 
-### PR 结果
-| PR | 对应 Issue | 结果 | 说明 |
+### PR results
+| PR | Linked Issues | Result | Details |
 |---|---|---|---|
-| [#101](https://example.test/pr/101) | #80 | 已合并 |  |
-| [#103](https://example.test/pr/103) | #82 | 已合并 | 修复 1 次后通过 |
-| [#105](https://example.test/pr/105) | #85、other/repo#7 | 等你审批 | 检查全部通过，仓库要求维护者批准；下一步：在 PR 页面批准 |
-| [#106](https://example.test/pr/106) | #86 | 等待 CI | CI 排队超过 30 分钟；下一步：CI 通过后再审查 |
-| [#107](https://example.test/pr/107) | #87 | 等待外部审批 | 需要安全团队放行 |
-| [#108](https://example.test/pr/108) | #89 | 已暂停 | 第三次修复后终审仍有必修问题 详见 PR 评论；下一步：人工处理后重新运行 |
-| [#109](https://example.test/pr/109) | 无 | 已关闭未合并 | 与 #101 重复 \| 已关闭 |
-| 无 | #88 | 已暂停 | “导出格式”没定，已在 Issue 里提问；下一步：回答后重新运行 |
-| 无 | #90 | 未开始 | 运行达到轮数上限 |
+| [#101](https://example.test/pr/101) | #80 | Merged |  |
+| [#103](https://example.test/pr/103) | #82 | Merged | Passed after one repair |
+| [#105](https://example.test/pr/105) | #85, other/repo#7 | Awaiting your approval | All checks passed; repository requires maintainer approval; Next: Approve on the PR page |
+| [#106](https://example.test/pr/106) | #86 | Waiting for CI | CI queued for more than 30 minutes; Next: Review after CI passes |
+| [#107](https://example.test/pr/107) | #87 | Waiting for external approval | Security team approval required |
+| [#108](https://example.test/pr/108) | #89 | Paused | Final review after the third repair still found required fixes See PR comments; Next: Resolve manually and rerun |
+| [#109](https://example.test/pr/109) | None | Closed without merge | Duplicate of #101 \| closed |
+| None | #88 | Paused | Export format is undecided; asked in the Issue; Next: Answer and rerun |
+| None | #90 | Not started | Run reached the cycle limit |
 
-### 本次概况
-- 启动检查：当前版本已检查过，跳过
-- 开始前已有的 PR：2 个，均已处理
-- 轮数：2 / 10，停止原因：没有可做的 Issue 而停止
-- 同时进行：开启，最多 3 个；两个 PR 同时跑 CI 时排队 5 分钟
-- 分支清理：删除 3 个已合并的分支；保留 #105、#108 的分支和工作区
+### Run overview
+- Startup check: Already checked this version; skipped
+- Existing PRs: 2, All handled
+- Cycles: 2 / 10; Stop reason: Stopped because no Issues were ready
+- Concurrency: Enabled, up to 3; Two PRs running CI together queued for 5 minutes
+- Branch cleanup: Deleted 3 merged branches; retained branches and workspaces for #105 and #108
 
-### 耗时
-- 总计 1 小时 42 分：准备 12、实现 48、审查 25、修复 9、audit 2（分钟）
-- 其中等 CI 31 分，等本地资源 4 分
+### Time spent
+- Total 1 h 42 min: Preparation 12, Implementation 48, Review 25, Repair 9, audit 2 (minutes)
+- Including Waiting for CI 31 min, Waiting for local resources 4 min
 
-### 异常与恢复
-- 创建审查子 Agent 时返回线程上限。处理：核对确认未创建，回收 2 个已完成的线程后重试成功，审查照常完成
+### Errors and recovery
+- Review subagent creation hit the thread limit. Recovery: Confirmed no Agent was created; reclaimed 2 completed threads and retried successfully; review completed normally

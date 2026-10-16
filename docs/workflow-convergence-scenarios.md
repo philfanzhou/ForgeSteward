@@ -1,43 +1,43 @@
-# 工作流收敛场景验收
+# Workflow convergence acceptance scenarios
 
-以下是 `0.1.1` 修订时的历史走查，表中的“当前正文”指当时版本。`find-work` 及其执行 prompt 已由当前源码的 `prepare-work` 与 `execute-work` 替代；现行准备/执行验收见 [新场景矩阵](prepare-execute-scenarios.md)，不沿用下表 S11 的调查 prompt 出口。
+This is a historical walkthrough from the `0.1.1` revision. “Current rules” in the table means the rules at that time. Current `prepare-work` and `execute-work` replaced `find-work` and its execution prompt. Use the [new scenario matrix](prepare-execute-scenarios.md) for current preparation/execution acceptance; S11's investigation-prompt exit no longer applies.
 
-## 范围与验证方式
+## Scope and method
 
-本次修订针对三个 Skill 在多轮使用时的主线排期、跨仓执行、Review 状态交接和结项。保持三个插件独立安装，各自版本由 `0.1.0` 更新为 `0.1.1`；没有新增运行时、调度 Skill 或跨插件文件依赖。各 Skill 内保留独立使用所需的交接字段，公共字段的修改须对照检查三份正文。
+That revision addressed mainline scheduling, cross-repository execution, review-state handoffs, and closure across repeated uses of three Skills. All three remained independently installable and moved from `0.1.0` to `0.1.1`, without a runtime, scheduler Skill, or cross-plugin file dependency. Each retained the handoff fields needed for independent use; shared-field changes required checking all three bodies.
 
-下表为有限输入下的人工规则走查：依据当前正文推演允许的动作、结果和停止条件，不实际修改场景中的仓库，不宣称已经完成多 Agent 或多轮真实运行测试。技能格式校验只能证明格式有效，不能证明 Agent 一定按规则执行。实际使用若出现与预期不同的行为，应保留输入、Skill 版本、输出及状态差异，再针对该差异修订。
+The following is a manual walkthrough of limited inputs, deriving allowed actions, results, and stop conditions from the rules then current. It did not modify example repositories or constitute real multi-Agent/multi-round testing. Skill format validation proves only format validity, not Agent compliance. For unexpected real behavior, preserve input, Skill version, output, and state differences before revising the specific gap.
 
-## 场景矩阵
+## Scenario matrix
 
-| 编号 | 输入与触发 | 必须产生的结果及停止条件 | 当前正文依据与走查结果 |
+| ID | Input and trigger | Required result and stop condition | Rule basis at the time and walkthrough result |
 | --- | --- | --- | --- |
-| S01 | 主线旧任务 A 设计受阻，独立小任务 B 已 ready；A 的问题能由一个最小实验决定 | 先推进 A 的实验，不能直接只选 B；实验解除阻塞且其余条件满足时当轮选 A、B，仍不在发现阶段实现 | `find-work`「先推进主线阻塞」要求先调查、再重新检查 ready；走查符合 |
-| S02 | A 等待外部权限，已有具体申请、负责角色和解除条件；下一轮条件未变，B 可独立实施 | 不重跑相同实验或生成无动作循环；交接外部请求，允许选择 B，保留 A 的剩余范围 | `find-work` 主线调查及零项流程明确外部等待出口；走查符合 |
-| S03 | Issue `owner/library#71` 的代码位于 `owner/product`；另一个任务在 library 实现 | 输出逐项完整链接、实际实现仓库、主线和审计记录；执行时检查两个实现仓库的开放变更，各自开 PR，回链原 Issue，不复制任务 | `find-work` 基线关联、输出与执行模板均携带跨仓归属；review/fix 继续读取原任务；走查符合 |
-| S04 | 上限为 10，实际有 10 个独立 ready 项；第 2 项出现无法解除的环境阻塞，第 1 项已提交 PR | 保留全部 10 项，不缩成 3 项；记录第 2 项后继续第 3–10 项；每项达到提交或具体阻塞状态后结束批次，禁止合并和叠加未合并代码 | `find-work` 数量约束及执行模板保留完整批次与受阻后继续；走查符合 |
-| S05 | 上一会话已记录两轮 Review 和已接受的非保证；当前 head 无相关变化，仓库没有可写记录位置 | 从交接内容恢复轮次和边界，不归零、不重开相同建议；输出完整新交接记录，不自动发布评论或创建 tracker；信息缺失则标未知 | 三个 Skill 的「交接记录」字段一致且含输出兜底；review/fix 明确不重算；走查符合 |
-| S06 | PR 只剩一个明确越界建议，仓库没有 Review 预算，验收与平台条件均满足 | fix 判定无需代码修改；review 不以该建议阻塞，在已获合并授权时完成交付 | review/fix 明确无预算默认不要求实施及意见分类；走查符合 |
-| S07 | 范围意见确有争议，或已判无需改代码但平台仍有有效的请求修改审批 | 记录分歧、决策人、解除条件或平台门禁；不扩大代码、不自动撤销审批、不假报可合并；交接后继续其他项 | review/fix 区分代码必修、外部裁决和平台限制；走查符合 |
-| S08 | 已有完整开工审计；新 main 只改无关文档。另一个对照输入修改了相关契约或缺失原证据 | 前者复用审计；后者补查相关完整成员、测试及契约。实际实现后仍重新验证修改，不复用旧绿色结果冒充新验收 | `find-work` 基线第 4 项；review 同时检查 base/head，fix 补查相关变化；走查符合 |
-| S09 | 产品仓 PR 已合并，库仓原 task 未自动关闭；直接父项还有一个未完成子项 | 核对远端合并和原 task 验收，授权及权限允许时关闭原 task，否则给出交接动作；父项保持开启并记录剩余项，到此停止向上核对 | `review-and-merge`「合并后结项」要求跨仓实查及直接父级完成后再向上；走查符合 |
-| S10 | 清理周期期初 5 个 task；实际交付 1 个，另有 2 个新发现和 1 个父项关闭 | 原 task 完成 1、剩余 4；新增 2、父级关闭 1 单列。下一轮继承相同周期；若原 task 被拆分，未交付范围继续计入目标 | 三个 Skill 保留周期基线和剩余范围，禁止用新增、拆分、迁移或父级结项冒充交付；走查符合 |
-| S11 | 无 ready 项；分别输入“存在可执行调查”“只剩外部等待”“全部任务已完成” | 分别输出带停止条件的调查 prompt、具体外部交接、已完成事实；都不输出空编号实现模板，不虚构主线 | `find-work`「没有 ready 项时」覆盖三个出口；走查符合 |
-| S12 | 发现已关闭任务的原验收遗漏；另一个发现属于已接受非保证且没有新证据 | 前者回链原 task/PR 和遗漏条目，记为返工；后者不重复登记为 bug。真实严重风险仍按影响处理并写明恢复条件 | 三个 Skill 的发现分诊与报告区分返工、独立缺陷、可选建议和严重风险；走查符合 |
+| S01 | Old mainline A is design-blocked, small independent B ready; a minimal experiment can decide A | Advance A's experiment first rather than selecting only B. If it resolves the blocker and other conditions hold, select A/B this round; discovery still does not implement | `find-work`'s mainline-blocker rule investigates then rechecks ready; matched |
+| S02 | A awaits external access with a concrete request, responsible role, and unblock condition; unchanged next round, B independent | Do not repeat experiments or unactionable loops; hand off the external request, select B if appropriate, preserve A's remaining scope | `find-work` mainline investigation and zero-item paths provide external-wait exits; matched |
+| S03 | `owner/library#71` is implemented in `owner/product`; another task belongs in library | Output full links, actual implementation repositories, main branches, and audits per item. Check open changes in both, open separate PRs, backlink original Issues without duplication | `find-work` baseline/output/execution template carry ownership; review/fix keep reading original tasks; matched |
+| S04 | Limit 10, ten independent ready items; item 2 has an unresolved environment blocker, item 1's PR submitted | Preserve all ten, not three; record item 2 and continue 3–10. End only when each is submitted or concretely blocked; no merge or stacking unmerged code | Count rules/execution template preserve full batches and continuation; matched |
+| S05 | Previous session recorded two reviews and accepted non-guarantees; head unchanged, no writable repository record location | Restore rounds/boundaries from handoff, never reset or reopen identical suggestions; output a complete updated handoff without automatically posting comments/creating trackers; mark missing facts unknown | All three handoff fields align and include output fallback; review/fix prohibit recounting; matched |
+| S06 | PR has one clearly out-of-scope suggestion, no repository review budget, acceptance/platform conditions met | fix decides no code change needed; review does not block on the suggestion and delivers if merge is authorized | review/fix classify feedback and default to no implementation requirement without a budget; matched |
+| S07 | Scope is disputed, or no code change is needed but a valid changes-requested approval remains | Record disagreement, decision owner, unblock condition/platform requirement; do not expand code, revoke approval, or falsely report mergeability; hand off and continue | review/fix separate required code, external decisions, and platform restrictions; matched |
+| S08 | Complete starting audit; new main changes unrelated docs. Comparison case changes a relevant contract or lacks original evidence | Reuse the first audit; inspect relevant complete members/tests/contracts in the second. Revalidate actual implementation; old green checks are not new acceptance | `find-work` baseline item 4; review checks base/head and fix relevant changes; matched |
+| S09 | Product PR merged but original library task remains open; direct parent has an unfinished child | Verify remote merge and original acceptance, close when authorized/permitted or hand off. Keep parent open, record remaining work, and stop upward traversal | review-and-merge post-merge closure verifies cross-repository state and only ascends after direct parent completion; matched |
+| S10 | Cleanup cycle began with 5 tasks; 1 delivered, 2 newly discovered, 1 parent closed | Count 1 original task done and 4 remaining; count 2 new and 1 parent closure separately. Next round inherits the cycle; split tasks retain undelivered scope in the goal | All three preserve baseline/remainder and prohibit treating new work, splitting, migration, or parent closure as delivery; matched |
+| S11 | No ready items: possible investigation, external waits only, or all tasks complete | Historically return, respectively, an investigation prompt with stop conditions, a concrete external handoff, or completion facts; no empty-ID implementation template or invented mainline | `find-work` no-ready rules covered all three exits; matched |
+| S12 | Original acceptance omission found in a closed task; another finding concerns an accepted non-guarantee with no new evidence | Backlink original task/PR and omission as rework; do not reregister the accepted non-guarantee as a bug. Handle real serious risk by impact with recovery conditions | All three classify/report rework, independent defects, optional advice, and serious risk separately; matched |
 
-## 本次验证记录
+## Verification record
 
-- 三个 Skill 分别通过 `skill-creator/scripts/quick_validate.py` 格式校验。
-- 校验所有 JSON 清单可解析，每个插件的三份 manifest 名称、版本一致，marketplace 源路径及声明的 skills 路径存在；三份 Skill 的公共交接字段人工对照一致。
-- `git diff --check` 检查空白错误；人工按上述 12 个有限场景对照正文，未执行跨 Agent 行为评测，也未安装到三个 Agent 中验证运行时兼容性。
+- Each of the three Skills passed `skill-creator/scripts/quick_validate.py` format validation.
+- All JSON manifests parsed; each plugin's three manifests agreed on names/versions; marketplace source and declared Skill paths existed. Shared handoff fields were manually compared across all three.
+- `git diff --check` checked whitespace, and the 12 limited scenarios above were compared manually. No cross-Agent behavior evaluation or installation into the three Agents was performed to verify runtime compatibility.
 
-## 主干保护
+## Main-branch protection
 
-2026-09-13 已通过 GitHub API 创建并回读活动规则集：
+On 2026-09-13 an active GitHub ruleset was created and reread through the API:
 
-- [Require pull requests on default branch](https://github.com/philfanzhou/ForgeSteward/rules/23147476)：覆盖 `main` 和默认分支，要求 Pull Request，禁止强推和删除。
-- 绕过名单为空；API 返回当前用户 `current_user_can_bypass: never`。管理员账号也未被列为绕过者。
-- `GET /repos/philfanzhou/ForgeSteward/rules/branches/main` 返回生效的 `pull_request`、`non_fast_forward`、`deletion` 三条规则。
-- 未额外设置他人审批数量或不存在的 CI 门禁；本次只要求通过 PR 交付。未尝试向主干推送测试提交，也未合并本次 PR。
+- [Require pull requests on default branch](https://github.com/philfanzhou/ForgeSteward/rules/23147476) covers `main` and the default branch, requires Pull Requests, and prohibits force pushes and deletion.
+- Bypass list is empty; the API returned `current_user_can_bypass: never`. Administrators were not listed as bypass actors.
+- `GET /repos/philfanzhou/ForgeSteward/rules/branches/main` returned active `pull_request`, `non_fast_forward`, and `deletion` rules.
+- No extra approval counts or nonexistent CI requirements were configured; that work required PR delivery only. No test commit was pushed to main, and that PR was not merged during the check.
 
-远端规则约束主干更新，本地创建 commit 的纪律由 `AGENTS.md` 规定；本地文件不是服务端保护机制。具有规则管理权限的维护者仍可修改配置，本记录不承诺抵抗将来的主动停用。
+Remote rules constrain main-branch updates; `AGENTS.md` governs local commit discipline. Local files are not server-side protection. Maintainers with rules-management access can still change configuration; this record does not promise resistance to future deliberate disabling.

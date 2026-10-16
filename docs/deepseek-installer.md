@@ -1,52 +1,52 @@
-# DeepSeek Harness 安装与维护
+# DeepSeek Harness installation and maintenance
 
-## 范围及来源
+## Scope and sources
 
-从 `v0.2.15` 起提供 `scripts/deepseek.py`，适配 DeepSeek Harness 的原生文件系统技能发现。Python 3.9+ 标准库即可运行，无需 npm 插件、运行中的 Harness 或模型密钥。六项技能保留原始目录、正文、引用与脚本；`--all` 自动读取当前 catalog，不固定未来数量。Claude/Codex 的 marketplace 不是 Harness 原生市场。
+Since `v0.2.15`, `scripts/deepseek.py` supports DeepSeek Harness's native filesystem Skill discovery. It needs only the Python 3.9+ standard library, without an npm plugin, running Harness, or model key. All six Skills retain their original directories, bodies, references, and scripts. `--all` reads the current catalog, without fixing future counts. The Claude/Codex marketplaces are not native Harness marketplaces.
 
-共享生命周期实现位于 `scripts/skill_installer.py`；`scripts/opencode.py` 保留既有命令、作用域、schema 1 收据、输出及退出码。DeepSeek 薄适配只处理路径和发现提示，不改变技能业务规则。安装单项不要求同时安装全部；完整 `work-cycle` 还需同版本五项阶段技能和子 Agent 能力。该委派行为已由维护者在本机 `0.2.0-rc.2` 中实际运行验证，对应的自动化探针未纳入本仓库 CI；其他客户端、模型与配置未获兼容保证。
+Shared lifecycle implementation lives in `scripts/skill_installer.py`. `scripts/opencode.py` preserves its existing commands, scopes, schema 1 receipts, output, and exit codes. The thin DeepSeek adapter handles paths and discovery guidance only, without changing Skill business rules. Installing one Skill does not require installing all of them; a complete `work-cycle` also requires five matching-version stage Skills and subagent support. The maintainer has verified that delegation behavior in a local `0.2.0-rc.2` run; its automated probe is not part of this repository's CI. Compatibility with other clients, models, and configurations is not guaranteed.
 
-依据：[官方 Skills 说明](https://deepseek-harness.github.io/deepseek-harness/en/reference/subsystems/skills)，以及 2026-09-30 本机桌面/内置包 `0.2.0-rc.2` 的实际 `FileSystemSkillProvider` 和 `resolveDshHome`。包内 `dsh-skill-filesystem/lib/index.js` SHA-256 为 `244e92e032ef15e96cb60c9e2cfddf5d89e167eb171fcbfd83e9415b0455a0d7`，`dsh-home-paths/lib/index.js` 为 `97c1c10b299a4f2aec5f34bac5370cad3834391cd75c91a76b1e7b8a643584f5`。这是核对版本的证据，不承诺未来所有客户端。
+Sources: [official Skills documentation](https://deepseek-harness.github.io/deepseek-harness/en/reference/subsystems/skills), and the actual `FileSystemSkillProvider` and `resolveDshHome` in the local desktop/bundled `0.2.0-rc.2` packages on 2026-09-30. SHA-256 for `dsh-skill-filesystem/lib/index.js` is `244e92e032ef15e96cb60c9e2cfddf5d89e167eb171fcbfd83e9415b0455a0d7`; for `dsh-home-paths/lib/index.js` it is `97c1c10b299a4f2aec5f34bac5370cad3834391cd75c91a76b1e7b8a643584f5`. This evidence identifies the checked version, not all future clients.
 
-## 首次安装与作用域
+## First installation and scope
 
-先取得独立、可信的 checkout。下例跟随当前开发源码，使用前核对其 commit、`VERSION` 和修改；开发源码不能当作已发布 Tag，需要固定版本时改用 `v0.2.15` 或更后的已发布 Tag。若已有源码，直接使用其绝对路径。
+Obtain a separate, trusted checkout first. This example follows current development source: check its commit, `VERSION`, and local changes before use. Development source is not a published Tag; to pin a release, select published `v0.2.15` or later. If source is already available, use its absolute path.
 
 ```bash
 mkdir -p "$HOME/code"
 git clone https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-deepseek"
 git -C "$HOME/code/ForgeSteward-deepseek" rev-parse HEAD
 git -C "$HOME/code/ForgeSteward-deepseek" status --short
-# 在需要维护的项目目录执行：
+# Run from the project to maintain:
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" list
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" install prepare-work --project .
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" status prepare-work --project .
 ```
 
-选择完整名 `forge-steward-prepare-work` 等价；全部安装使用 `install --all --project .`。每条命令显式且互斥地选择 `--project PATH` 或 `--user`。项目 PATH 必须存在：从它向上寻找最近的 `.git` 标记（目录或 worktree 文件），写到该根的 `.dsh/skills/<name>`；没有 Git 标记时使用 PATH 本身，与核对的原生提供方一致。路径含空格时加引号，子目录不是自动创建另一个安装作用域。拒绝尚未解析和解析后的符号链接及 Windows reparse point，避免 resolve 丢失保护。
+The full name, such as `forge-steward-prepare-work`, is equivalent. To install everything, use `install --all --project .`. Each command must explicitly select exactly one of `--project PATH` or `--user`. Project PATH must exist: search upward for the nearest `.git` marker, a directory or worktree file, and write to that root's `.dsh/skills/<name>`. Without a Git marker, use PATH itself, matching the checked native provider. Quote paths containing spaces; a subdirectory does not automatically create another installation scope. Reject symlinks and Windows reparse points both before and after resolution so resolving a path cannot discard protection.
 
-用户安装用 `install prepare-work --user`，目标为 `$DSH_HOME/skills`，未设置、空串或纯空白值回退到 OS home 的 `.dsh/skills`。支持 `~`、`~/` 和 `~\` 开头；非空相对值按调用 cwd 解析，保留非空值的前后空白。每次打印绝对目标。Harness 的显式 `dshHome` 配置优先于环境；如果客户端配置覆盖它，请让调用安装器的 `DSH_HOME` 指向相同路径。安装器不读或修改账号、凭据和配置。
+User installation uses `install prepare-work --user`, targeting `$DSH_HOME/skills`. Unset, empty, or whitespace-only values fall back to the OS home's `.dsh/skills`. Prefixes `~`, `~/`, and `~\` are supported. Resolve a nonempty relative value from the invocation cwd and preserve leading/trailing whitespace in nonempty values. Always print the absolute destination. Harness's explicit `dshHome` setting takes precedence over the environment; if client configuration overrides it, point the installer's `DSH_HOME` at the same path. The installer neither reads nor changes accounts, credentials, or configuration.
 
-Windows PowerShell 使用已安装的 Python 3.9+ 与实际 checkout：
+In Windows PowerShell, use an installed Python 3.9+ and the actual checkout:
 
 ```powershell
 py -3 "$HOME\code\ForgeSteward-deepseek\scripts\deepseek.py" install --all --project .
 ```
 
-新会话从目标项目打开，核对技能清单中的完整名称及来源，加载 `forge-steward-prepare-work` 后检查配套资源可读。安装器的 `status` 只核对选中目标，不替代客户端发现验证。当前提供方按项目 `.dsh/skills`、项目 `.agents/skills`、自定义根、用户 `$DSH_HOME/skills`、用户 `.agents/skills`、内置根提供候选排名；同名技能可能被更高优先级副本遮蔽。提供方不递归扫描插件市场目录，不能仅添加 ForgeSteward 仓库根便声称安装完成。
+Open a new session from the target project, verify full names and sources in the Skill list, load `forge-steward-prepare-work`, and check that supporting resources are readable. Installer `status` checks only the selected destination; it does not replace client discovery verification. The current provider ranks candidates from project `.dsh/skills`, project `.agents/skills`, custom roots, user `$DSH_HOME/skills`, user `.agents/skills`, and bundled roots, in that order. Higher-priority copies may shadow the same name. The provider does not recursively scan plugin marketplaces; adding only the ForgeSteward repository root does not establish installation.
 
-## 显式更新、固定源码及回退
+## Explicit updates, pinned source, and rollback
 
 ```bash
-# 在目标项目执行；仅选择实际已安装项：
+# Run in the target project; select only installed entries:
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" update prepare-work --project .
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" status prepare-work --project .
 ```
 
-全部安装时才能 `update --all`；缺失安装要求先 install，任一选中项有冲突则全批拒绝。安装器只用本地 checkout，不隐式 fetch、下载或执行远端命令。需要固定版本时先在 [Releases](https://github.com/philfanzhou/ForgeSteward/releases) 选择含本适配的已发布 Tag，或记录经审阅的完整 commit。不要使用早期 `v0.2.1`，它没有 DeepSeek 入口。独立快照目录不存在时：
+Use `update --all` only when all entries are installed. Missing entries require install first; a conflict in any selected entry rejects the entire batch. The installer uses only the local checkout; it does not implicitly fetch, download, or run remote commands. For a fixed version, select a published Tag containing this adapter from [Releases](https://github.com/philfanzhou/ForgeSteward/releases), or record a reviewed full commit. Do not use early `v0.2.1`, which lacks the DeepSeek entry point. If the separate snapshot directory does not exist:
 
 ```bash
-# 先将 FULL_REVIEWED_COMMIT 替换为完整的可信 SHA：
+# Replace FULL_REVIEWED_COMMIT with the complete trusted SHA first:
 git clone https://github.com/philfanzhou/ForgeSteward.git "$HOME/code/ForgeSteward-deepseek-fixed"
 git -C "$HOME/code/ForgeSteward-deepseek-fixed" checkout --detach FULL_REVIEWED_COMMIT
 git -C "$HOME/code/ForgeSteward-deepseek-fixed" rev-parse HEAD
@@ -54,26 +54,26 @@ git -C "$HOME/code/ForgeSteward-deepseek-fixed" status --short
 python3 "$HOME/code/ForgeSteward-deepseek-fixed/scripts/deepseek.py" update prepare-work --project .
 ```
 
-对已发布 Tag 使用相同 checkout 流程并核对非 draft Release 与 SHA。回退选取保存的旧快照，再显式 update；支持版本降级和同版本内容变化。不要对 detached checkout 使用 git pull，不覆盖有本地工作的源码。收据记录版本、source commit/dirty、全部文件摘要与空目录；相同版本及摘要的 install/update 保持字节、mtime、收据不变，因此收据的 commit 不一定随等价源码 checkout 改变。它不是签名，信任源码仍由调用方负责。
+Use the same checkout process for a published Tag and verify its non-draft Release and SHA. To roll back, select a saved older snapshot and explicitly update; downgrades and same-version content changes are supported. Do not git pull a detached checkout or overwrite source with local work. Receipts record version, source commit/dirty state, all file digests, and empty directories. Install/update with matching version and digests preserves bytes, mtimes, and receipts, so the receipt's commit need not change when equivalent source is checked out. Receipts are not signatures; callers remain responsible for source trust.
 
-## 冲突、事务及卸载
+## Conflicts, transactions, and uninstall
 
-未托管同名目录、用户增删改或空目录变化、损坏回执和链接不覆盖、不采用，不提供 force。备份完整目录及差异，将确认冲突的副本移到全部技能搜索路径之外，再安装；不要删回执绕过保护。不同 Agent、项目/用户和兼容根各自独立，更新不清理其他根。
+Do not overwrite or adopt unmanaged same-named directories, user-added/removed/edited files or empty-directory changes, corrupt receipts, or links. There is no force option. Back up the complete directory and differences, move the confirmed conflicting copy outside every Skill search path, then install. Do not delete receipts to bypass protection. Different Agents, project/user scopes, and compatibility roots are independent; updating does not clean other roots.
 
-写命令持有目标父目录的 `.forge-steward.lock`。全批先校验和暂存到父目录 `.forge-steward-txn-*`，随后 rename 发布完整资源与 schema 1 回执；普通 copy/rename 失败和 KeyboardInterrupt 逆序回滚，正常清理。回滚失败报告确切事务路径并保留 `old-<skill>` 备份，下次拒绝遗留事务。第二进程拒绝现有锁，不删第一进程锁。中断时确认进程已停止，保留整个事务并恢复实际安装，再移出事务及清理陈旧锁后重试。不保证 SIGKILL、断电、文件系统损坏、恶意并发写入或运行中 Agent 的多目录原子快照。
+Write commands hold `.forge-steward.lock` in the destination's parent. Validate and stage the full batch in that parent's `.forge-steward-txn-*`, then publish complete resources and schema 1 receipts with renames. Ordinary copy/rename failures and KeyboardInterrupt trigger reverse-order rollback and normal cleanup. If rollback fails, report the exact transaction path, retain `old-<skill>` backups, and reject the leftover transaction on the next call. A second process rejects an existing lock without deleting the first process's lock. After an interruption, confirm the process has stopped, preserve the entire transaction and restore the actual installation, then move out the transaction and remove the stale lock before retrying. SIGKILL, power loss, filesystem damage, malicious concurrent writes, and atomic multi-directory snapshots for running Agents are not guaranteed.
 
 ```bash
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" uninstall prepare-work --project .
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" uninstall --all --project .
-# 用户作用域单独操作，保持同一个 DSH_HOME/cwd：
+# Handle user scope separately, keeping the same DSH_HOME/cwd:
 python3 "$HOME/code/ForgeSteward-deepseek/scripts/deepseek.py" uninstall --all --user
 ```
 
-卸载无需原源码仍有该技能，只移除选中、有效且未修改的受管目录与回执，保留其他技能和空容器。`--all` 可移除有效项并报告无收据/手工/旧名候选；损坏、修改的选中受管项仍整批阻止。只扫描打印目标的直接子项：全部选择报告 `forge-steward-*` 与已知四个旧名，具名选择只报告所选名称及已知旧名。候选不代表归属，不跟随链接，不删除未知内容。
+Uninstall does not require the Skill to remain in the original source. It removes only selected, valid, unchanged managed directories and receipts, preserving other Skills and empty containers. `--all` may remove valid entries while reporting receipt-free/manual/historical-name candidates. Corrupt or modified selected managed entries still block the whole batch. Scan only direct children of the printed destination: all-selection reports `forge-steward-*` and four known historical names; named selection reports only selected names and their known historical counterparts. Candidates are not proof of ownership; do not follow links or delete unknown contents.
 
-退出 `0` 表示有限扫描无残留，`1` 表示操作/扫描失败，`2` 表示有候选需人工确认（参数用法错误也可能是 2，应结合输出）。错误优先，不把残留或扫描失败写成清理成功。其他项目、用户、agents/custom/bundled 根及旧会话未扫描；项目卸载不证明用户副本消失。在新会话复核真实发现及资源来源，备份并仅处理已确认归属的副本，不删整个配置或缓存。卸载不撤销项目代码、规则、Issue、PR 或历史工作。
+Exit `0` means no leftovers in the limited scan, `1` means an operation/scan failed, and `2` means candidates need manual review. Usage errors may also return 2, so read the output. Errors take precedence; do not report leftovers or a failed scan as successful cleanup. Other projects, user/agents/custom/bundled roots, and old sessions are unscanned; project uninstall does not prove user copies are gone. Recheck actual discovery and resource sources in a new session. Back up and handle only confirmed copies; do not delete whole configurations or caches. Uninstall does not undo project code, rules, Issues, PRs, or earlier work.
 
-## 验证与支持边界
+## Verification and support boundaries
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -82,7 +82,7 @@ python3 scripts/sync_marketplace.py --check
 git diff --check
 ```
 
-共享生命周期回归在三 OS CI 执行，DeepSeek 套件复用 OpenCode 的完整事务和保护断言，并增加路径矩阵、固定完整 commit 回退及实际两个进程锁测试。真实包不自动下载：把解包后的 Harness 包目录（包含 `node_modules/@deepseek-ai/dsh-skill-filesystem/lib/index.js` 及 `dsh-home-paths` 和其依赖）显式交给测试；桌面 ASAR 应先由用户另行提取。需要可用 Node.js，默认 `node`，可用第二个变量指定绝对可执行路径。
+Shared lifecycle regressions run in three-OS CI. The DeepSeek suite reuses OpenCode's complete transaction/protection assertions and adds a path matrix, fixed-full-commit rollback, and real two-process locking. Real packages are not downloaded automatically. Explicitly give the test an unpacked Harness package directory containing `node_modules/@deepseek-ai/dsh-skill-filesystem/lib/index.js`, `dsh-home-paths`, and dependencies. Users must extract desktop ASAR packages separately first. A usable Node.js is required; the default is `node`, or the second variable may provide an absolute executable path.
 
 ```bash
 FORGESTEWARD_DEEPSEEK=/absolute/path/to/dsh \
@@ -90,6 +90,6 @@ FORGESTEWARD_DEEPSEEK_NODE=/absolute/path/to/node \
 python3 -m unittest discover -s tests -p test_deepseek_installer.py -v
 ```
 
-未配置 `FORGESTEWARD_DEEPSEEK` 明确 skip，配置但缺包、缺 Node 或不兼容则失败。探针仅导入显式运行时，以隔离项目、用户、agents、custom、bundled 根调用真实 Provider，不输出其他用户技能、不调用模型。逐项比较全部完整正文、resourceBase 和资源摘要，检查 `.git` 文件子目录、home 矩阵和候选排名；项目 CLI 卸载后同提供方仍发现用户副本，再卸载用户后重发现为空。
+Without `FORGESTEWARD_DEEPSEEK`, explicitly skip. If configured but packages/Node are missing or incompatible, fail. The probe imports only the explicit runtime and calls the real Provider with isolated project, user, agents, custom, and bundled roots, without exposing other user Skills or calling a model. Compare every full body, resourceBase, and resource digest; check `.git`-file subdirectories, the home matrix, and candidate ranking. After project CLI uninstall, the same provider must still find the user copy; after user uninstall, rediscovery must be empty.
 
-本机 macOS 的 `0.2.0-rc.2` 实际包已通过上述验证；原生 Windows Harness、桌面 GUI、模型行为及完整 work-cycle 未验证。CI 不获取 Harness，只明确跳过真实测试；OpenCode 真实发现 CI 继续固定 `1.18.30` Linux。长度检查通过不证明模型永远完整收到全部规则，详见 [跨 Agent 兼容边界](skill-compatibility.md)。
+The actual local macOS `0.2.0-rc.2` package passed these checks. Native Windows Harness, the desktop GUI, model behavior, and a complete work-cycle were not verified by this test. CI does not obtain Harness and explicitly skips real tests; real OpenCode discovery CI remains pinned to `1.18.30` on Linux. Passing length checks does not prove that a model always receives every rule in full; see [cross-Agent compatibility boundaries](skill-compatibility.md).

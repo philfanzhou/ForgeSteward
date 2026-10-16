@@ -1,4 +1,4 @@
-"""ZCode 共用清单契约与可选的真实 CLI 发现；不进行模型调用。"""
+"""Shared ZCode catalog contract and optional real CLI discovery, without model calls."""
 
 import importlib.util
 from contextlib import redirect_stdout
@@ -40,12 +40,12 @@ class ZCodePackagingTests(unittest.TestCase):
                 content = skill.read_text(encoding="utf-8")
                 self.assertTrue(content.startswith("---\n"))
                 _, frontmatter, body = content.split("---", 2)
-                # 本仓库采用顶层单行标量；不把此检查宣传为通用 YAML 解析器。
+                # This repository uses top-level single-line scalars; this check is not a general YAML parser.
                 name = re.findall(r"^name: (.+)$", frontmatter, re.MULTILINE)
                 description = re.findall(r"^description: (.+)$", frontmatter, re.MULTILINE)
                 self.assertEqual(name, [skill.parent.name])
                 self.assertEqual(len(description), 1)
-                # 长度与 Unicode 单位统一由 check_skill_limits.py 及其测试维护。
+                # check_skill_limits.py and its tests maintain lengths and Unicode units centrally.
                 for reference in re.findall(r"\]\((references/[^)#]+)(?:#[^)]*)?\)", content):
                     target = (skill.parent / reference).resolve()
                     self.assertIn(skill.parent.resolve(), target.parents)
@@ -148,7 +148,7 @@ class ZCodePackagingTests(unittest.TestCase):
                     self.assertNotIn("codec can't encode", result.stderr)
 
 
-@unittest.skipUnless(os.environ.get("FORGESTEWARD_ZCODE_CLI"), "未指定 ZCode CLI；不代表真实发现已通过")
+@unittest.skipUnless(os.environ.get("FORGESTEWARD_ZCODE_CLI"), "ZCode CLI not specified; real discovery has not been verified")
 class ZCodeRuntimeTests(unittest.TestCase):
     def test_documented_loader_boundaries_in_temporary_skill(self):
         cli = Path(os.environ["FORGESTEWARD_ZCODE_CLI"]).resolve()
@@ -161,7 +161,7 @@ class ZCodeRuntimeTests(unittest.TestCase):
             skill.parent.mkdir(parents=True)
 
             def run(*arguments):
-                # 大体积探针写入文件，避免 Node 管道退出时丢失 stdout 尾部。
+                # Write large probes to files to avoid losing stdout tails when Node exits with piped output.
                 with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
                     result = subprocess.run([node, str(cli), *arguments, "--cwd", str(root), "--json"],
                                             cwd=root, stdout=output, stderr=subprocess.PIPE, text=True, timeout=60)
@@ -169,7 +169,7 @@ class ZCodeRuntimeTests(unittest.TestCase):
                     output.seek(0)
                     return json.load(output)
 
-            # 已核对的 CLI 按整个文件的十进制字节数截断，包含 frontmatter。
+            # The verified CLI truncates by decimal bytes across the entire file, including frontmatter.
             prefix = f"---\nname: {name}\ndescription: Boundary probe\n---\n".encode()
             for size in (100_000, 100_001):
                 skill.write_bytes(prefix + b"x" * (size - len(prefix)))
@@ -187,7 +187,7 @@ class ZCodeRuntimeTests(unittest.TestCase):
         cli = Path(os.environ["FORGESTEWARD_ZCODE_CLI"]).resolve()
         self.assertTrue(cli.is_file())
         node = shutil.which("node")
-        self.assertIsNotNone(node, "ZCode bundled CLI 需要 Node.js")
+        self.assertIsNotNone(node, "ZCode bundled CLI requires Node.js")
         with tempfile.TemporaryDirectory(prefix="forgesteward-zcode-runtime-") as directory:
             root = Path(directory).resolve()
             shutil.copytree(REPO / "plugins", root / "plugins")
@@ -207,7 +207,7 @@ class ZCodeRuntimeTests(unittest.TestCase):
                 return json.loads(result.stdout)
 
             installed = run("plugins", "list")
-            # 0.16.9 直接返回列表，0.16.5 返回含 plugins 的对象。
+            # 0.16.9 returns a list directly; 0.16.5 returns an object containing plugins.
             installed_plugins = installed if isinstance(installed, list) else installed["plugins"]
             actual = {item["name"]: item for item in installed_plugins
                       if root in Path(item["rootPath"]).resolve().parents}
@@ -218,7 +218,7 @@ class ZCodeRuntimeTests(unittest.TestCase):
                 self.assertEqual(item["version"], version)
                 self.assertEqual(Path(item["manifestPath"]).parent.name, ".claude-plugin")
             listed = run("skills", "list")
-            # 不改 HOME 或用户配置；仅断言本次临时目录的项目插件，不输出其他技能。
+            # Do not change HOME or user settings; assert only project plugins in this temporary directory, without printing other skills.
             found = {item["name"]: item for item in listed["skills"]
                      if root in Path(item["path"]).resolve().parents}
             self.assertEqual(set(found), {"forge-steward-" + p.name for p in plugins})

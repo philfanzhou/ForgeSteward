@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从当前 checkout 管理 OpenCode 技能；仅使用 Python 标准库。"""
+"""Manage OpenCode skills from this checkout using only the Python standard library."""
 
 import os
 from pathlib import Path

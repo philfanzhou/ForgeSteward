@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""只读校验技能的跨 Agent 长度预算和引用完整性；仅依赖 Python 标准库。"""
+"""Read-only checks of cross-Agent skill budgets and reference integrity; Python standard library only."""
 
 import argparse
 from pathlib import Path
@@ -8,48 +8,48 @@ import sys
 
 
 REPO = Path(__file__).resolve().parents[1]
-# 仓库维护预算的唯一数值来源；依据和平台差异见 docs/skill-compatibility.md。
+# Single numeric source for repository budgets; evidence and platform differences are in docs/skill-compatibility.md.
 ENTRYPOINT_BYTES = 6_000
 ENTRYPOINT_LINES = 499
 REFERENCE_BYTES = 8_000
 REFERENCE_LINES = 499
-# 覆盖 DeepSeek Harness 默认发现列表的完整描述展示边界；不是正文加载上限。
+# Covers full descriptions in the default DeepSeek Harness discovery list, not the body loading limit.
 DESCRIPTION_UTF16_UNITS = 500
 NAME_CHARS = 64
 
 
 def utf16_units(text):
-    """与 JavaScript String.length 一致；非 BMP 字符占两个单元。"""
+    """Match JavaScript String.length; non-BMP characters use two units."""
     return len(text.encode("utf-16-le")) // 2
 
 
 def frontmatter(text):
-    """读取本仓库的 name/description 单行裸标量约定，不冒充通用 YAML 解析器。"""
+    """Read this repository's single-line plain name/description scalars, not general YAML."""
     lines = text.splitlines()
     if not lines or lines[0] != "---":
-        raise ValueError("SKILL.md 必须以 YAML frontmatter 开始")
+        raise ValueError("SKILL.md must start with YAML frontmatter")
     try:
         end = lines.index("---", 1)
     except ValueError:
-        raise ValueError("frontmatter 缺少结束分隔符") from None
+        raise ValueError("frontmatter has no closing delimiter") from None
     values = {}
     for key in ("name", "description"):
         matches = [line[len(key) + 1:].strip() for line in lines[1:end]
                    if line.startswith(key + ":")]
         if len(matches) != 1 or not matches[0]:
-            raise ValueError(key + " 必须恰好出现一次且非空")
+            raise ValueError(key + " must appear exactly once and be nonempty")
         value = matches[0]
         position = next(i for i, line in enumerate(lines[1:end], 1) if line.startswith(key + ":"))
         for following in lines[position + 1:end]:
             if not following.strip() or following.lstrip().startswith("#"):
                 continue
             if following[0].isspace():
-                raise ValueError(key + " 不允许缩进续行；请保留单行文本")
+                raise ValueError(key + " must not have indented continuation lines; use a single line")
             break
-        # 禁止把块标量、别名、引号或 YAML 注释误当成描述计数。
+        # Do not count block scalars, aliases, quotes, or YAML comments as description text.
         if (value[0] in "\"'|>!&*[{#%@`" or ": " in value or " #" in value
                 or value.lower() in ("null", "true", "false", "~")):
-            raise ValueError(key + " 必须使用不带引号、注释或 YAML 特殊语法的单行文本")
+            raise ValueError(key + " must be a single plain line without quotes, comments, or special YAML syntax")
         values[key] = value
     return values, "\n".join(lines[end + 1:])
 
@@ -66,13 +66,13 @@ def check_skill(entrypoint):
     references = sorted((root / "references").rglob("*.md"))
     for path in [entrypoint, *references]:
         if path.is_symlink() or root not in path.resolve().parents:
-            error(path, "技能规则必须是包内普通文件，不能通过符号链接绕过检查")
+            error(path, "Skill rules must be regular files in the package; symlinks cannot bypass checks")
             continue
         try:
             raw = path.read_bytes()
             text = raw.decode("utf-8")
         except (OSError, UnicodeError) as exc:
-            error(path, f"无法读取 UTF-8 规则文件：{exc}")
+            error(path, f"Cannot read UTF-8 rule file: {exc}")
             continue
         texts[path.resolve()] = text
         is_entry = path == entrypoint
@@ -81,9 +81,9 @@ def check_skill(entrypoint):
         lines = len(text.splitlines())
         rows.append((path, len(raw), byte_limit, lines, line_limit))
         if len(raw) > byte_limit:
-            error(path, f"{len(raw)} UTF-8 bytes > {byte_limit}；按阶段拆分规则，不删减语义绕过检查")
+            error(path, f"{len(raw)} UTF-8 bytes > {byte_limit}; split rules by stage without deleting constraints to bypass checks")
         if lines > line_limit:
-            error(path, f"{lines} lines > {line_limit}；将细节拆为明确链接的引用文件")
+            error(path, f"{lines} lines > {line_limit}; move details into explicitly linked references")
 
     entry_text = texts.get(entrypoint.resolve())
     description_units = 0
@@ -93,10 +93,10 @@ def check_skill(entrypoint):
             name = metadata["name"]
             if (len(name) > NAME_CHARS or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
                     or name != root.name):
-                error(entrypoint, f"name 须为 1–{NAME_CHARS} 位小写字母/数字及单连字符，且与目录名一致")
+                error(entrypoint, f"name must be 1–{NAME_CHARS} lowercase letters/digits with single hyphens and match the directory name")
             description_units = utf16_units(metadata["description"])
             if description_units > DESCRIPTION_UTF16_UNITS:
-                error(entrypoint, f"description {description_units} UTF-16 units > {DESCRIPTION_UTF16_UNITS}；细节移到正文")
+                error(entrypoint, f"description {description_units} UTF-16 units > {DESCRIPTION_UTF16_UNITS}; move details into the body")
         except ValueError as exc:
             error(entrypoint, str(exc))
 
@@ -112,17 +112,17 @@ def check_skill(entrypoint):
                 continue
             target = (source.parent / link.split("#", 1)[0]).resolve()
             if root not in target.parents:
-                error(source, f"引用超出独立技能目录：{link}")
+                error(source, f"Reference leaves the standalone skill directory: {link}")
             elif not target.is_file():
-                error(source, f"引用文件缺失：{link}")
+                error(source, f"Missing reference file: {link}")
             elif target.suffix == ".md":
                 if target not in texts:
-                    error(source, f"规则 Markdown 必须位于 references/ 并接受长度检查：{link}")
+                    error(source, f"Rule Markdown must be under references/ and subject to length checks: {link}")
                 else:
                     pending.append(target)
     for path in references:
         if path.resolve() not in visited:
-            error(path, "引用规则无法从 SKILL.md 到达；补充读取时机和相对 Markdown 链接")
+            error(path, "Reference rules are unreachable from SKILL.md; add loading instructions and relative Markdown links")
     return rows, errors, description_units
 
 
@@ -130,7 +130,7 @@ def check_repository(repo):
     skills = sorted((repo / "plugins").glob("*/skills/**/SKILL.md"))
     rows, errors, description_units = [], [], 0
     if not skills:
-        errors.append(f"{repo}: 未发现技能入口，禁止空集合通过检查")
+        errors.append(f"{repo}: No skill entrypoints found; an empty set must not pass")
     for skill in skills:
         found, problems, units = check_skill(skill)
         rows.extend(found)
@@ -144,8 +144,8 @@ def main(argv=None):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="backslashreplace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=REPO, help="待检查的仓库根目录")
-    parser.add_argument("--check", action="store_true", help="只读检查（默认行为）")
+    parser.add_argument("--repo", type=Path, default=REPO, help="repository root to check")
+    parser.add_argument("--check", action="store_true", help="read-only check (default)")
     args = parser.parse_args(argv)
     repo = args.repo.resolve()
     rows, errors, description_units = check_repository(repo)

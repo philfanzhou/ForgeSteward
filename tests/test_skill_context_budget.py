@@ -1,4 +1,4 @@
-"""校验跨 Agent 预算、Unicode 边界、资源完整性与实际命令退出状态。"""
+"""Check cross-Agent budgets, Unicode boundaries, resource integrity, and actual command exit status."""
 
 import importlib.util
 import os
@@ -16,6 +16,7 @@ LIMITS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(LIMITS)
 
 
+# U+4E2D is a three-byte UTF-8, one-unit UTF-16 CJK boundary probe.
 class SkillContextBudgetTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -38,7 +39,7 @@ class SkillContextBudgetTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_entry_byte_boundary_includes_frontmatter_and_multibyte_text(self):
-        self.write_skill(body="中\n")
+        self.write_skill(body=chr(0x4E2D) + "\n")
         raw = self.entry.read_bytes()
         raw += b"x" * (LIMITS.ENTRYPOINT_BYTES - len(raw))
         self.entry.write_bytes(raw)
@@ -62,7 +63,7 @@ class SkillContextBudgetTests(unittest.TestCase):
         self.assertTrue(any("500 lines > 499" in error for error in self.errors()))
 
     def test_description_counts_javascript_utf16_units(self):
-        for valid, invalid in (("a" * 500, "a" * 501), ("中" * 500, "中" * 501),
+        for valid, invalid in (("a" * 500, "a" * 501), (chr(0x4E2D) * 500, chr(0x4E2D) * 501),
                                ("😀" * 250, "😀" * 251), ("😀" * 250, "😀" * 250 + "a")):
             with self.subTest(character=valid[0]):
                 self.write_skill(description=valid)
@@ -72,7 +73,7 @@ class SkillContextBudgetTests(unittest.TestCase):
                                     for error in self.errors()))
 
     def test_cli_rejects_description_beyond_catalog_budget(self):
-        self.write_skill(description="中" * 501)
+        self.write_skill(description=chr(0x4E2D) * 501)
         result = subprocess.run([sys.executable, str(SCRIPT), "--repo", str(self.repo), "--check"],
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 1, result.stderr)

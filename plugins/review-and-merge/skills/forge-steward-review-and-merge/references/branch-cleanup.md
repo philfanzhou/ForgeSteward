@@ -1,67 +1,67 @@
-## 遗留分支清理
+## Leftover branch cleanup
 
-清理以前运行中断或合并后没删掉的分支和 worktree。只删能确认安全、可以恢复的；拿不准的一律保留并列出。
+Clean branches/worktrees left by interrupted runs or post-merge omissions. Delete only confirmed safe, recoverable items; retain and list anything uncertain.
 
-### 时机与模式
+### Timing and modes
 
-- 整个冻结清单处理完（每项的合并后结项都已完成）后做一次；本轮没有合并也照做。
-- 用户只要求审查、不允许合并或修改时，只列出、不删除，也不执行 `git worktree prune`。用户明确要求保留的分支不删。
-- 调用方说明本次不做遗留分支清理（例如编排技能逐项派发的审查）时跳过本节，已合并项自己的分支和工作区仍按合并后结项清理。调用方说明只做遗留分支清理时，不冻结或审查任何 Change Request，直接按本节执行。
-- 调用方给出的其他阶段正在使用的分支和工作区都视为正在使用；被并发调用而没给这份清单时只列出、不删除。
-- 用户中途要求停止时，停止后续删除，汇报已删除和未处理的部分。
+- Run once after the whole frozen list and each item's post-merge work, even if nothing merged this round.
+- For review-only requests forbidding merges/changes, list only: no deletion or `git worktree prune`. Preserve explicitly retained branches.
+- If the caller excludes leftover cleanup (such as per-item orchestration reviews), skip this section while still cleaning each merged item's own branch/workspace. If asked only for leftover cleanup, freeze/review no Change Requests and run this section directly.
+- Treat caller-listed branches/workspaces owned by other stages as active. In a concurrent invocation without that list, list only and do not delete.
+- On a user stop request, stop subsequent deletions and report deleted/unfinished portions.
 
-### 范围与读取
+### Scope and inspection
 
-- 只处理本次审查的仓库：托管平台上该仓库的远端分支（只认指向该仓库的远端，fork 和其他远端不碰），以及当前本地仓库的本地分支和 worktree。
-- 先获取远端，读取：远端分支及 head；本地分支、上游是否已不存在；`git worktree list --porcelain`（含加锁、分离 HEAD）；每个分支名对应的全部 Change Request（开放、已合并、已关闭）及其最后 head；默认分支和受保护分支。查询 Change Request 状态、保护规则和删除远端分支的具体命令由所在平台决定。
-- 查询失败或结果不全时，凡是无法确认的分支一律保留，只处理已确认的部分。
+- Only this review's repository: its hosted remote branches (only remotes pointing to this repository, never forks/other remotes), local branches, and worktrees in the current local repository.
+- Fetch first, then read remote branches/heads, local branches and missing upstreams, `git worktree list --porcelain` including locks/detached HEAD, every open/merged/closed Change Request for each branch name and last heads, and default/protected branches. Platform adapters determine request/protection queries and remote deletion commands.
+- With failed/incomplete queries, retain unconfirmed branches and process only confirmed portions.
 
-### 分类
+### Classification
 
-每个分支只归一类，先判“绝不删除”，再按下表顺序取第一条命中的。
+Each branch gets one category. First apply “never delete,” then use the first matching table row.
 
-绝不删除（远端、本地分支及其 worktree 都不动）：
+Never delete the remote/local branch or its worktree when:
 
-- 默认分支、受保护分支，或保护状态查不到；
-- 有开放 Change Request，或是某个开放 Change Request 的目标分支；
-- 运行本技能的当前工作区检出的分支，或仍被不满足下文移除条件的其他 worktree 检出的分支；
-- 调用方列为正在使用的分支；
-- fork 上的分支、来源不明或无法确认下表安全条件的分支。
+- Default/protected, or protection cannot be determined.
+- Used by an open Change Request as source or target.
+- Checked out in the workspace running this skill, or another worktree failing removal conditions below.
+- Listed as active by the caller.
+- On a fork, of unknown origin, or unable to satisfy the table's safety conditions.
 
-仓库文档或 CI 配置点名的长期分支（如 `develop`、`release/*`）只列出。
+List only long-lived branches named in documentation/CI, such as `develop` or `release/*`.
 
-| 情况 | 远端分支 | 本地分支 |
+| Condition | Remote branch | Local branch |
 | --- | --- | --- |
-| Change Request 已合并，分支 head 等于合并时的 head | 删 | 删 |
-| Change Request 已关闭未合并，分支 head 等于关闭时的 head | 删 | 删 |
-| 同上已关闭，但本地比它多出未推送的提交 | 按上一行 | 不删，列出 |
-| 从没提过 Change Request，全部提交都在主线里 | 删 | 删 |
-| 本地分支的远端已不存在，本地 head 在主线里或等于某个已合并、已关闭 Change Request 的最后 head | 不适用 | 删 |
-| 本地分支的远端已不存在，无法确认没有未推送的提交 | 不适用 | 不删，列出 |
-| 有独有提交、从没提过 Change Request | 只列出 | 只列出 |
+| Change Request merged; branch head equals merge-time head | Delete | Delete |
+| Closed without merge; branch head equals closure-time head | Delete | Delete |
+| Same closed request, but local branch has additional unpushed commits | As above | Retain and list |
+| Never had a Change Request; all commits are in mainline | Delete | Delete |
+| Upstream gone; local head is in mainline or equals last head of a merged/closed request | Not applicable | Delete |
+| Upstream gone; cannot rule out unpushed commits | Not applicable | Retain and list |
+| Unique commits and never had a Change Request | List only | List only |
 
-- squash、rebase 合并后分支提交不在主线历史里，前两类按 Change Request 记录的 head 判断，不按是否为主线祖先判断；`git branch -d` 拒绝不代表没合并，核对一致后强制删除本地分支。
-- 同一分支名有多个 Change Request 时，有一个开放就不删，否则以最近一个为准；head 对不上任何 Change Request 时按“有独有提交”处理。
-- 已关闭未合并的分支关闭后即可删除，可在 Change Request 页面恢复。有独有提交却没有 Change Request 的分支删了无法恢复，只列出。
+- Squash/rebase may leave source commits outside mainline. For the first two categories compare recorded request heads, not ancestry. A refused `git branch -d` is not evidence of unmerged status; force-delete locally once verified.
+- With multiple requests on one branch name, retain if any is open; otherwise use the latest. If head matches no request, treat as unique commits.
+- A closed-unmerged branch can be deleted immediately and restored from the request page. A branch with unique commits and no request is not recoverable by that route; list only.
 
-### worktree
+### Worktrees
 
-- 目录已不存在的记录执行 `git worktree prune`（加锁记录 git 会跳过）。
-- 只有同时满足以下条件才移除，用 `git worktree remove`，不加 `--force`：检出的分支属于上表 Change Request 已合并、已关闭或远端已不存在且可删的情况；没有未提交的改动和未跟踪文件；未加锁；不是当前工作区；不在调用方的正在使用清单里；路径在 ForgeSteward 约定的工作区目录 `<仓库上级目录>/<仓库目录名>-forge-steward/` 下。移除后再删其分支。
-- 其他位置的 worktree（如 `~/.codex/worktrees/`、`.claude/worktrees/`、用户自建的）、分离 HEAD 的、其他会话或工具正在使用的一律不动，只列出原因；它们检出的分支按“绝不删除”保留。
+- Prune records whose directories no longer exist with `git worktree prune`; git skips locked records.
+- Remove with `git worktree remove`, never `--force`, only when all hold: its branch is deletable under the table's merged, closed, or missing-upstream cases; no uncommitted/untracked files; unlocked; not current; not caller-listed active; and beneath ForgeSteward's workspace directory `<repository-parent>/<repository-name>-forge-steward/`. Delete the branch after removing its worktree.
+- Leave worktrees elsewhere (such as `~/.codex/worktrees/`, `.claude/worktrees/`, or user-created locations), detached HEAD worktrees, and those used by other conversations/tools untouched; list reasons and retain their branches under “never delete.”
 
-### 删除与上限
+### Deletion and limits
 
-- 每删一个都先重新读取该分支 head，并确认没有新出现的开放 Change Request；有变化就保留并列出原因。远端删除后回读确认。
-- 删除失败（权限不足、保护规则拒绝等）记录原因继续下一个；分支已被他人删掉记为已不存在，不算失败。
-- 每次最多删除 50 个分支，远端和本地各算一个；随分支移除的 worktree 和 `git worktree prune` 不计数。按分支最后一次提交时间从早到晚处理，时间相同按名称排序；超出的列为留到下次。
+- Immediately before each deletion, reread head and confirm no newly opened request. Retain/report changed items. Verify remote deletion by reading back.
+- Record failures such as permissions/protection and continue. If someone already deleted the branch, record absent rather than failed.
+- Delete at most 50 branches per run, counting remote/local separately. Associated worktree removals/pruning do not count. Order by oldest last-commit time, then name on ties. List excess items for next time.
 
-### 汇报
+### Report
 
-用日常中文写明：
+Use everyday English unless the user or repository specifies another language:
 
-- 删掉的分支：远端或本地、名称、删除时的提交号、原因、怎么恢复（有 Change Request 的在其页面恢复；其他用记下的提交号重建）。
-- 保留和只列出的分支及原因；移除和保留的 worktree 及原因；留到下次的数量。
-- 因查询失败或权限不足没检查的部分。
+- Deleted branches: remote/local, name, deletion-time commit, reason, recovery (request page when available; otherwise recreate from recorded commit).
+- Retained/list-only branches and reasons; removed/retained worktrees and reasons; count deferred to next run.
+- Unchecked scope due to query/permission failures.
 
-汇报和评论中不出现令牌等敏感值。
+Never include tokens or other sensitive values in reports/comments.

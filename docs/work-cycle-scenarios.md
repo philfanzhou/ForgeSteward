@@ -1,250 +1,260 @@
-# 编排技能场景验收
+# Orchestration Skill acceptance scenarios
 
-本说明针对 `0.2.16` 的 `work-cycle`。以下是有限场景的规则走查；缓存判定由单元测试验证。未将规则走查冒充跨 Agent 的真实仓库端到端运行。
+This document covers `work-cycle` in `0.2.16`, with later revisions identified below. These are limited rule walkthroughs; unit tests verify cache decisions. They are not presented as real cross-Agent end-to-end repository runs.
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 默认轮数 | 显式调用但未给数字 | 最多运行 10 个非空准备周期，逐阶段派发子 Agent；符合门禁的 Change Request 直接合并 |
-| 指定轮数与提前结束 | 调用时给 `5`，第 3 次 `prepare-work` 返回 `[]` | 已处理 2 轮后结束，不创建空执行任务，不继续凑满 5 轮；报告既有待处理项 |
-| 启动时已有开放 PR | 有两个开放 PR，均非本次新建；一个可合并，一个需修复 | 启动检查后先审查完整开放队列，合并可交付项，对必修反馈派发修复和复审；完成后才开始第 1 个准备周期 |
-| 无可准备 Issue 但有开放 PR | 启动时已有开放 PR，之后 `prepare-work` 返回 `[]` | 仍完成启动队列的审查、符合门禁的合并及分支清理；`[]` 只停止新增周期 |
-| 无开放 PR | 启动时开放队列为空 | 不创建空审查任务，直接进入准备阶段 |
-| 必需子 Agent | 已确认必需创建或等待接口不存在、访问被确定拒绝，或阶段技能未安装 | 在阶段写入前停止并报告具体缺口；编排 Agent 不代做阶段工作 |
-| 低额度提醒 | 系统提示额度较低，但创建与等待仍可用 | 继续派发必需阶段，不缩减轮数、不伪造 `[]`，不创建额度探针 |
-| 阶段完成回收 | 本次阶段已完成，完整结果和远端证据已保存；运行时支持关闭线程 | 释放该阶段线程后继续；不关闭仍在执行或其他会话的 Agent |
-| 首次创建失败 | 实际调用返回线程上限；状态核对确认任务未创建 | 回收可关闭的已完成线程，再有限重试；成功后继续原阶段，不因一次错误结束 |
-| 无关闭接口 | 已完成线程仍列出，关闭接口不可用，下一次创建成功 | 记录接口限制并继续；不虚构关闭工具，不把中断视作一定释放，不复用旧审查 Agent |
-| 创建结果不确定 | 创建返回传输错误，状态查询发现原任务仍在运行 | 继续等待原 Agent，不重复派发可能已写入的阶段 |
-| 不确定状态持续 | 创建结果不明，追加两次查询仍无法确认 | 保存最后确认的状态和恢复条件后结束；不重复创建、不宣称业务完成 |
-| 正常等待 | 等待超时或没有新消息，但 Agent 仍正常运行 | 继续等待原 Agent，不计为启动失败或消耗故障恢复次数 |
-| 等待调用失败 | 等待返回实际传输错误，原 Agent 标识已知 | 核对原任务状态，重试原 Agent 的等待或结果读取，不重新创建阶段 |
-| 恢复耗尽 | 初次调用及最多两次操作重试仍失败 | 在第三轮做最终状态核对；仍无法继续时停止并列出错误、恢复结果、未完成阶段及解除条件，不更名重置计数 |
-| 同轮独立工作 | 一个 Issue 实施阻塞，另有两个独立 Issue 可实施 | 执行技能继续后两项；审查、修复和合并也不因单个项暂停而停止 |
-| 第三次修复终审 | 某 PR 第 3 次修复已推送，当前 head 未终审且满足全部门禁 | 新审查子 Agent 逐 commit 审计并合并；不因轮数达到 3 而直接排除 |
-| 终审失败 | 上述 PR 仍有范围内必修问题，同队列另有可合并 PR | 记录该 head 的终审和暂停原因，不做第 4 次自动修复；继续合并独立 PR，后续周期不重审同一失败 head |
-| 外部门禁等待 | 第三次修复的代码终审通过，CI 尚未完成 | 记录平台等待而非代码失败；条件变化后只复核合并门禁，不重复代码终审 |
-| 修复后 CI 失败 | 修复推送后，本次修改让必要 CI 确定性失败 | 修复子 Agent 在同一次修复中继续修好并推送，不算新一轮往返，不等下一次审查才发现 |
-| 合并后其余 PR 冲突 | 同一批 PR 合并第一个后，其余与主线冲突或因仓库要求分支保持最新而落后 | 审查记为需要同步主线并交给修复子 Agent；修复在原分支同步主线、重跑受影响验证后推送，不计入往返轮数；之后由新审查子 Agent 复核 |
-| CI 还在运行 | 审查时某 PR 的必要检查尚未完成 | 先审其他项，最后回来复核；在该仓库历史耗时推算的上限内（无历史时 30 分钟）完成且满足条件就当场合并，超时或迟迟未开始才记为等待外部检查 |
-| 实现确认做不了 | 执行子 Agent 确认某 Issue 无法实施 | 在原 Issue 写明原因和解除条件并移除过时的可开工标记；下一周期准备时条件未变则沿用结论，不重复调查 |
-| 子 Agent 需要提问 | 阶段技能要求向用户提问或请求澄清 | 问题写进原 Issue/Change Request 和返回结果，子 Agent 继续其他独立工作并按时交回结果，不让整个编排停住 |
-| 复审时没有变化的 PR | 修复只改了部分 PR；另一个 PR 的 head、意见、检查状态都没变，主线也没有相关变化 | 新审查子 Agent 沿用上次结论，只重新确认检查、审批、冲突和分支保护；有变化的 PR 照常按原标准复审 |
-| 第二轮准备 | 同一次运行的第 2 个周期派发准备，前一周期已记录安全告警、分诊和阻塞复查结果及其时间、主线基线 | 只补查此后新增或有变化的部分，其余沿用；记录缺失或覆盖不明时按完整流程执行 |
-| 第 3 次修复后的终审 | 修复子 Agent 已记录覆盖其推送 head 的逐 commit 审计 | 终审逐条核对记录并完整审计之后新增的 commit，不重复做整份审计 |
-| 已交出的 PR 先审查 | 运行时支持后台子 Agent；执行阶段已交出 2 个 PR，仍在实现第 3 项 | 派发审查子 Agent 处理已交出的项，跳过仍由执行阶段持有的项；执行阶段不再向已交出的分支推送 |
-| 实现中主线变化 | 审查合并了一个 PR，执行阶段正在实现的项基于旧主线 | 执行阶段推送前重新获取远端主线，有冲突先同步并重跑受影响验证；之后出现的冲突交给修复阶段同步 |
-| 合并后清理与实现并存 | 审查合并 PR 后清理本地分支和工作区，执行阶段同时在另一工作区实现 | 删除已合并 PR 自己的分支和专用工作区，并按 review-and-merge 规则清理遗留分支；派发审查时列出的其他阶段正在使用的分支和工作区一律不碰，没给这份清单时遗留分支只列出不删除；git 锁冲突短暂重试 |
-| 下一周期提前准备 | 本周期执行已结束，某 PR 仍在修复与复审循环中 | 派发下一周期准备，与该循环同时进行；共享进度记录只由编排 Agent 写入 |
-| 不支持后台子 Agent | 运行时无法后台运行子 Agent 或读取其进度 | 逐阶段串行，工作量和规则不变，并在最终报告说明 |
-| 两项都要用本地数据库 | 两个实现子 Agent 同时验证，Issue 中都写了“本地数据库” | 先取到 `db` 锁的先跑，另一个先做静态检查等不占数据库的工作，等锁释放后再跑；结束后无论成败都释放 |
-| 可隔离的资源 | 仓库配置允许指定测试数据库名和容器项目名 | 各自用任务标识命名，不排队；不为隔离修改仓库配置 |
-| 查不清资源 | 审查一个没有资源记录的外部 PR | 审查者取本次运行已知的全部共享资源锁和 `local-suite` 后再跑本地测试 |
-| 并发时测试失败 | 某测试在并发时失败，持有全部相关锁单独重跑后通过 | 报告为与该资源撞车，不当作代码问题修，不计修改次数；编排之后把该资源列为需排队 |
-| 子 Agent 异常退出 | 子 Agent 已停止但仍持有锁 | 编排确认它已停止后用同一任务标识释放；仍在运行的子 Agent 的锁不动 |
-| 等锁太久 | 累计等待超过 30 分钟 | 记为等待资源并交回结果，不原地空等 |
-| 锁脚本不可用 | 脚本无法运行或返回错误 | 本次运行不并发，逐阶段串行 |
-| 三项互不相干 | 准备返回 `#1, #2, #3`，批内关系均为互不相干，并发上限 3 | 三个实现子 Agent 各在仓库外的独立 worktree 同时实现，每个只拿一个 Issue；先交出的 PR 先进入审查 |
-| 代码依赖 | `#2` 依赖 `#1` | `#1`、`#3` 先开工；`#1` 合并后 `#2` 才开工，开工时先按补查范围核对 `#1` 实际合并的改动 |
-| 依赖的前置暂停 | `#1` 三次修改后仍未通过而暂停 | `#2` 保持等待并记录原因，不开工；不影响 `#3` |
-| 改动重叠 | `#3` 与 `#1` 都改依赖锁文件 | `#3` 等 `#1` 合并后开工；`#1` 暂停或确认不提交时 `#3` 直接开工，之后的冲突交修复阶段同步主线 |
-| 改动超出预计 | `#3` 实现中发现必须改 `#1` 预计要改的文件 | `#3` 停下，保留工作区与本地提交并报告；编排改为等 `#1` 合并后再继续 |
-| 同时发现同一问题 | 两个子 Agent 都发现同一个既有缺陷 | 先取 `issue-registry` 锁的检索后登记；另一个在锁内检索到已有登记，只追加证据 |
-| 机器核心少 | 逻辑核心 6 个 | 并发上限降为 2 |
-| 下一周期准备 | 本周期各项都已开工或在等前置 | 派发下一周期准备，并告知本次运行已分配、未完成的 Issue，准备阶段不再选它们 |
-| 两个 PR 同时审查 | PR A、B 都已交出，并发上限有空位 | 各派一个审查子 Agent，在各自工作区检出审查，本地检查按资源锁排队 |
-| 一个在修一个合并 | A 需要修改，B 审查通过 | A 派修复子 Agent，修完再派新审查；B 不等 A，取 `merge` 锁后合并 |
-| 合并前主线已变且有重叠 | B 审查期间 A 已合并，两者都改了依赖锁文件 | B 在本地把新主线合入后的临时结果上重跑受影响的检查，通过后取锁、确认主线未再变化再合并；不通过则记为需要同步或修改 |
-| 取锁后主线又变了 | B 复核用的主线是 M，取锁时已有 C 合入且与 B 重叠 | 释放锁，以新主线回到复核，不在锁内跑长时间检查 |
-| 要求分支保持最新 | 仓库要求分支最新，A 合并后 B、C 都已审查通过 | 编排同时给 B、C 派发同步主线的修复，CI 一起跑，再各自复审、排队合并 |
-| 合并锁被占 | B 取 `merge` 锁时 A 正在合并 | B 等待 A 完成合并与清理、释放锁后再进行 |
-| 审查者异常退出 | 审查子 Agent 停止时仍持有 `merge` 锁 | 编排确认其已停止后释放该锁，再按原状态重新派发该 PR 的审查 |
-| 首次自动清理 | 目标仓库 Git 元数据中无记录 | 只在启动时派发一次 check-workflow 子 Agent，结果写入本地 Git 元数据，不计入工作周期 |
-| 同版本与普通变更 | 上次运行已完成，版本相同；期间有普通提交或 PR 合并 | 跳过自动清理，即使超过 7 天；不以 PR 状态或文件 diff 触发 |
-| 新版本冷却 | 版本变化，上次运行距今 6 天或恰满 7 天 | 6 天时跳过；满 168 小时时运行一次；跳过不延长冷却时间 |
-| 未完成运行 | 上次自动清理失败或结果不明 | 168 小时内不自动重试；之后可再次运行，同版本也可；不影响独立的工作周期 |
+| Default cycle count | Explicit invocation without a number | Run at most 10 nonempty preparation cycles, dispatching stage subagents; merge eligible Change Requests directly |
+| Explicit limit and early end | Limit `5`; third prepare-work returns `[]` | Stop after 2 completed cycles; no empty execution task or work merely to reach 5; report existing pending items |
+| Open PRs at startup | Two preexisting PRs, one mergeable and one needing repair | After startup checks, review the entire open queue, merge eligible work, dispatch required repair/review, then begin preparation cycle 1 |
+| No ready Issue but open PRs | Preexisting open PRs, then prepare-work returns `[]` | Still complete startup reviews, eligible merges, and branch cleanup; `[]` only stops new cycles |
+| No open PRs | Startup queue empty | Skip empty review tasks and begin preparation |
+| Required subagents | Create/wait API confirmed absent, access definitively denied, or stage Skill missing | Stop before stage writes and report the specific gap; orchestrator does not perform stage work |
+| Low-quota warning | Warning appears but create/wait remain usable | Continue required dispatch without reducing cycles, inventing `[]`, or making quota probes |
+| Release completed stage | Stage finished, complete results/remote evidence saved, runtime supports closing threads | Release that stage's thread and continue; never close active or other-session Agents |
+| First creation failure | Thread limit returned; status confirms no task created | Release eligible completed threads, retry within limits, and resume original stage on success; one error does not end the run |
+| No close API | Completed threads remain listed, no close API, next creation succeeds | Record limitation and continue; invent no tool, do not assume interruption frees capacity, and do not reuse old review Agents |
+| Ambiguous creation | Transport error, but status shows original task running | Wait for original Agent; do not duplicate a stage that may already have written |
+| Persistent ambiguity | Creation uncertain after two additional queries | Save last confirmed state/recovery conditions and end without duplicate creation or claiming completion |
+| Ordinary waiting | Wait timeout/no new message while Agent runs normally | Keep waiting for original Agent; not startup failure or recovery-budget consumption |
+| Wait call fails | Actual transport failure, known Agent ID | Inspect original task, retry its wait/result read, never recreate stage |
+| Recovery exhausted | Initial operation and at most two operation retries fail | Third round checks final status only; if still unable to continue, report errors, recovery results, unfinished stages, and unblock conditions; renaming cannot reset count |
+| Independent work in a cycle | One Issue blocked, two independent items implementable | Execution continues with the other two; one paused item also does not stop independent review, repair, or merge |
+| Final review after third repair | Third repair pushed, current head not finally reviewed, all requirements met | New reviewer audits commits and merges; three rounds alone do not exclude it |
+| Failed final review | Same PR still has required in-scope problems, another is mergeable | Record failed head/reason, no fourth automatic repair; merge independent PR and do not rereview the failed unchanged head next cycle |
+| External requirements pending | Code final review after third repair passed, CI unfinished | Record platform waiting rather than code failure; after conditions change, recheck merge requirements without another code final review |
+| CI failure after repair | Repair deterministically breaks required CI | Same repair subagent fixes/pushes within that repair, without another exchange or waiting for review to discover it |
+| Other PRs conflict after merge | First PR merges, others conflict or become stale under up-to-date-branch policy | Review records main-sync requirement; repair syncs original branch, reruns affected verification, and pushes without consuming an exchange; a new reviewer checks afterward |
+| CI still running | Required review checks unfinished | Review other items first, then revisit. Merge if checks finish within the repository-history-based limit, or 30 minutes without history; timeout or delayed start becomes waiting for external checks |
+| Implementation impossible | Execution confirms an Issue cannot be implemented | Record reason/unblock conditions on original Issue and remove stale ready marker; next preparation reuses conclusion while conditions stay unchanged |
+| Subagent needs clarification | Stage requires a user question | Record question on original Issue/Change Request and in return, continue independent work, and return promptly without blocking all orchestration |
+| Unchanged PR on rereview | Repair changed other PRs; this one's head, feedback, checks, and relevant main remain unchanged | New reviewer reuses conclusion and confirms only checks, approvals, conflicts, and protection; changed PRs get normal review |
+| Second preparation cycle | Earlier cycle recorded alert checks, classification, blocker rechecks, times, and main baseline | Check only new/changed evidence; use full process if records or coverage are missing |
+| Third-repair final audit | Repair recorded a per-commit audit covering its pushed head | Verify that record item by item and fully audit later commits, without repeating the entire audit |
+| Review completed PRs early | Background subagents supported; execution handed off 2 PRs and is implementing item 3 | Dispatch review for handed-off items, excluding execution-owned items; execution stops pushing handed-off branches |
+| Main changes during implementation | Review merges another PR while implementation is based on older main | Refetch remote main before push, resolve conflicts and rerun affected verification first; later conflicts go to repair |
+| Cleanup alongside implementation | Review cleans after merge while another workspace implements | Delete this merged PR's branch/dedicated workspace and follow review cleanup rules for leftovers; preserve all other-stage active branches/workspaces listed at dispatch. Without that list, leftover cleanup is list-only; briefly retry Git lock conflicts |
+| Early next-cycle preparation | Execution ended, a PR still cycles through repair/review | Dispatch next preparation concurrently; only orchestrator writes shared progress |
+| No background support | Runtime cannot run/read background subagent progress | Run stages serially with unchanged scope/rules and disclose in final report |
+| Two tasks need local database | Two implementation Agents verify; both Issues list a local database | First `db` lock holder runs; the other does independent checks, then waits for release; always release on success/failure |
+| Isolatable resources | Existing config permits test database/container project names | Name them per task instead of queueing; do not change repository config for isolation |
+| Unknown resources | External PR lacks resource records | Reviewer acquires all resources known to this run plus `local-suite` before local tests |
+| Failure under concurrency | Test fails concurrently but passes alone while holding all relevant locks | Report resource collision, not code defect/repair round; orchestrator marks resource as queued thereafter |
+| Subagent exits abnormally | Stopped Agent retains locks | Orchestrator confirms stop, then releases under same task ID; never release a running Agent's locks |
+| Excessive lock wait | Cumulative wait exceeds 30 minutes | Return waiting-for-resource result instead of idle waiting |
+| Lock script unavailable | Script cannot run or errors | Disable concurrency for this run and use serial stages |
+| Three unrelated items | Preparation returns `#1, #2, #3`, no relationships, limit 3 | Three execution Agents each take one Issue in an independent external worktree; first handed-off PR enters review first |
+| Code dependency | `#2` depends on `#1` | Start `#1`/`#3`; start `#2` only after `#1` merges, first checking actual merged changes within recorded recheck scope |
+| Prerequisite paused | `#1` remains ineligible after three repairs | Keep `#2` waiting with reason, without affecting `#3` |
+| Overlapping changes | `#3`/`#1` both change lockfile | Start `#3` after `#1` merges; if `#1` pauses or will not submit, start `#3` directly and send later conflicts to repair |
+| Unexpected overlap | Implementing `#3` requires a file reserved for `#1` | Pause `#3`, preserve workspace/local commits, and report; orchestrator resumes only after `#1` merges |
+| Same finding concurrently | Two subagents find the same existing defect | First `issue-registry` lock holder searches/registers; second searches under lock and adds only evidence to the existing Issue |
+| Few CPU cores | 6 logical cores | Reduce concurrency limit to 2 |
+| Next preparation cycle | Every current item started or waits for prerequisite | Dispatch next preparation with all assigned unfinished Issues excluded from reselection |
+| Two concurrent reviews | A/B handed off, capacity available | One reviewer/workspace per PR; local checks queue on resource locks |
+| One repair and one merge | A needs changes, B approved | Dispatch A repair and then a fresh reviewer; B independently takes `merge` lock and merges |
+| Main changed with overlap | A merged during B review; both change lockfile | Rerun affected checks on B's temporary local merge with new main, then lock/confirm main unchanged/merge; failure becomes sync or repair requirement |
+| Main changes before lock | B checked main M, but overlapping C merged before lock acquired | Release lock and recheck new main; do not run long checks inside lock |
+| Up-to-date branches required | A merged, B/C both reviewed | Under this earlier concurrent-sync rule, dispatch B/C main sync together, run CI concurrently, then rereview/queue merges; later #87 below replaces repeated all-branch synchronization |
+| Merge lock occupied | A merging when B requests lock | B waits until A finishes merge/cleanup and releases |
+| Reviewer exits abnormally | Stopped reviewer holds `merge` | Confirm stopped, release, and redispatch that PR review from recorded state |
+| First automatic cleanup | No target-repository Git-metadata record | Dispatch check-workflow once at startup, record in local Git metadata, outside cycle count |
+| Same version, ordinary changes | Previous run completed at same version; ordinary commits/merges since | Skip automatic cleanup even after 7 days; PR state/file diffs do not trigger it |
+| New-version cooldown | Version changed, last run 6 days ago or exactly 7 | Skip at 6 days; run at 168 hours; skips do not extend cooldown |
+| Incomplete prior run | Previous automatic cleanup failed/uncertain | No automatic retry within 168 hours; afterward retry allowed even at same version; independent cycles continue |
 
-编排 Skill 只接受一个可选正整数；没有额外的“允许合并”或“是否使用子 Agent”开关。显式调用即为完整交付请求，但仓库必要检查、审批、分支保护及实际权限仍逐项生效。各阶段技能的冻结范围和 Issue 粒度仍由对应技能决定。
+The orchestration Skill accepts only one optional positive integer, with no extra merge-permission or subagent toggle. Explicit invocation requests complete delivery, while repository checks, approvals, protection, and actual permissions still apply per item. Each stage Skill governs its own frozen scope and Issue granularity.
 
-迁移说明：此前 `prepare-work` 首次返回 `[]` 会跳过审查，启动时已有的开放 Change Request 仅在最终报告中出现。`0.2.14` 起先处理该开放队列，再运行最多指定数量的 Issue 周期；启动审查可能合并并清理既有分支。需要只读分析时不要显式调用完整工作周期。
+Migration: previously the first prepare-work `[]` skipped review, and preexisting open Change Requests appeared only in the final report. Since `0.2.14`, process that open queue first, then at most the requested number of Issue cycles. Startup review may merge and clean existing branches. Do not explicitly invoke a complete work cycle for read-only analysis.
 
-`0.2.16` 调整子 Agent 故障终止判定：额度提醒不再构成停止依据，实际调用失败先核对与有限恢复；保留独立阶段、新 Agent 复审和同仓库串行写入约束。上述恢复场景是规则走查，不代表运行时线程回收已获得端到端认证。
+`0.2.16` changed subagent failure termination: quota warnings no longer justify stopping; actual failures require state checks and bounded recovery. Independent stages, fresh review Agents, and sequential dependent writes in one repository remain. Recovery walkthroughs do not constitute end-to-end certification of runtime thread release.
 
-[#59](https://github.com/philfanzhou/ForgeSteward/issues/59) 消除阶段交接中的返工和卡死：修复阶段推送后自行检查 CI；合并冲突和分支落后由修复阶段同步主线，且不计入往返轮数；CI 等待有按仓库历史推算的上限；实现阶段把做不了的结论写回原 Issue，供准备阶段沿用；编排派出的子 Agent 不停下等用户回答。合并条件、审查标准和 3 轮上限不变。
+[#59](https://github.com/philfanzhou/ForgeSteward/issues/59) removes rework and stalls in handoffs: repair watches its own post-push CI; repair handles conflicts/stale branches without consuming exchanges; CI wait limits derive from repository history; impossible implementation conclusions go back to the original Issue for preparation reuse; dispatched subagents do not stop waiting for user answers. Merge conditions, review standards, and the three-round limit stay unchanged.
 
-[#60](https://github.com/philfanzhou/ForgeSteward/issues/60) 去掉对没有变化对象的重复检查：没变化的 PR 沿用上次审查或修复分类；同一次运行内准备阶段沿用前面周期的全局排查结果；终审复用修复阶段的逐 commit 审计记录；审查不在本地重跑 CI 已在同一 head 通过的检查；合并后自动删分支设置每次调用只读一次；编排只保存结论摘要和证据位置，阶段结束只核对该阶段涉及的对象。审查标准和判定条件不变。
+[#60](https://github.com/philfanzhou/ForgeSteward/issues/60) removes duplicate checks on unchanged objects: reuse prior review/repair classification; reuse earlier-cycle global preparation checks within a run; final review reuses repair's commit audit; do not rerun locally checks already passed by CI on the same head; read auto-delete settings once per invocation. Orchestrator stores only conclusions/evidence locations and verifies only objects involved in the finished stage. Standards and decisions remain unchanged.
 
-[#61](https://github.com/philfanzhou/ForgeSteward/issues/61) 让已完成的项先往下走：运行时支持后台子 Agent 时，执行阶段每交出一个 PR 即可开始审查，审查与修复的循环可以与后续执行、下一周期准备同时进行。防冲突规则：一个 PR 同一时间只归一个阶段；各阶段使用独立工作区，执行阶段只从远端最新主线开分支并在推送前再同步；合并后清理不碰其他阶段的工作目录；共享进度记录只由编排 Agent 写。执行与准备仍互相串行。不支持时退回逐阶段串行。
+[#61](https://github.com/philfanzhou/ForgeSteward/issues/61) lets completed work advance early: with background subagents, each handed-off PR can enter review while later implementation or next-cycle preparation runs. One PR has one stage owner at a time; stages use independent workspaces; execution branches from latest remote main and synchronizes before push; cleanup preserves other stages' workspaces; only orchestrator writes shared progress. This initial revision kept execution/preparation mutually serial. Without background support, use serial stages.
 
-[#67](https://github.com/philfanzhou/ForgeSteward/issues/67) 并发时的本地验证：work-cycle 新增 `scripts/resource_lock.py`，锁存于目标仓库 Git 公共目录、所有 worktree 共享；本地验证先用任务标识隔离，隔离不了的按资源排队，重活另有上限；并发失败的检查先单独重跑，区分撞车与真问题；锁不可用时不并发。验证标准不变。
+[#67](https://github.com/philfanzhou/ForgeSteward/issues/67) adds concurrent local verification: `scripts/resource_lock.py` stores locks in the repository's common Git directory shared by all worktrees. Isolate by task first, queue unisolatable resources, and separately limit heavy work. Rerun concurrent failures alone to distinguish collisions from defects; disable concurrency if locks cannot work. Verification standards remain unchanged.
 
-[#68](https://github.com/philfanzhou/ForgeSteward/issues/68) 实现阶段按 Issue 并发：子 Agent 合计默认最多 3 个（核心少时下调）；编排维护调度表，按准备阶段写下的批内关系决定开工先后；worktree 放在仓库目录外，有子模块时改用独立 clone；新建 Issue 前在 `issue-registry` 锁内检索去重。
+[#68](https://github.com/philfanzhou/ForgeSteward/issues/68) makes implementation concurrent per Issue: default total maximum 3 subagents, reduced for fewer cores. Orchestrator schedules using recorded batch relationships. Worktrees live outside the repository; use separate clones for submodules. Search/deduplicate under `issue-registry` before creating Issues.
 
-[#69](https://github.com/philfanzhou/ForgeSteward/issues/69) 审查和修复按 PR 并发：每个 PR 自己走“审查 → 修复 → 再审查”，互不等待；合并靠 `merge` 锁一次一个，合并前在新主线上复核有重叠的改动，在锁内确认主线未再变化后合并并清理；仓库要求分支最新时同时派发同步。审查标准、合并条件和 3 次修改上限不变。
+[#69](https://github.com/philfanzhou/ForgeSteward/issues/69) makes review/repair concurrent per PR: each independently follows review → repair → rereview. `merge` lock permits one merge at a time, with overlapping changes rechecked on new main and main reconfirmed under lock before merge/cleanup. This revision dispatched simultaneous synchronization when current branches were required; #87 below refines it. Review standards, merge conditions, and three-repair limit remain unchanged.
 
-## 语言与提交约定（#83）
+## Language and commit conventions (#83)
 
-| 场景 | 输入和状态 | 预期行为 |
+The original #83 revision used everyday Chinese as the default while prioritizing target-repository language rules. The English migration changes that default to everyday English; explicit user/repository requirements still take precedence.
+
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 仓库要求英文提交信息 | 目标仓库贡献规范要求提交信息用英文，PR 正文为中文 | 合并时按仓库约定显式填写英文的合并提交标题和说明，不沿用中文 PR 正文；squash 合并同理 |
-| 仓库要求英文 Issue/PR 正文 | 贡献规范要求 Issue 和 PR 正文用英文 | Issue、PR 正文和评论按仓库规定用英文；给用户的汇报、进度说明和提问仍用日常中文 |
-| 仓库没有语言规定 | 无相关约定 | Issue、PR 正文和评论用日常中文；合并提交使用平台默认 |
+| English commit messages required | Target contribution rules require English commits and Chinese PR bodies | Explicitly provide English merge title/body, including squash merges, instead of reusing the Chinese PR body |
+| English Issue/PR bodies required | Contribution rules require English Issue/PR bodies | Write bodies/comments in the required English; user reports, progress, and questions default to everyday English unless explicitly requested otherwise |
+| No language policy | No applicable convention | Use everyday English for Issue/PR bodies/comments and platform defaults for merge commits |
 
-## 遗留分支清理只做一次（#84）
+## Leftover branch cleanup once per run (#84)
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 并发审查合并 | 三个 PR 各由一个审查子 Agent 合并 | 每个只在合并锁内清理本 PR 自己的分支和工作区，不扫描全仓分支，也不在锁内做遗留分支清理 |
-| 串行运行多次审查 | 一次运行中审查阶段派发了 6 次 | 每次都不做遗留分支清理 |
-| 运行收尾 | 所有阶段都已结束，有一个暂停的 PR | 编排派发一个只做遗留分支清理的子 Agent，暂停 PR 的分支和工作区列为保留，整次运行只清理一次 |
-| 单独调用 review-and-merge | 用户直接调用审查技能 | 行为不变：处理完清单后做一次遗留分支清理 |
+| Concurrent merges | Three PRs each merged by a reviewer | Each cleans only its PR branch/workspace under merge lock; no repository-wide scan or leftover cleanup in the lock |
+| Repeated serial reviews | Review dispatched 6 times in a run | None performs leftover cleanup |
+| Run completion | All stages finished, one PR paused | Dispatch one cleanup-only subagent, explicitly retaining paused PR branches/workspaces; one leftover pass for the whole run |
+| Standalone review-and-merge | User directly invokes review Skill | Unchanged: one leftover pass after processing its list |
 
-## 运行记录与耗时（#85）
+## Run records and timing (#85)
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 开始运行 | 启动检查完成 | `start` 在 Git 公共目录下建立 `runs/<运行编号>/`，只保留最近 20 次由脚本创建的运行目录，不碰旧版本留下的其他文件 |
-| 派发与结束 | 派发实现子 Agent，之后它交回结果 | 派发前记 `started`，确认结束后记 `finished`；子 Agent 的证据放在 `task-dir` 给出的目录，不放 `/tmp` |
-| 等 CI | 子 Agent 推送后等待 CI 8 分钟 | 子 Agent 记 `wait-start`/`wait-end`（类型 `ci`），汇总里计入等 CI 时间 |
-| 中断恢复 | 编排上下文压缩 | 先读取运行目录下的 `handoff.json` 恢复进度 |
-| 最终报告 | 运行结束 | 附整次耗时、各阶段合计耗时、等 CI 与等锁合计时间 |
-| 脚本不可用 | 记录命令返回错误 | 在会话交接说明，继续交付，不中断运行 |
+| Start | Startup checks finished | `start` creates `runs/<run-id>/` in common Git metadata and retains only the latest 20 script-created runs, leaving other old-version files untouched |
+| Dispatch/completion | Execution Agent starts then returns | Record `started` before dispatch and `finished` after confirmed completion; place evidence in `task-dir` directory, not `/tmp` |
+| CI wait | Subagent waits 8 minutes after push | Record `wait-start`/`wait-end` with type `ci`; include time in summary |
+| Recovery | Orchestrator context compacted | Read run-directory `handoff.json` first to restore progress |
+| Final report | Run ends | Include wall time, aggregate stage durations, and total CI/lock waits |
+| Script unavailable | Recording command errors | Explain in session handoff and continue delivery |
 
-## 与改动无关的 CI 失败只重跑一次（#86）
+## Retry unrelated CI failures once (#86)
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 无关测试偶发失败 | PR 只改文档，必要 CI 中一个并发测试失败，重跑后通过 | 重跑一次失败任务，按通过处理并继续合并；PR 中记录两次运行链接；在锁内检索去重后把该测试登记为 Issue |
-| 重跑仍失败 | 同上，但重跑后仍失败 | 记为等待外部，不再重跑；独立工作照常进行 |
-| 与改动有关 | 失败的测试覆盖了本次改动的代码 | 不重跑放过，按原规则修复或记为必修 |
-| 无法判断 | 看不出失败测试是否依赖被改动的代码 | 按与改动有关处理，不重跑放过 |
-| 已登记的不稳定测试再次出现 | 另一个 PR 遇到同一测试偶发失败 | 重跑一次；锁内检索到已有 Issue，只追加这次的运行链接 |
+| Unrelated flaky test | Docs-only PR, required concurrent test fails then passes rerun | Rerun failed job once, accept pass and continue merge; record both run links on PR, then deduplicate/register test Issue under lock |
+| Rerun fails | Same input, rerun also fails | Record external waiting, no more reruns; continue independent work |
+| Related failure | Test covers changed code | Repair or classify as required; do not rerun to dismiss it |
+| Unclear relationship | Cannot determine whether failed test depends on changed code | Treat as related, without rerun-to-dismiss |
+| Known flaky test recurs | Another PR sees the same flaky failure | Rerun once; under lock find existing Issue and append this run's links only |
 
-## 合并车道与合并队列（#87）
+## Merge lane and repository merge queue (#87)
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 要求分支最新，4 个 PR 已审查通过 | 合并第一个后其余 3 个落后，均无冲突 | 一个合并车道子 Agent 持 `merge` 锁逐个处理：只同步下一个、等检查、核对差异只来自主线、合并；不再每合并一个就同步全部，也不为每一圈新开子 Agent |
-| 车道中遇到冲突 | 第 2 个 PR 试合并有冲突 | 不解决冲突，交修复阶段；车道继续处理第 3 个；修好后重新审查，再进入下一次车道 |
-| 车道中检查失败 | 同步后必要检查失败 | 与该 PR 无关的失败按规则重跑一次；有关的记为修改要求交修复，车道继续下一个 |
-| 源分支来自 fork | 车道无法向源分支推送 | 记为需要作者同步，继续下一个 |
-| 仓库已启用合并队列 | 审查通过，分支落后 | 直接加入合并队列等待结果，不自行同步，不取 `merge` 锁；队列因冲突退回交修复，因检查失败退回按 CI 失败规则处理 |
-| 仓库没有合并队列 | 同上 | 不替仓库开启合并队列或自动合并，按逐个同步并合并处理 |
-| 单独调用 review-and-merge | 冻结清单中 3 个 PR 审查通过后因要求分支最新而落后 | 审查完后按合并车道逐个同步并合并 |
+| Up-to-date policy, 4 approved PRs | After first merge, 3 become stale without conflicts | One merge-lane subagent holds `merge` and processes each: sync only next PR, wait checks, verify changes come only from main, merge. Do not resync all after each merge or create a new Agent each lap |
+| Conflict in lane | Second PR trial merge conflicts | Do not resolve in lane; send to repair and continue third. Repaired PR gets reviewed before another lane pass |
+| Checks fail in lane | Required checks fail after sync | Retry unrelated failure once; related failure goes to repair, lane continues |
+| Fork source | Lane cannot push source branch | Record author-sync requirement and continue |
+| Repository merge queue enabled | Approved branch is stale | Enqueue and wait, without own sync or `merge` lock. Conflict rejection goes to repair; failed checks follow CI rules |
+| No repository queue | Same state | Do not enable queue or auto-merge; synchronize/merge one at a time |
+| Standalone review-and-merge | Three approved frozen PRs are stale under policy | After review, process sequentially through merge lane |
 
-## 固定格式的最终汇报（#95）
+## Fixed final report format (#95)
 
-汇报的章节、结果词和名称对照只在 work-cycle 的 `references/report.md` 定义一份，`run_record.py report` 从中读取并按 `handoff.json` 和事件记录生成。下表是规则走查；固定样例的逐字节比对由 `tests/test_run_report.py` 验证。
+Sections, result vocabulary, and display-name mappings are defined only in work-cycle's `references/report.md`. `run_record.py report` reads that specification and renders `handoff.json` plus events. The table is a rule walkthrough; `tests/test_run_report.py` compares fixed examples byte for byte.
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 正常结束 | `handoff.json` 字段齐全、结果都在 7 个词内 | `report` 打印前 6 节，仅在有升级可处理时增加第 7 节，并写入运行目录的 `report.md`，返回 `0`；编排原样贴出，最多在末尾加一段“补充说明” |
-| 重复生成 | 同一份数据再运行一次 | 输出和 `report.md` 逐字节一致；生成时不读当前时间 |
-| 结果词写错 | 某 PR 的结果写成“待合并”，或缺少必填字段 | 返回 `1`，逐条列出字段（如 `change_requests[2].result 不在结果词表中`），不写 `report.md`；编排按提示改正后重试，最多 3 次 |
-| 重试仍不通过 | 改正 3 次后仍返回 `1` | 编排按 `report.md` 的模板手写，第一行写“本次汇报由模型手写，原因：……” |
-| 脚本跑不了 | 没有 3.9 以上的 Python、Windows 上只有应用商店假入口、沙箱拦截，或返回 `2` | 运行开始时就按 `python3`、`py -3`、`python` 的顺序确认可用的 Python，找不到时记入交接；结束时照模板手写并注明原因，交付不中断 |
-| 用户中途停止 | 还有 PR 在审查、Issue 没开工 | 照常生成汇报；没处理完的记“已暂停”并写原因，需要用户处理的列入“需要你处理” |
-| 没有任何内容 | 没有 PR、没有异常 | 前 6 节照常出现，没有内容的写“- 无”；第 7 节按升级内容决定 |
-| 没有事件记录 | 运行记录脚本中途不可用，`events.jsonl` 为空 | “耗时”一节写“- 无记录” |
-| 耗时为零 | 事件都在同一时刻 | 写“总计 0 分”，等 CI、等本地资源写“0 分” |
-| 可选的安装升级节 | `handoff.json` 没有 `agent_check`（旧记录或没做检查） | 省略第 7 节，前 6 节照常生成；检查结果已保存时按下一节筛选 |
-| 旧运行记录 | `handoff.json` 是旧版的自由格式 | 返回 `1` 并列出缺少的字段，按兜底手写；不需要迁移 |
+| Normal finish | Complete handoff, all results in seven-value vocabulary | Print six required sections, add seventh only for available updates, save run `report.md`, return `0`; orchestrator pastes unchanged with at most one additional-notes paragraph |
+| Repeat render | Identical data | Byte-identical output/report, without reading current time |
+| Invalid result | PR result `Ready to merge`, or a required field missing | Return `1`, list exact field errors such as `change_requests[2].result`, and do not write report; orchestrator corrects/retries at most 3 times |
+| Retries exhausted | Still `1` after three corrections | Use report template manually, starting `This report was written manually by the model because: ...` |
+| Script cannot run | No Python 3.9+, Windows Store placeholder only, sandbox denial, or exit `2` | At startup try `python3`, `py -3`, then `python`; record absence in handoff. At end use annotated manual template and continue delivery |
+| User stops | PRs still reviewing and Issues not started | Still report; unfinished items become `Paused` with reasons, actionable ones appear under Needs your action |
+| Empty run | No PRs or exceptions | Still render first six sections with `- None` where empty; seventh depends on upgrades |
+| No events | Recording became unavailable, events.jsonl empty | Time spent section says `- No record` |
+| Zero time | All events at same instant | Report `Total 0 min`, CI/resource waits `0 min` |
+| Optional upgrade section | No `agent_check`, due to old records or skipped check | Omit seventh section and render six normally; saved checks use filtering below |
+| Old free-form record | handoff.json predates required structured fields | Return `1` with missing fields and use manual fallback; migration is not required |
 
-## 其他 Agent 安装检查（#97）
+## Other-Agent installation checks (#97)
 
-work-cycle 开始时运行一次技能包内的 `scripts/agent_install.py check`，只读查出本机各 Agent 用户级装的 ForgeSteward 版本，与 GitHub 最新正式版比较，结果存为运行目录的 `agent-check.json`，汇报最后一节按它筛选生成，只在有可处理的升级时出现。检测方式全部取自同目录的 `agents.json`。原始状态保存在检查 JSON；汇报只列可升级项；结束时的提问和同意后的安装、升级见下一节。下表是规则走查；各状态由 `tests/test_agent_install.py` 用临时 HOME、临时 PATH 里的假命令和注入的发布数据验证，不联网。
+At startup work-cycle runs bundled `scripts/agent_install.py check` once, read-only, to compare local Agents' user-scope ForgeSteward versions with the latest GitHub stable release. Save `agent-check.json` in the run directory. The optional final section appears only for actionable upgrades. Detection comes solely from adjacent `agents.json`. Raw states remain in the check JSON; the report lists only upgrade candidates. End-of-run consent/install behavior follows below. These are rule walkthroughs; `tests/test_agent_install.py` checks states using temporary HOME/PATH fake commands and injected release data without network.
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| Agent 不存在 | 命令、应用位置、配置目录都找不到 | 记“未安装 Agent”，汇报不列出 |
-| 一个插件都没装 | 本机只缺 DeepSeek Harness 的 ForgeSteward，最新为 v0.2.21 | 记“缺少”，汇报写“DeepSeek Harness：未安装（最新 v0.2.21）” |
-| 只装了部分 | Codex 装了 2 个插件，版本都是最新 | 记“不完整”，汇报写“Codex：缺 a、b（最新 vN）” |
-| 版本落后 | ZCode 全部插件为 0.2.20，最新为 0.2.21 | 记“落后”，汇报写“ZCode：v0.2.20，落后于最新 v0.2.21” |
-| 全部最新 | 每个已装的 Agent 都是最新且齐全，会话包版本相同 | 无第 7 节，无提问；检查 JSON 保留 |
-| 比最新正式版新 | OpenCode 装的是开发版 0.2.22 | 记“高于最新正式版”，汇报不列出 |
-| 有非用户级安装 | Claude Code 另有项目级的同名插件 | 只按用户级判断；只有该 Agent 可升级而被列出时，句末注明“另有非用户级安装” |
-| 命令超时或输出无法识别 | `claude plugin list --json` 20 秒没返回，或输出不是预期的 JSON | 该 Agent 记“无法判断”并附原因，汇报不列；其他可升级 Agent 照常输出，退出码仍为 `0` |
-| 手工副本 | OpenCode 或 Harness 目录里有 `forge-steward-*` 但没有安装记录 | 记“无法判断：有手工副本” |
-| ZCode 缺 `node` 或找不到 `zcode.cjs` | 只有 `~/.zcode` | 记“无法判断”并写明缺什么；数据文件没有安装记录文件的兜底读取方式，本版本不另写路径 |
-| 最新版查不到 | `gh` 不可用且 GitHub 接口失败，或最新发布是预发布、Tag 不是 `vX.Y.Z` | 原始状态保留，省略第 7 节，不提问 |
-| 检查做不了 | 没有可用的 Python、返回 `2`、超过 60 秒或被中断 | `handoff.json` 记 `unavailable` 原因，省略第 7 节；本次工作照常交付 |
-| 只读 | 检查前后对比临时 HOME 下的全部文件 | 逐字节不变；检查结果只写到运行目录 |
-| Codex 远端目录首次查询较慢（#114） | macOS CLI `0.157.1`；假命令的无过滤查询在远端冷缓存时延迟、热缓存时立即返回 | 数据文件只执行 `codex plugin list --marketplace forge-steward --json`，首次和后续均跳过远端路径，目标插件名与版本和旧查询过滤后相同；保持每条 20 秒、整体 60 秒，不延长等待 |
-| Codex 目标市场的安装状态 | 严格检查参数，目标市场分别为最新、落后、缺少、不完整；其他市场有同名插件 | 四种分类不变，其他市场不计入；检查 JSON schema 和其他 Agent 状态不变 |
-| Codex 查询失败或旧 CLI 不支持选项 | 超时、非零退出、非法 JSON、`installed` 非数组、`pluginId` 或 `version` 字段变化 | Codex 记“无法判断”，其他 Agent 正常，检查返回 `0`；只查询一次，不退回无过滤命令或读内部缓存；未安装 CLI 且无配置时仍记“未安装 Agent” |
-| Codex 只读和超时终止 | 隔离 HOME 内放配置和安装文件，运行目录接收检查 JSON；超时假命令另启动子进程 | HOME 路径和字节不变，只写运行目录检查结果；超时仍终止命令及其子进程，不追加查询 |
-| 会话包落后（#113） | 包 `scripts/VERSION` 为 0.2.9，已确认最新为 0.2.10，Agent 都最新或清单为空 | 第 7 节第一行“本次用的是旧版 v0.2.9，最新是 v0.2.10”，最后只问一次是否升级；按整数比较，不能从这行猜 Agent id |
-| 会话包旧且有可升级 Agent | 会话包较旧，另有缺少、不完整、落后的多个 Agent | 先写会话旧版提示，只列可升级 Agent，不重复行，合并为一次提问 |
-| 会话包相同或更高 | 会话包为 0.2.10 或 0.2.11，最新为 0.2.10 | 不提示会话旧版；有可升级 Agent 才显示第 7 节 |
-| 会话包版本读取失败 | 包版本文件缺失或非法，但有可升级 Agent | 不猜会话版本，仍显示可升级 Agent |
-| 检查文件无法读取 | 文件丢失、JSON 非法或字段无法识别 | 省略第 7 节，前 6 节正常；不改已保存的检查文件，也不吞掉 handoff 的数据错误 |
-| 重复生成 | 同一 handoff、事件、检查文件与包版本 | 输出逐字节一致，检查文件逐字节不变；固定样例测试用受控包版本，避免真实包版本污染注入数据 |
+| Agent absent | No command, application, or config directory | State `Agent not installed`; omit from report |
+| No plugins installed | Only Harness lacks ForgeSteward; latest v0.2.21 | State `Missing`; report `DeepSeek Harness: Not installed (latest v0.2.21)` |
+| Partial installation | Codex has two plugins, both latest | State `Incomplete`; report `Codex: Missing a, b (latest vN)` |
+| Older version | ZCode all 0.2.20, latest 0.2.21 | State `Behind`; report `ZCode: v0.2.20, behind latest v0.2.21` |
+| All current | Every installed Agent complete/current, same session package | No seventh section or question; retain check JSON |
+| Newer than stable | OpenCode development 0.2.22 | State `Ahead of latest release`; omit from report |
+| Other installation scopes | Claude also has project-level same-named plugins | Judge user scope only; append other-scope note only if this Agent is listed as upgradeable |
+| Timeout/unrecognized output | `claude plugin list --json` exceeds 20 seconds or returns unexpected JSON | State `Unknown` with reason; omit that Agent but retain others, still exit `0` |
+| Manual copy | OpenCode/Harness has forge-steward-* without receipts | State `Unknown` with manual-copy reason |
+| Missing ZCode runtime | Only ~/.zcode, no node or zcode.cjs | State `Unknown`, identify missing component; no additional internal installation-record fallback path |
+| Latest unavailable | gh unavailable and API fails, or latest is prerelease/non-vX.Y.Z Tag | Preserve raw states, omit section seven/question |
+| Check unavailable | No Python, exit `2`, more than 60 seconds, or interruption | Record unavailable reason in handoff, omit section seven, continue delivery |
+| Read-only | Compare all temporary-HOME files before/after | Paths/bytes unchanged; write check only to run directory |
+| Slow first Codex catalog query (#114) | macOS CLI 0.157.1; unfiltered fake command delays on cold remote cache but not warm | Catalog uses only `codex plugin list --marketplace forge-steward --json`, skipping remote path on first/later calls with same target names/versions as old filtered result; preserve 20-second command/60-second overall limits |
+| Codex target states | Strict argument checks, target Current/Behind/Missing/Incomplete, same names in other marketplaces | Preserve four classifications; ignore other marketplaces; JSON schema/other Agents unchanged |
+| Codex failure/old CLI | Timeout, nonzero, invalid JSON, nonarray installed, changed pluginId/version fields | Codex `Unknown`, other Agents continue, overall check `0`; one query only, no unfiltered/internal-cache fallback; absent CLI/config still `Agent not installed` |
+| Codex read-only/timeout termination | Isolated HOME config/files, output run directory; timeout fake spawns child | HOME paths/bytes unchanged, only check result written; terminate command and child on timeout, no extra query |
+| Older session package (#113) | Bundled scripts/VERSION 0.2.9, confirmed latest 0.2.10, all Agents current or empty | First upgrade line states session v0.2.9 vs latest v0.2.10; ask once. Compare integer components and do not infer Agent ID from notice |
+| Old session and upgradeable Agents | Older session plus multiple Missing/Incomplete/Behind Agents | Session notice first, only eligible Agents without duplicates, one combined question |
+| Same/newer session | Session 0.2.10/0.2.11, latest 0.2.10 | No old-session notice; seventh section only for eligible Agents |
+| Invalid session version | Missing/invalid package VERSION, eligible Agent exists | Do not guess session version; still list eligible Agent |
+| Unreadable check file | Missing file, invalid JSON, unrecognized fields | Omit seventh section, preserve six; do not rewrite check or hide handoff validation errors |
+| Repeat render | Same handoff/events/check/package version | Byte-identical output, unchanged check file; fixed fixtures control package version to avoid actual version contaminating injected data |
 
-Codex 的真实查询在 macOS `0.157.1` 上核对（2026-10-13）：原查询 0.949 秒，首次和再次限定查询 0.070/0.047 秒，目标市场的六个插件名与版本一致。固定源码 [run_plugin_list 与 fetch_remote_marketplaces](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/cli/src/plugin_cmd.rs) 表明限定非全局市场时跳过远端获取；回归假命令验证该参数分支和失败边界，不代表 Windows/Linux 真实 CLI 或操作系统缓存完全清空的冷启动时延。检查脚本不新增内部缓存读取方式，安装、升级步骤不变。
+Real Codex queries were checked on macOS `0.157.1` on 2026-10-13: old query 0.949 seconds, first/repeated scoped queries 0.070/0.047 seconds, with matching six target plugin names/versions. Fixed source [run_plugin_list and fetch_remote_marketplaces](https://github.com/openai/codex/blob/rust-v0.157.1/codex-rs/cli/src/plugin_cmd.rs) skips remote fetch for a specified nonglobal marketplace. Fake-command regressions verify that argument path and failures, not Windows/Linux real CLI behavior or fully cold OS-cache timings. No internal-cache reader is added; installation/update steps remain unchanged.
 
-## 结束时询问，同意后安装或升级（#98）
+## Ask at completion, install or upgrade after consent (#98)
 
-汇报最后一节在最新正式版已知、且有“缺少”“不完整”“落后”的 Agent 或会话技能包旧版提示时出现。有可升级 Agent 时末行列出这些 Agent 和目标版本，问一句“要现在安装或升级吗？”；只有会话旧版提示时问一次是否升级，不凭会话提示构造 `apply --agents`，后续仍由用户明确同意实际 Agent。用户明确同意后，编排 Agent 运行 `scripts/agent_install.py apply --version X.Y.Z --agents <id,...>`，再把脚本输出的实际结果告诉用户。只有 work-cycle 编排这样做；阶段子 Agent 不检查、不提问、不安装。下表是规则走查；各场景由 `tests/test_agent_install.py` 用临时 HOME、临时目录、临时 PATH 里的有状态假命令、本地临时 Git 仓库和注入的发布数据验证，不联网，不碰本机真实的 Agent 配置。
+Show the final optional section only when the latest stable release is known and there are Missing/Incomplete/Behind Agents or an older session-package notice. With eligible Agents, end with their names/target version and one `Install or upgrade now?` question. With only a session notice, ask once about upgrading; do not derive `apply --agents` from the notice, and obtain explicit consent for actual Agents. After consent, orchestrator runs `scripts/agent_install.py apply --version X.Y.Z --agents <id,...>` and reports actual script results. Only work-cycle orchestrator does this; stage Agents neither check nor ask/install. The following are walkthroughs tested with temporary HOME/directories, stateful fake PATH commands, local temporary Git repositories, and injected releases, without network or real Agent configuration.
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 只缺 Harness，同意 | 汇报末行“DeepSeek Harness 可以安装或升级到 v0.2.21。要现在安装或升级吗？”，用户同意 | 查到 `v0.2.21` 的提交，没有可用的本地副本时下载 Tag 到临时目录并核对提交；用其中的 `scripts/deepseek.py install forge-steward-<插件> --user` 逐个安装 6 个技能到 `DSH_HOME/skills`（未设置时为 `~/.dsh/skills`），各带安装记录、版本 `0.2.21`；复查为“最新”；临时源码和锁目录删除；输出“DeepSeek Harness：已安装 v0.2.21”和“新版本要在各 Agent 的下一个新会话里才生效。” |
-| 拒绝或没回答 | 同上，用户说不用或没回应 | 不运行 `apply`，任何文件不变；不记住拒绝，下次运行照样检查和询问 |
-| 只有 Codex 落后 | Codex 全部为 0.2.20，其他 Agent 最新，用户同意了全部 | Claude Code、Harness 跳过（“已是最新”）；Codex 先只读地运行 `marketplace list --json`（查到市场在），再依次逐个 `codex plugin remove`、`marketplace remove`、`marketplace add philfanzhou/ForgeSteward --ref v0.2.21`、逐个 `codex plugin add`；其他 Agent 只被调用过 `list`，文件不变 |
-| 部分同意 | 汇报列出 Codex 和 Harness，用户只同意 Codex | 只传 `--agents codex`，Harness 不动 |
-| 一个插件都没装 | Claude Code 存在但没装 ForgeSteward，也没有 `forge-steward` 市场 | 同样用升级命令：没有可卸载的插件，列出市场后发现没有，跳过删除；先 `marketplace add ...@v0.2.21 --scope user`，再逐个 `plugin install --scope user`；输出“Claude Code：已安装 v0.2.21” |
-| 没装插件但留着市场 | Claude Code 或 Codex 卸载过全部插件，`forge-steward` 市场还指向旧版本 v0.2.20（实测此时直接添加 v0.2.21 会因来源不同失败） | 列出市场查到它在，先 `marketplace remove forge-steward`，再添加 v0.2.21 来源并逐个安装；复查为“最新”，退出码 `0` |
-| 插件在但市场已删 | Codex 还装着 0.2.20 的插件，`forge-steward` 市场已被删除 | 先列出市场，没有它；逐个卸载后跳过删除市场这一步（不去删不存在的市场），再添加 v0.2.21 来源并逐个安装；复查为“最新”，退出码 `0` |
-| 查不到市场列表 | `claude plugin marketplace list --json` 返回非零、超过 20 秒或输出无法识别 | 这个 Agent 不执行任何改动命令，结果写“查不到市场是否存在：原因”，复查状态不变；同一次同意的其他 Agent 照常处理；退出码 `1` |
-| 有已停用的旧插件 | Codex 还装着 `find-work` | 升级时一并卸载，不再装回；OpenCode、Harness 用安装器的 `uninstall` 卸载有安装记录的旧技能 |
-| 有非用户级安装 | Claude Code 另有项目级插件 | 只处理用户级，结果句末注明“另有非用户级安装，没有改动” |
-| 本地副本可用 | Claude Code 的市场副本 `~/.claude/plugins/marketplaces/forge-steward` 是 Git 仓库，`HEAD` 等于 Tag 提交且没有改动 | 直接用它运行安装器，不下载，用完不删除 |
-| 本地副本不可用 | 副本有未提交的文件，或 `HEAD` 不是 Tag 提交 | 不用它，改为下载 Tag 并核对 |
-| 下载的提交不一致 | Tag 下载后 `git rev-parse HEAD` 与接口查到的提交不同 | 该 Agent 不安装，报告两个提交；临时源码删除；退出码 `1` |
-| 被修改过的副本 | Harness 的 `forge-steward-prepare-work` 有安装记录但内容被改过，版本较旧 | 安装器拒绝更新，目录逐字节不变；其余技能照常安装；结果写出安装器给的路径和原因，复查仍为“落后”，退出码 `1` |
-| 没有安装记录的副本 | OpenCode 目录里有手工复制的 `forge-steward-review-and-merge` | 检查为“无法判断”，`apply` 跳过该 Agent 并写明原因，目录不变 |
-| 已装版本更高 | Codex 装的是 0.2.22，目标 0.2.21 | 跳过，“比目标版本新，不降级”；没有任何改动命令 |
-| 某一步失败 | ZCode 卸载成功后 `marketplace add` 因断网失败；Codex 也落后 | ZCode 停在这一步，不再执行安装；复查为“缺少”，输出失败的命令、原因和恢复办法（解决后再同意一次重新运行）；Codex 照常升级；退出码 `1` |
-| 用户中途中断 | `apply` 处理到一半被中断 | 已处理完的 Agent 保持新版本；正在处理的可能“已卸载未重装”，下次检查显示为缺少或不完整，再同意一次重跑即可补齐；锁目录和临时源码在退出时删除 |
-| 处理中意外错误 | 处理 Codex 时，第二个改动命令还没运行就遇到文件错误（如建临时文件时权限不够）；Claude Code 也落后 | Codex 停下余下步骤，结果写“运行 `…` 时出现意外的文件错误：原因（路径）”，以复查结果为准（复查已装好也写出这一句）；Claude Code 照常升级；退出码 `1`，不是 `2` |
-| 收尾失败 | Harness 已装好，最后删除临时目录或锁目录时权限不够 | 输出“DeepSeek Harness：已安装 v…”，另起一行说明哪个目录没删掉、原因和处理办法（临时目录可手动删；锁目录要确认没有安装在运行后手动删，否则下次会提示另一个安装正在进行）；`--json` 的顶层 `cleanup` 记下路径和原因；退出码 `1` |
-| 建不了临时目录 | 锁已拿到、重新检查通过，系统临时目录里建不了工作目录 | 退出码 `3`，输出“没有做任何改动：无法建立临时目录…”，不运行任何改动命令 |
-| 缺参数 | 没给 `--version` 或 `--agents`，版本不是 `X.Y.Z`，Agent 名不认识，或数据文件读不了 | 退出码 `2`，只在开始改动前出现，不做任何改动；开始改动后的文件错误不再返回 `2` |
-| 最新版已变 | 同意的是 v0.2.21，此时最新已是 v0.2.22 | 退出码 `3`，不做改动；编排重新检查并按新版本再问 |
-| 另一个安装在进行 | 系统临时目录里已有 `forge-steward-agent-install.lock` | 退出码 `3`，说明另一个安装正在进行，不删除这个锁 |
-| 当前 Agent 被升级 | 在 Claude Code 里运行 work-cycle，同意升级 Claude Code | 照常升级；告诉用户本次会话仍是旧版本，新版本在下一个新会话生效 |
-| 被沙箱拦截 | 运行环境不允许联网或写用户目录 | 如实说明，给出同一条命令让用户自己运行，不换别的安装方式 |
+| Only Harness missing, consent given | Offer Harness v0.2.21, user agrees | Resolve Tag commit; if no usable local copy, download Tag temporarily and verify commit. Individually install six Skills using `scripts/deepseek.py install forge-steward-<plugin> --user` into DSH_HOME/skills or ~/.dsh/skills with receipts/version 0.2.21. Recheck Current, remove temporary source/lock, report installed version and activation in each Agent's next new session |
+| Decline/no answer | Same offer, no consent | Do not run apply or change files; do not persist refusal, check/ask again on a later run |
+| Only Codex behind | Codex 0.2.20, others current, user agrees to all | Skip current Claude/Harness; Codex first reads `marketplace list --json`, then runs each `codex plugin remove`, `marketplace remove`, `marketplace add philfanzhou/ForgeSteward --ref v0.2.21`, and each `codex plugin add`. Others receive only list calls and remain unchanged |
+| Partial consent | Codex/Harness offered, only Codex accepted | Pass only `--agents codex`; leave Harness untouched |
+| No plugins/marketplace | Claude exists without ForgeSteward | Use upgrade sequence, skip absent removals after listing marketplace, run `marketplace add ...@v0.2.21 --scope user`, then each `plugin install --scope user`, report installed version |
+| Empty old marketplace remains | Claude/Codex has no plugins but marketplace v0.2.20 remains; direct new-source add fails in verified behavior | List/confirm, run `marketplace remove forge-steward`, add v0.2.21 and install individually; recheck Current, exit `0` |
+| Plugins remain, marketplace absent | Codex plugins 0.2.20 but source deleted | List first, uninstall plugins, skip nonexistent marketplace removal, add v0.2.21/install; recheck Current, exit `0` |
+| Marketplace query fails | `claude plugin marketplace list --json` returns nonzero, exceeds 20 seconds, or is unrecognized | No mutation commands for this Agent; report cannot determine existence and reason, recheck unchanged state. Other consented Agents continue; exit `1` |
+| Retired plugin remains | Codex has find-work | Remove during upgrade without reinstall; OpenCode/Harness use installer uninstall for receipted retired Skills |
+| Other scopes | Claude also has project plugins | Modify user scope only and state other-scope installations were untouched |
+| Usable local source | Claude marketplace clone `~/.claude/plugins/marketplaces/forge-steward` has HEAD equal to Tag commit and is clean | Use its installer without download; never remove it afterward |
+| Unusable local source | Dirty files or wrong HEAD | Leave it alone; download/verify Tag instead |
+| Download commit mismatch | Downloaded `git rev-parse HEAD` differs from API-resolved commit | Do not install that Agent, report both commits, remove temporary source, exit `1` |
+| Edited managed copy | Older Harness `forge-steward-prepare-work` has receipt but changed contents | Installer rejects update with byte-identical directory; other Skills still install; report path/reason, recheck Behind, exit `1` |
+| Receipt-free copy | Manual OpenCode `forge-steward-review-and-merge` | Check Unknown, apply skips Agent with reason, directory unchanged |
+| Higher installed version | Codex 0.2.22, target 0.2.21 | Skip as newer than target, no downgrade/mutation commands |
+| Step failure | ZCode uninstall succeeds, marketplace add fails offline; Codex also behind | Stop ZCode before install, recheck Missing, report failed command/reason and renewed-consent recovery; continue Codex, exit `1` |
+| User interruption | apply interrupted halfway | Completed Agents keep updates; active Agent may be removed but not reinstalled. Later check shows Missing/Incomplete and renewed consent can complete it; remove lock/temporary source on exit |
+| Unexpected file error | Codex file error before second mutation, e.g. temporary-file permission; Claude also behind | Stop Codex steps, report command/file error/reason/path even if recheck is installed, and use recheck state. Continue Claude; exit `1`, not `2` |
+| Cleanup failure | Harness installed, temporary/lock directory deletion denied | Report successful install separately from retained path/reason/recovery. Temporary source may be removed manually; confirm no installer running before removing lock. Record top-level JSON cleanup details; exit `1` |
+| Cannot create temp directory | Lock acquired/recheck passed, temp work directory unavailable | Exit `3`, report no changes and cause, no mutation commands |
+| Invalid arguments | Missing version/agents, malformed X.Y.Z, unknown Agent, unreadable data file | Exit `2` only before mutation; no changes. Later file errors never return `2` |
+| Latest changed | Consent v0.2.21, latest now v0.2.22 | Exit `3` without changes; orchestrator rechecks and asks for new version |
+| Another installer active | forge-steward-agent-install.lock exists in system temp | Exit `3`, explain active installation, never delete its lock |
+| Current Agent upgraded | Running in Claude, consent includes Claude | Upgrade normally; explain current session remains old and next session uses new version |
+| Sandbox rejection | Network/user-directory writes prohibited | Explain accurately and give the same command for the user to run, without another installation route |
 
-不保证：某一步失败后自动回到旧版本（会如实报告当前状态和恢复办法）；文件错误以外的程序缺陷、按 Ctrl+C 中断、标准输出写不出去时的退出码和输出；未核对版本的 Agent 命令行仍按同样方式工作。`apply` 只从 GitHub 读取发布信息和 Tag 内容，Tag 名必须是 `vX.Y.Z`，所有命令以参数列表运行、不经过 shell；不读取、不保存、不输出令牌，GitHub 接口请求不带凭据。
+Not guaranteed: automatic rollback after a failed step (report actual state/recovery); exit codes/output for program defects beyond file errors, Ctrl+C, or stdout failure; identical behavior in unverified Agent CLI versions. apply reads only GitHub release/Tag contents, requires vX.Y.Z Tags, and runs argument arrays without a shell. It does not read/save/output tokens, and GitHub API requests contain no credentials.
 
-## 读日志、等 CI 与子 Agent 交回（#99）
+## Logs, CI waiting, and subagent returns (#99)
 
-读日志和等待检查的做法写在 `execute-work`、`fix-feedback`、`review-and-merge` 各自的 `references/ci.md`，三份逐字节相同，由 `tests/test_shared_ci_rules.py` 检查；等待上限、超时记为等待外部、无关失败只重跑一次等判定仍在原规则里，不变。交回格式写在 work-cycle 的 `references/agents.md`“交回格式”一节。下表是规则走查。
+Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's own `references/ci.md`, byte-identical under `tests/test_shared_ci_rules.py`. Existing wait limits, external-wait timeout classification, and one retry for unrelated failures remain unchanged. Return format is in work-cycle `references/agents.md`, under Return format. The table is a rule walkthrough.
 
-| 场景 | 输入和状态 | 预期行为 |
+| Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| 长日志、失败在中间某步 | 几千行的 CI 日志，第 3 步测试失败 | 只读失败那一步的日志（GitHub 上如 `gh run view <运行编号> --log-failed`），从报错处往前看；定位后修复或分类，PR 里只贴报错几行和运行链接，日志不整份读入 |
-| 报错原因在更早的步骤 | 失败那一步只显示“依赖缺失”，原因在前面的安装步骤 | 逐段往前扩或读前一步；“只看末尾”不是限制 |
-| 规则文件被截断与日志被截断 | 读 `repair.md` 时输出被截断；读 CI 日志时输出也被截断 | 规则文件按入口要求补读到文件末尾；日志不补读整份，按 `ci.md` 只读需要的部分 |
-| GitHub 上等 CI | PR 推送后检查在跑 | `gh pr checks <编号> --watch --interval 60` 丢弃输出、只看退出状态（0 全过、1 有失败、8 仍在跑），结束后再查一次只读最终结果；总时长不超过原等待上限 |
-| 等待超过工具单次时长 | 检查要跑 25 分钟，执行工具单次最多 10 分钟 | 改为后台运行或分段继续，每段只看退出状态；总时长仍按原上限算，超过记为等待外部检查 |
-| 还没有任何检查 | 推送后命令立即报“no checks reported” | 按“迟迟未开始运行”处理：隔不少于 1 分钟再看，超过上限记为等待外部检查 |
-| 平台没有“跑完才返回” | 托管平台只能查询状态 | 每隔不少于 1 分钟查一次，每次只取汇总（几项在跑、几项失败），跑完后读一次完整结果 |
-| 本地测试失败 | 本地单元测试有 2 项失败 | 先看失败项；测试框架有只显示失败的选项时优先用 |
-| 子 Agent 正常结束 | 实现子 Agent 完成 #12 并交出 PR | 交回一组：结果“已交出”、PR 链接、一句原因、一句下一步、证据目录里的 `result.md`；编排 Agent 记入调度表，不读 `result.md` |
-| 交回缺项或与远端不符 | 交回说 PR 已交出，远端查不到该 PR | 编排 Agent 读 `result.md` 并核对远端状态，以远端为准 |
-| 子 Agent 交回大段过程 | 交回附了几百行过程描述 | 编排 Agent 只保存固定几项，不把过程存进交接 |
-| 子 Agent 中途失败、没有交回 | 创建或等待调用报错 | 按 `agents.md` 已有的恢复规则处理，不变 |
-| 用户中途停止 | 还有 PR 在审查 | 照常生成汇报，没处理完的记“已暂停”，不变 |
-| 并发 | 3 个子 Agent 同时运行 | 每个任务的证据目录由任务标识区分，`result.md` 不互相覆盖 |
-| 安全 | 失败日志里出现令牌 | 只摘报错几行，不把令牌写进 PR、Issue 或交回内容 |
+| Long log, middle-step failure | Thousands of CI lines, step 3 fails | Read only failed-step log, e.g. `gh run view <run-id> --log-failed`, working backward from error; repair/classify, post a few error lines/run link, not entire log |
+| Earlier root cause | Failed step says missing dependency caused during install | Expand backward in chunks or read previous step; not restricted to the tail |
+| Truncated rule vs log | Both repair.md and CI log reads truncate | Reread rule to EOF per entry requirements; read only needed log portions under ci.md |
+| GitHub CI wait | Checks running after push | Run `gh pr checks <number> --watch --interval 60`, discard output, inspect exit status (0 passed, 1 failures, 8 pending), then read final result once; respect existing total limit |
+| Tool wait shorter than CI | Checks need 25 minutes, tool maximum 10 | Run in background or resume bounded segments, examining exit status only; overall limit unchanged, exceeded means external waiting |
+| No checks yet | Command immediately says no checks reported | Treat as not started; poll at least one minute apart until limit, then external waiting |
+| Platform has no blocking watcher | Status query only | Query summary counts at least one minute apart, read full result once finished |
+| Local failures | Two unit tests fail | Read failures first, using failure-only framework output if available |
+| Normal subagent completion | Implementation #12 hands off PR | Return Handed off, PR link, one reason sentence, one next-step sentence, and task evidence result.md; orchestrator records schedule without reading full result.md |
+| Missing/conflicting return | Return says PR submitted but remote cannot find it | Read result.md and verify remote; remote state wins |
+| Excessive process return | Hundreds of narrative lines returned | Save only fixed fields, not process in handoff |
+| No return after failure | Create/wait errors | Use existing agents.md recovery rules |
+| User stops | PR still in review | Generate report; unfinished work Paused |
+| Concurrent evidence | Three subagents run | Task IDs distinguish evidence directories; result.md files cannot overwrite each other |
+| Sensitive logs | Failure log includes token | Quote only relevant error lines, without copying token into PR/Issue/return |
 
-| 阶段 | 结果 | 链接 | 原因 / 下一步 | 编排 Agent 记到 |
+| Stage | Result | Link | Reason / next step | Orchestrator records |
 | --- | --- | --- | --- | --- |
-| check-workflow | `clean` 或 `pr-open` | 清理 PR（有时） | 一句 / 一句 | `check_workflow` 记录、`startup_check` |
-| prepare-work | 一行 Issue 列表或 `[]` | 无 | 每个入选项一句批内关系和需排队资源；`[]` 时一句原因 | 调度表；`[]` 时 `stop_reason` |
-| execute-work（每个 Issue） | “已交出”、“未开始”或“已暂停” | PR 或 Issue | 一句 / 一句 | 调度表；结束时 `change_requests` 或 `issues_without_change_request` |
-| review-and-merge（每个 PR） | 7 个结果词之一，或“待修复”（要修改或同步主线） | PR | 一句 / 一句 | 调度表；`change_requests` |
-| fix-feedback（每个 PR） | “已交出”（已推送待复审）、“等待 CI”或“已暂停” | PR | 一句 / 一句 | 调度表 |
-| 遗留分支清理 | 保留了哪些分支和工作区 | 无 | 无 | `branch_cleanup` |
+| check-workflow | `clean` or `pr-open` | Cleanup PR if any | One sentence each | check_workflow record and startup_check |
+| prepare-work | One-line Issue list or `[]` | None | Per selected item one sentence for relationships/queued resources; one reason for `[]` | Schedule; stop_reason for `[]` |
+| execute-work per Issue | Handed off, Not started, or Paused | PR or Issue | One sentence each | Schedule; final change_requests or issues_without_change_request |
+| review-and-merge per PR | One of seven report results, or Awaiting repair for edits/main sync | PR | One sentence each | Schedule and change_requests |
+| fix-feedback per PR | Handed off after push, Waiting for CI, or Paused | PR | One sentence each | Schedule |
+| Leftover cleanup | Retained branches/workspaces | None | None | branch_cleanup |
 
-不保证：静态检查不能证明模型一定照做，也不保证 token 用量降低多少；不覆盖托管平台以外的 CI 系统的具体命令。
+Static checks do not prove model compliance or any specific token reduction. These instructions do not specify commands for CI systems outside the hosting platform.
+
+## English migration and record compatibility (#118)
+
+Current source rules, newly generated statuses, reports, errors, prompts, and manually prepared handoffs use clear English. Earlier releases used Chinese defaults; translating historical notes does not change that fact. No schema, field name, CLI command, persisted-record path, event model, or version number changes as part of this migration.
+
+The single report specification in `references/report.md` defines current vocabularies and exact aliases for known legacy Chinese result and Agent-state values. On reading structured `handoff.json` or `agent-check.json`, readers map only those known fields in an in-memory copy before validation, counting, and upgrade filtering. Equivalent old, new, or mixed values produce the same merged/actionable counts and upgrade candidates. Unknown values remain invalid. Invalid Agent-check data retains the existing behavior of omitting the optional upgrade section, while invalid handoff data still fails validation. Old free-form records missing required fields still use the existing manual fallback.
+
+Reading does not rewrite original input files or translate user-provided free text such as reasons, next actions, Agent names, or external command errors. New handoff prose must use the required language. Keep original records for recovery. Old readers may reject new English enum values; when rolling source back, use saved old records or continue generating reports with the new reader. Do not automatically reverse-translate or overwrite user records. The migration neither upgrades installed plugins nor grants installation or release authorization.

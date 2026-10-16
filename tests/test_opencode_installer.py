@@ -1,4 +1,4 @@
-"""验证真实文件操作、事务回滚及 OpenCode 所需的安装结构。"""
+"""Verify real file operations, transaction rollback, and OpenCode installation layout."""
 
 from contextlib import redirect_stderr, redirect_stdout
 import io
@@ -80,7 +80,7 @@ class InstallerTests(unittest.TestCase):
         self.run_cli("install", "forge-steward-prepare-work")
         self.assertEqual([p.name for p in self.root.iterdir()], ["forge-steward-prepare-work"])
         self.assertEqual((self.installed() / "SKILL.md").read_bytes(), (self.source_skill() / "SKILL.md").read_bytes())
-        # prepare-work 的门禁等规则位于引用文件，安装不得只复制入口。
+        # prepare-work acceptance rules live in references; installation must copy more than the entrypoint.
         for relative, content in self.contents(self.source_skill()).items():
             with self.subTest(resource=relative):
                 self.assertEqual((self.installed() / relative).read_bytes(), content)
@@ -167,7 +167,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("use install first", self.run_cli("update", "prepare-work", expected=1))
 
     def install_retired_find_work(self):
-        # 模拟旧 catalog；安装收据由真实安装器生成，不手工伪造归属。
+        # Simulate an old catalog; the real installer creates receipts, without fabricated ownership.
         plugin = self.source / "plugins/find-work"
         shutil.copytree(self.source / "plugins/prepare-work", plugin)
         skill = plugin / "skills/forge-steward-prepare-work"
@@ -250,7 +250,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(before, self.contents(self.installed()))
         self.assertEqual([p.name for p in self.root.iterdir()], [self.installed().name])
         self.assert_no_transactions()
-        # 幂等重跑仍然报告残留，不因“无托管项”变成成功。
+        # Idempotent reruns still report leftovers; no managed items does not turn the result into success.
         self.run_cli("uninstall", "--all", expected=2)
 
     def test_unmanaged_and_legacy_names_are_only_candidates(self):
@@ -402,7 +402,7 @@ class InstallerTests(unittest.TestCase):
             self.run_cli("uninstall", "--all", user=True)
 
     def test_real_opencode_discovery(self):
-        # 此测试针对 CI 固定的 OpenCode 1.18.30；PATH 上的其他主版本可能没有 debug skill --pure。
+        # This test targets CI-pinned OpenCode 1.18.30; other major versions on PATH may lack debug skill --pure.
         executable = os.environ.get("FORGESTEWARD_OPENCODE")
         if not executable:
             self.skipTest("Set FORGESTEWARD_OPENCODE to a compatible OpenCode CLI for actual discovery")
@@ -417,7 +417,7 @@ class InstallerTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(self.project)], check=True, capture_output=True)
 
         def discovered():
-            # OpenCode 在 macOS 上写管道时会在 65536 字节处截断输出，改为写入临时文件再读取。
+            # OpenCode pipes on macOS truncate output at 65536 bytes; write a temporary file and read it instead.
             with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as stdout:
                 result = subprocess.run([executable, "debug", "skill", "--pure"], cwd=self.project,
                                         env=env, stdout=stdout, stderr=subprocess.PIPE, text=True, timeout=60)
@@ -435,7 +435,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(item["content"].strip(), expected)
         self.run_cli("uninstall", "--all")
         self.assertEqual(discovered(), {})
-        # 同一可执行程序还须发现默认 XDG 和自定义配置目录的用户级安装。
+        # The same executable must discover user installations in default XDG and custom config directories.
         for custom in (None, self.base / "custom-user-config"):
             user_env = {"XDG_CONFIG_HOME": env["XDG_CONFIG_HOME"]}
             if custom:
@@ -449,7 +449,7 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(Path(items["forge-steward-prepare-work"]["location"]).resolve(), expected)
                 self.run_cli("uninstall", "--all", user=True)
                 self.assertEqual(discovered(), {})
-        # 命令失败/有残留与真实发现一致：不能把缺失收据的副本当成已卸载。
+        # Command failure/leftovers must agree with real discovery: a copy without a receipt is not uninstalled.
         self.run_cli("install", "prepare-work")
         (self.installed() / installer.RECEIPT).unlink()
         self.assertIn("Residual:", self.run_cli("uninstall", "--all", expected=2))

@@ -1,69 +1,68 @@
-# ForgeSteward 项目指引
+# ForgeSteward Project Guide
 
-## 规则来源
+## Source of rules
 
-- 本文件是仓库级 Agent 指令的唯一事实来源。
-- Codex、OpenCode 和 ZCode 直接读取本文件；ZCode 使用仓库根目录作为工作区，不依赖子目录扫描或 `@import`。
-- Claude Code 通过仓库根目录的 `CLAUDE.md` 导入本文件。
-- 不要在平台适配文件中复制本文件的通用规则。通用规则只在此处维护，避免内容漂移。
+- This file is the single source of truth for repository-level Agent instructions.
+- Codex, OpenCode, and ZCode read this file directly. ZCode uses the repository root as its workspace and does not depend on subdirectory scanning or `@import`.
+- Claude Code imports this file through `CLAUDE.md` at the repository root.
+- Do not duplicate these shared rules in platform adapter files. Maintain them only here to avoid drift.
 
-## 主干交付
+## Delivery to the main branch
 
-- 本仓库的 `main` 和默认分支只能通过 Pull Request 更新。修改前创建工作分支，commit 和 push 均在工作分支上进行，不在主干直接提交或推送。
-- 不绕过、停用或放宽远端主干规则以完成交付。
-- 远端规则禁止直接更新、强制推送和删除受保护主干，且不配置绕过名单。规则在 GitHub 上管理，本文件不能代替远端保护。
+- Update this repository's `main` and default branch only through Pull Requests. Create a working branch before making changes; commit and push on that branch, never directly on the main branch.
+- Do not bypass, disable, or weaken remote main-branch rules to complete delivery.
+- Remote rules prohibit direct updates, force pushes, and deletion of the protected main branch, with no bypass list. These rules are managed on GitHub; this file does not replace remote protection.
 
-## 项目定位
+## Project purpose
 
-ForgeSteward 是一组面向多种编码 Agent 和代码托管平台的仓库维护 Skill，用于删除项目中与技能重复的工作流规则、将 Issue 准备到可实施状态、按 Issue 清单实现并提交 Change Request、审查并在满足条件时合并 Change Request，以及根据 Review Feedback 修复代码。
+ForgeSteward is a set of repository-maintenance Skills for multiple coding Agents and code-hosting platforms. They remove workflow rules that duplicate the Skills, prepare Issues for implementation, implement supplied Issue lists and submit Change Requests, review and merge eligible Change Requests, and repair code in response to Review Feedback.
 
-各 Skill 应保持独立安装，但必须统一版本管理。Skill 名称和核心流程不得绑定 GitHub、GitLab、Gitea 等特定平台。只有真正跨 Agent、跨托管平台通用的行为才应共享；平台特有的 API、术语、清单、目录和调用方式应放在各自适配层中。
+Each Skill must remain independently installable, with a shared version across all plugins. Skill names and core workflows must not depend on a particular platform such as GitHub, GitLab, or Gitea. Share only behavior that is truly common across Agents and hosting platforms. Keep platform-specific APIs, terminology, manifests, directories, and invocation methods in their adapters.
 
-核心设计统一使用以下平台无关术语：
+Use these platform-neutral terms throughout the core design:
 
-- `Issue` 表示托管平台上的问题或工作项。
-- `Change Request` 表示等待审查和合并的变更，例如 GitHub Pull Request 或 GitLab Merge Request。
-- `Review Feedback` 表示针对 Change Request 的 Comment、Discussion 或 Review Thread。
+- `Issue`: an issue or work item on a hosting platform.
+- `Change Request`: a change awaiting review and merge, such as a GitHub Pull Request or GitLab Merge Request.
+- `Review Feedback`: a Comment, Discussion, or Review Thread on a Change Request.
 
-## 统一版本
+## Unified version
 
-- 根目录 `VERSION` 是当前源码目标版本的唯一事实来源，不含 `v` 前缀；它不代表该版本已经发布。
-- 所有插件（包括未来新增插件）的 `plugin.json`、`.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 中的版本必须与 `VERSION` 完全一致，不允许按插件独立升版。
-- Claude Code / ZCode 共用 `.claude-plugin/marketplace.json`。其中每个插件的 `version` 是供 ZCode 更新检测使用的派生字段，必须与 `VERSION` 和插件清单一致；用 `python3 scripts/sync_marketplace.py --write` 同步，CI 用 `--check` 校验。不要在 Codex 市场添加未经支持的版本字段，也不维护另一份 ZCode 技能正文或市场索引。
-- 每次发布统一升版，未修改功能的插件也同步版本；仅文档或安装器变更的发布同样遵守此规则。不要求每个开发提交都升版，未发布的同一目标版本可以继续完善。
-- Agent 不得自行修改版本号。无论 `VERSION` 是否已经发布，都只在用户明确要求本次升版时才修改 `VERSION`，并同步全部插件清单和共用市场；用户没有要求时保持版本号不变，最多在交付说明中提示“当前版本已发布，是否需要升版”，由用户决定。
-- 用户要求升版但没有指定目标版本时，只将 `X.Y.Z` 的最后一位 `Z` 加一，保持 `X.Y` 不变；即使新增 Skill、改名或存在不兼容变化，也不得自行提升 minor 或 major。只有用户明确指定目标版本或指定调整其他位时才按其要求执行。不兼容变化仍须记录迁移说明。候选版后缀及发布渠道的新增或变更也须由用户明确指定，不借后缀绕过此限制。
-- 发布 Tag 必须为 `v` 加 `VERSION`，Release 对应表中的全部插件版本必须与其一致。发布前按 `docs/releasing.md` 核对；CI 必须校验所有插件清单与 `VERSION` 一致。
-- 已发布 Tag 和历史版本对应表保持不变，不因采用新规则改写历史；修复必须使用新版本。修改版本规则不等于授权合并、发布或升级用户安装。
+- The root `VERSION` is the single source of truth for the current source target version, without a `v` prefix. It does not mean that version has been released.
+- Versions in every plugin's `plugin.json`, `.codex-plugin/plugin.json`, and `.claude-plugin/plugin.json`, including future plugins, must exactly match `VERSION`. Do not version plugins independently.
+- Claude Code and ZCode share `.claude-plugin/marketplace.json`. Each plugin's `version` there is derived metadata for ZCode update detection and must match `VERSION` and the plugin manifests. Synchronize it with `python3 scripts/sync_marketplace.py --write`; CI validates it with `--check`. Do not add unsupported version fields to the Codex marketplace or maintain separate ZCode Skill text or a marketplace index.
+- Bump all plugins together for each release, including plugins with no functional changes. Documentation-only and installer-only releases follow the same rule. Individual development commits do not require a bump; an unreleased target version may continue to evolve.
+- Agents must not change version numbers on their own. Whether or not `VERSION` is already released, change it only when the user explicitly requests a bump for this work, and synchronize all plugin manifests and the shared marketplace. Otherwise keep the version unchanged; at most mention that the current version is already released and let the user decide whether to bump it.
+- If the user requests a bump without a target version, increment only `Z` in `X.Y.Z`, keeping `X.Y` unchanged. Do not independently bump minor or major for new Skills, renames, or incompatible changes. Change another component only when the user explicitly specifies it or the target version. Still document migration for incompatible changes. Adding or changing prerelease suffixes or release channels also requires an explicit user request; do not use a suffix to evade this limit.
+- Release Tags must be `v` followed by `VERSION`, and every plugin version in the Release mapping table must match. Follow `docs/releasing.md` before releasing. CI must check that all plugin manifests match `VERSION`.
+- Keep published Tags and historical version mapping tables unchanged. Do not rewrite history to adopt new rules; fixes require a new version. Changing version rules does not authorize merging, releasing, or upgrading the user's installation.
 
-## Skill 长度与跨 Agent 兼容
+## Skill length and compatibility across Agents
 
-- 所有现有和新增 Skill 共用同一份入口与配套规则，不按 Agent 复制正文。修改入口、描述或引用文件时，遵守 [跨 Agent 技能兼容约定](docs/skill-compatibility.md)，并运行 `python3 scripts/check_skill_limits.py --check`；CI 必须执行同一检查。
-- 可执行预算的唯一数值来源是 `scripts/check_skill_limits.py`。按原始 UTF-8 字节、行数及描述的 UTF-16 长度分别检查，不用字符数或估算 token 数代替字节，也不将某个平台的建议误记为通用硬限制。
-- 新建或修改 Skill 的 `description` 时，须遵守脚本中的共用描述预算，使其在已核对 Agent 的默认发现列表中完整展示。DeepSeek Harness `0.2.0-rc.2` 默认展示最多 500 个 JavaScript UTF-16 单元，超出时缩短并加省略号；这不是正文加载上限。用途、触发条件及关键排除边界放在短描述中，详细流程保留在正文或引用文件中，不通过调大客户端配置规避维护预算。版本、单位、可配置性质和验证边界见跨 Agent 兼容文档。
-- 超预算时按工作阶段拆到技能包内 `references/`，保留授权边界、阶段导航及输出契约；入口须说明哪些文件在何时必须读完，处理工具输出截断、缺失文件和上下文恢复。不得删减业务约束、只截取正文前缀、把规则藏到不受检文件，或要求用户调大客户端预算来通过检查。
-- 引用规则使用可检查的相对 Markdown 链接，并随该技能独立安装。`name`、`description` 保持仓库约定的单行裸文本；复杂 YAML 或新的资源组织方式须同时更新校验与兼容性证据，不能绕过校验器。
-- 增加 Agent、升级验证版本、修改预算或遇到新的截断告警时，更新兼容性文档中的官方依据、版本/提交、计量单位、验证范围及未验证部分，并补充相应边界测试。静态检查通过不代表任意客户端配置、所有技能合计上下文或模型行为均得到保证。
+- All existing and new Skills share one entry point and supporting rules, without Agent-specific copies. When editing an entry point, description, or referenced file, follow the [cross-Agent Skill compatibility agreement](docs/skill-compatibility.md) and run `python3 scripts/check_skill_limits.py --check`. CI must run the same check.
+- `scripts/check_skill_limits.py` is the only numeric source for enforced budgets. Check raw UTF-8 bytes, lines, and description UTF-16 length separately. Do not substitute character counts or estimated tokens for bytes, or describe one platform's recommendation as a universal hard limit.
+- New or edited Skill `description` fields must meet the shared description budget in the script so they appear in full in the default discovery lists of the checked Agents. DeepSeek Harness `0.2.0-rc.2` displays at most 500 JavaScript UTF-16 units by default, shortening longer descriptions and adding an ellipsis. This is not a body-loading limit. Put purpose, triggers, and key exclusions in the short description; keep detailed steps in the body or references. Do not increase client configuration limits to evade maintenance budgets. See the compatibility document for versions, units, configurability, and verification boundaries.
+- If content exceeds a budget, split it by stage into the Skill package's `references/`, preserving authorization boundaries, stage navigation, and output contracts. The entry point must say which files must be read in full and when, and address truncated tool output, missing files, and context recovery. Do not remove business constraints, read only a body prefix, hide rules in unchecked files, or ask users to increase client budgets to pass validation.
+- Use checkable relative Markdown links for referenced rules and include them in each Skill's independent installation. Keep `name` and `description` as single-line plain scalars under repository conventions. Complex YAML or new resource layouts require matching validator and compatibility-evidence updates, not a bypass of validation.
+- When adding an Agent, changing a verified version or budget, or encountering a new truncation warning, update the compatibility document's official sources, version/commit, units, verification scope, and unverified areas, and add boundary tests. Passing static checks does not guarantee arbitrary client settings, total context across all Skills, or model behavior.
 
-## 文档语言
+## Documentation language
 
-- 除 `README` 文件外，所有项目设计文档必须使用简体中文编写。
-- 项目设计文档包括架构说明、设计方案、规范、决策记录、实施计划和 `docs/` 下的设计类文档。
-- `README` 文件不受上述语言限制，可根据公开分发和使用者需求选择语言。
-- 代码标识符、API 名称、命令、文件路径和无法准确翻译的技术术语可以保留英文；必要时在中文上下文中解释。
+- Write all project-maintained documentation, including README files, in clear English.
+- This includes architecture descriptions, designs, specifications, decision records, implementation plans, and design documents under `docs/`.
+- Preserve code identifiers, API names, commands, file paths, and technical terms accurately, explaining unfamiliar terms in plain English when needed.
 
-## 托管平台协作语言
+## Hosting-platform collaboration language
 
-- Issue 标题必须使用英文。
-- Change Request 标题必须使用英文，包括 GitHub Pull Request、GitLab Merge Request 及其他平台的等价对象。
-- Issue 和 Change Request 的正文必须使用简体中文。
-- Issue、Change Request 和 Review 中的 Comment、Discussion 与 Review Thread 必须使用简体中文。
-- 引用代码、日志或外部原文时可以保留其原始语言，但分析、结论和行动说明必须使用简体中文。
+- Write Issue titles in English.
+- Write Change Request titles in English, including GitHub Pull Requests, GitLab Merge Requests, and their equivalents on other platforms.
+- Write Issue and Change Request bodies in English.
+- Write Comments, Discussions, and Review Threads on Issues, Change Requests, and Reviews in English.
+- Quoted code, logs, or external source text may retain their original language; write analysis, conclusions, and action descriptions in English.
 
-## 面向用户的输出用语
+## User-facing wording
 
-- Skill 中凡是规定写给用户或托管平台的内容，包括最终回复和汇报、Issue 与 Change Request 正文、Comment 及 Review Feedback 回复，都须要求使用日常中文。
-- 规则正文可以保留精炼的内部术语（如门禁、对账），但输出契约不得要求把它们原样输出；确需出现时，首次出现处用一句话解释。
-- 技能文件（`plugins/` 下全部文件）禁止出现“分诊”“制品”，文件或目录名也不得含 `triage`；由 `tests/test_skill_wording.py` 强制检查。
-- artifact 写作「构建输出」等日常说法，不用「制品」。
-- 本仓库自身的 Issue、Change Request 正文和 Comment 同样适用本节。
+- Skill requirements for user-facing or hosting-platform content, including final replies and reports, Issue and Change Request bodies, Comments, and Review Feedback replies, must default to clear, everyday English. Honor an explicit language requirement from the user or target repository.
+- Rules may use concise internal terminology, but output contracts must not require repeating it verbatim. Explain a necessary unfamiliar term in one sentence on first use.
+- Project-maintained content throughout the repository must be English. Keep technical Unicode test inputs and known legacy status aliases narrowly identified as data; do not hide untranslated prose in escapes. `tests/test_skill_wording.py` enforces the content policy and the existing prohibition on `triage` in file or directory names under `plugins/`.
+- Prefer familiar descriptions such as “build output” when they make an artifact's purpose clearer.
+- The same wording requirements apply to this repository's Issue and Change Request bodies and Comments.

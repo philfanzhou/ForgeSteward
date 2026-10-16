@@ -1,37 +1,37 @@
-## 并发时的本地验证
+## Concurrent local verification
 
-多个子 Agent 同时实现、审查或修复时，代码目录由独立工作区隔开；本地验证用到的端口、数据库、容器、模拟器、共享远端环境和机器算力仍会冲突。按隔离 → 排队 → 分辨撞车三层处理，并限制总量。验证标准不变，只改变何时、以何种方式运行。
+Separate workspaces isolate code, but concurrent implementation/review/repair may still contend for ports, databases, containers, simulators, remote environments, and computing capacity. Apply isolation, queuing, then contention diagnosis, with an overall limit. Change timing/execution method, never verification standards.
 
-### 资源锁
+### Resource locks
 
-使用本技能包的 `scripts/resource_lock.py`。锁保存在目标仓库 Git 公共目录的 `forge-steward/locks/`，所有 worktree 共享，不改动受版本控制的文件：
+Use this package's `scripts/resource_lock.py`. Locks live in the target's Git common directory at `forge-steward/locks/`, shared by worktrees without tracked-file changes:
 
 ```bash
-python3 <本技能目录>/scripts/resource_lock.py --repo <目标仓库> acquire <资源> --holder <任务标识> [--capacity <容量>] [--wait <秒>]
-python3 <本技能目录>/scripts/resource_lock.py --repo <目标仓库> release <资源> --holder <任务标识>
-python3 <本技能目录>/scripts/resource_lock.py --repo <目标仓库> status [<资源>]
+python3 <skill-directory>/scripts/resource_lock.py --repo <target-repository> acquire <resource> --holder <task-id> [--capacity <capacity>] [--wait <seconds>]
+python3 <skill-directory>/scripts/resource_lock.py --repo <target-repository> release <resource> --holder <task-id>
+python3 <skill-directory>/scripts/resource_lock.py --repo <target-repository> status [<resource>]
 ```
 
-`acquire` 返回 `0` 已取得（同一持有者重复取锁返回 `HELD`），`1` 等待到期仍被占用，`2` 参数或环境错误；只有持有者能释放。资源名使用小写字母、数字、`.`、`_`、`-`：
+`acquire` exits `0` when acquired (same-holder repeats return `HELD`), `1` when still occupied after waiting, and `2` on argument/environment errors. Only the holder may release. Resource names use lowercase letters, digits, `.`, `_`, and `-`:
 
-- `port-<端口号>`、`db`、`docker`、`simulator`、`browser-profile`、`path-<简名>`（固定路径或全局配置）、`remote-<环境名>`（共享远端测试环境或测试账号，始终独占）；
-- `local-suite`：查不清资源的整套本地测试；
-- `heavy`：编译、整套测试等重活，容量为本次运行的重活上限（默认 2，且不超过子 Agent 并发上限）；
-- `issue-registry`：新建 Issue 前的检索与登记；`merge`：合并一次一个；均见 [已完成项先往下走](concurrency.md)。
+- `port-<number>`, `db`, `docker`, `simulator`, `browser-profile`, `path-<short-name>` (fixed path/global configuration), `remote-<environment>` (shared remote tests/accounts, always exclusive).
+- `local-suite`: a full local suite with unclear resources.
+- `heavy`: compilation/full suites and similar heavy work; capacity equals this run's heavy-work limit, default 2 and no greater than subagent concurrency.
+- `issue-registry`: search/filing before new Issues; `merge`: one merge at a time. See [Move completed items forward](concurrency.md).
 
-任务标识为“阶段-Issue 或 PR 编号”，例如 `implement-123`、`review-pr-45`，每个子 Agent 任务唯一。
+Use unique per-subagent task identifiers in the form “stage-Issue-or-PR-number,” such as `implement-123` or `review-pr-45`.
 
-### 编排 Agent 的职责
+### Orchestrator responsibilities
 
-1. 启动并发前运行一次 `status` 确认脚本可用。脚本无法运行或返回 `2` 时，本次运行不并发，按 [轮次、交接与终止](cycles.md) 逐阶段串行。
-2. 派发时给子 Agent：任务标识、上面三条命令的实际路径、本项需排队的资源（来自 Issue 中“验证所需共享资源”及本次运行已记录的撞车资源）和 `heavy` 的容量。
-3. 子 Agent 结束（完成、失败或确认已停止）后运行 `status`。仍由其任务标识持有的锁，由编排 Agent 用同一标识释放；不释放仍在运行的子 Agent 的锁，也不手工删除锁目录。无法识别持有者的锁只报告，不清理。
-4. 子 Agent 报告与某资源撞车时，记入本次运行记录，之后派发的任务都把该资源列为需排队。
+1. Run `status` once before concurrency to confirm availability. If unavailable or exit `2`, run stages serially under [Cycles, handoffs, and stopping](cycles.md).
+2. Provide each subagent its identifier, actual paths for the three commands, queued resources from the Issue's shared-verification inventory and this run's recorded contention, and `heavy` capacity.
+3. After a subagent completes, fails, or is confirmed stopped, run `status`. Release its remaining locks using its identifier. Do not release active subagents' locks or manually delete lock directories. Report unknown holders without cleanup.
+4. Record any resource contention reported by subagents; require later tasks to queue for that resource.
 
-### 子 Agent 的规则
+### Subagent rules
 
-各阶段技能在“被并发调用时”的规则中执行同样的隔离、排队和撞车判断：用任务标识隔离临时目录、容器项目名、测试数据库名和端口，只用仓库已有配置；占用共享资源或属于重活的验证先取锁、结束后无论成败都释放；多把锁按资源名顺序取，等不到时先释放已取得的锁；查不清资源的验证取本次运行已知的全部共享资源锁和 `local-suite`；并发时失败的检查先在持有其全部资源锁（不清楚时取 `local-suite`）的情况下单独重跑，单独通过即报告为撞车，不当作代码缺陷修复，也不计入 Review 往返。累计等锁超过 30 分钟时记为等待资源并交回结果。
+Each stage's concurrent-invocation rules enforce the same isolation, queuing, and diagnosis. Use task identifiers for temporary directories, container names, test databases, and ports with existing configuration only. Lock shared-resource/heavy checks and release regardless of outcome. Take multiple locks in resource-name order; release held locks when another is unavailable. For unclear checks, take every known shared-resource lock and `local-suite`. Rerun concurrent failures alone with all relevant locks (`local-suite` when unclear). A solo pass is contention, not a code defect or review round. After over 30 minutes accumulated lock wait, return waiting-for-resources status.
 
-### 限制总量
+### Limit total work
 
-本地只跑与改动相关的检查，完整套件交给 CI；仓库规范要求本地跑完整套件时照做，并按重活排队。CI 已在同一提交上通过的同一检查不在本地重跑。
+Run relevant checks locally and leave full suites to CI unless repository rules require local execution; then queue as heavy work. Do not rerun locally the same check already passing CI on the same commit.

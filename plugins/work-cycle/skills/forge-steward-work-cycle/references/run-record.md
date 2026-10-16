@@ -1,27 +1,27 @@
-## 运行记录与耗时
+## Run records and timing
 
-每次运行的交接、证据和各阶段耗时统一放在目标仓库 Git 公共目录的 `forge-steward/runs/<运行编号>/`，所有 worktree 共享，不改动受版本控制的文件，不放 `/tmp`。使用本技能包的 `scripts/run_record.py`：
+Store handoffs, evidence, and stage timings in the target repository's Git common directory at `forge-steward/runs/<run-id>/`, shared by all worktrees. Do not change tracked files or use `/tmp`. Use this package's `scripts/run_record.py`:
 
 ```bash
-python3 <本技能目录>/scripts/run_record.py --repo <目标仓库> start --cycles <轮数>
-python3 <本技能目录>/scripts/run_record.py --repo <目标仓库> event --run <运行编号> --task <任务标识> --stage <阶段> --status <状态> [--wait <等待类型>] [--detail <说明>]
-python3 <本技能目录>/scripts/run_record.py --repo <目标仓库> task-dir --run <运行编号> --task <任务标识>
-python3 <本技能目录>/scripts/run_record.py --repo <目标仓库> summary --run <运行编号>
-python3 <本技能目录>/scripts/run_record.py --repo <目标仓库> report --run <运行编号>
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> start --cycles <count>
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> event --run <run-id> --task <task-id> --stage <stage> --status <status> [--wait <wait-type>] [--detail <description>]
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> task-dir --run <run-id> --task <task-id>
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> summary --run <run-id>
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> report --run <run-id>
 ```
 
-状态为 `started`、`finished`、`failed`、`wait-start`、`wait-end`；等待类型为 `ci`、`lock`、`review`、`external`、`other`。`report` 返回 `1` 表示 `handoff.json` 数据有问题；各命令返回 `2` 表示参数或环境错误。
+Statuses: `started`, `finished`, `failed`, `wait-start`, `wait-end`. Wait types: `ci`, `lock`, `review`, `external`, `other`. `report` exit `1` means invalid `handoff.json` data; any command's exit `2` means argument/environment error.
 
-### 找到可用的 Python
+### Find usable Python
 
-依次试 `python3 --version`、`py -3 --version`、`python --version`，用第一个能运行且版本不低于 3.9 的命令（避开 Windows 上只会打开应用商店的假入口）；本技能各规则中的 `python3` 都换成它。运行 `start` 前就确认，找不到时记入交接，运行照常进行，结束时按[最终汇报](report.md)手写。
+Try `python3 --version`, `py -3 --version`, then `python --version`; use the first working Python 3.9+ command, avoiding Windows stubs that only open the store. Substitute it for `python3` throughout these rules. Check before `start`. If none works, record it in the handoff, continue delivery, and use [Final report](report.md)'s manual fallback.
 
-### 编排 Agent
+### Orchestrator responsibilities
 
-1. 启动检查后运行 `start`，取得运行编号和目录；它同时只保留最近 20 次由该脚本创建的运行目录，不碰其他文件。
-2. 每派发一个子 Agent 前记 `started`，确认其结束后记 `finished` 或 `failed`；阶段用 `check-workflow`、`prepare`、`implement`、`review`、`fix`、`merge`、`cleanup`。任务标识与[资源锁](verification.md)的任务标识一致。
-3. 派发时告知子 Agent：运行编号、`task-dir` 给出的证据目录，以及等待 CI、锁、审批等外部结果时用 `event` 记录 `wait-start`/`wait-end`。子 Agent 的证据文件和交接文件都放在自己的证据目录。
-4. [轮次、交接与终止](cycles.md) 要求的编排短交接保存为运行目录下的 `handoff.json`，汇报要用的字段按[最终汇报](report.md)填写；上下文压缩或中断后先读取它恢复。
-5. 结束时运行 `report`，把输出原样贴给用户；它读取 `handoff.json` 和事件记录，耗时取 `summary` 的结果，同时写入运行目录的 `report.md`。数据有错时的重试和脚本不可用时的手写兜底见[最终汇报](report.md)。
+1. After the startup check, run `start` for a run identifier/directory. It retains only the latest 20 directories created by this script, leaving other files untouched.
+2. Before each dispatch record `started`; after confirmed completion record `finished` or `failed`. Stages are `check-workflow`, `prepare`, `implement`, `review`, `fix`, `merge`, `cleanup`. Task identifiers match [Resource locks](verification.md).
+3. Give subagents the run identifier and `task-dir` evidence directory. Require `event` records for `wait-start`/`wait-end` during CI, lock, approval, and other external waits. Each subagent's evidence/handoff files belong in its own directory.
+4. Save [Cycles, handoffs, and stopping](cycles.md)'s short orchestration handoff as run-directory `handoff.json`, populating [Final report](report.md)'s required fields. Read it first after compaction/interruption.
+5. At completion run `report` and paste output unchanged. It reads handoff/events, takes timings from `summary`, and saves run-directory `report.md`. See [Final report](report.md) for invalid-data retries and manual fallback.
 
-脚本无法运行或返回 `2` 时，在会话交接中说明并继续运行，不因记录失败中断交付；不要为此把证据改放到 `/tmp`，可写入会话交接。
+If the script cannot run or exits `2`, explain in the conversation handoff and continue. Record failure must not interrupt delivery. Do not relocate evidence to `/tmp`; a conversation handoff is acceptable.

@@ -5,55 +5,55 @@ description: Freeze the current repairable change-request queue, resolve only re
 
 # Fix Feedback
 
-## 规则加载
+## Load the rules
 
-对冻结待修清单中的候选进入修复、验证或推送阶段前，完整读取 [逐项修复规则](references/repair.md)。只读分类和跳过项按本入口处理；不得仅凭入口摘要改代码、推送或解决 Review Thread。
+Before repairing, verifying, or pushing any frozen repair candidate, read [Per-item repair](references/repair.md) in full. Use this entry for read-only classification and skips; never change code, push, or resolve a Review Thread from the summary alone.
 
-引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。本技能规则文件的读取结果被截断时按行或段补读至文件末尾（不适用于 CI 日志、测试输出等其他工具结果）；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
+These references are required rules. Resolve paths relative to this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 
-## 授权与边界
+## Authorization and boundaries
 
-修复当前开放 Change Request 中确实需要修改的项目。Change Request 是平台无关术语，包括 GitHub Pull Request、GitLab Merge Request 等等价对象。
+Repair currently open Change Requests that actually need changes. Change Request is platform-neutral and includes GitHub Pull Requests, GitLab Merge Requests, and equivalents.
 
-修复范围、意见分类和 Review 轮次以本技能为准，不采用仓库另行规定的同类工作流规则；语言、提交格式、验证命令和分支保护等项目约定仍按仓库执行。
+This skill governs repair scope, feedback classification, and review rounds, replacing separate repository rules for the same workflow. Follow repository conventions for language, commit format, verification commands, and branch protection.
 
-只有用户已授权修改代码并推送原分支且授权在当前任务中仍有效时才执行这些外部写入，不因切换会话要求重复授权。此 Skill 在任何情况下都不得合并 Change Request，也不得把“已推送”表述为“已验收完成”或“已合并交付”。使用当前环境可用的连接器、CLI 或平台 API，不要求特定托管平台。
+Perform external writes only when the user has authorized code changes and pushes to the original branch and that authorization remains valid for this task. Do not request it again merely because the conversation changed. This skill must never merge a Change Request or describe “pushed” as “accepted” or “merged and delivered.” Use available connectors, CLIs, or platform APIs without requiring a particular host.
 
-## 冻结待修清单
+## Freeze the repair queue
 
-1. 读取仓库规范、既定主线和上轮交接，获取当前开放 Change Request、Review、检查结果和关联任务。沿用清理周期期初 task 清单及未完成范围，不以修复提交重置目标或增加交付计数。
-2. 冻结本轮待修清单，记录时间、base、head 提交和入选原因。后续新出现的 Change Request 不自动加入。
-3. 只纳入至少存在一项必修内容的 Change Request：
-   - 尚未解决且落在原范围内的明确 Review 意见；
-   - 由当前分支确定性导致、可复现且属于本次范围的 CI 失败；
-   - 已确认未满足的原始验收条件；
-   - 与主线冲突，或落后而仓库要求保持最新（见[同步主线](references/repair.md#同步主线)）。
-4. 跳过仅等待复审、等待已触发检查、只含可选建议、意见已经由当前 head 解决，或没有确定性修复项的 Change Request。说明跳过依据。head、意见、检查均未变的项沿用上次分类。
-5. 跳过多轮往返项。一轮往返指：该 Change Request 上出现要求修改的 Review Feedback（包括请求修改的审查、Comment、Discussion 或 Review Thread），作者随后推送新提交作出回应；只为同步主线的推送不算。依据平台时间线及交接记录中的 Review 轮次计数，二者不一致时取较大值，不因换会话归零。已达到 3 轮或以上的项不纳入本轮修复（待终审项仅可同步主线）：不修改，不推送，不回复或解决 Review Thread，不添加标签。第 3 轮新 head 尚未终审时交由 review-and-merge 终审；终审仍有范围内必修问题时仅该项等待人工处理。只在输出中记录链接、轮次及计数依据。无法确定轮次时按正常流程判断，并标明轮次未知。用户本轮明确点名要求处理该项时除外。
+1. Read repository conventions, mainline, and the previous handoff; fetch open Change Requests, reviews, checks, and linked tasks. Preserve the cleanup cycle's original task list and unfinished scope; repair commits do not reset goals or increase delivery counts.
+2. Freeze this round's repair list with time, base/head commits, and selection reasons. Do not automatically add later Change Requests.
+3. Include only Change Requests with at least one required change:
+   - Explicit, unresolved Review Feedback within the original scope.
+   - A reproducible, deterministic CI failure caused by this branch and within scope.
+   - A confirmed unmet original acceptance criterion.
+   - A mainline conflict, or an outdated branch where repository policy requires it current; see [Sync with mainline](references/repair.md#sync-with-mainline).
+4. Skip requests only awaiting re-review or triggered checks, containing only optional suggestions, already addressed at the current head, or having no deterministic fix. Explain the evidence for skipping. Reuse prior classification when head, feedback, and checks are unchanged.
+5. Skip requests with repeated review/repair rounds. A round means change-requesting Review Feedback (a review, Comment, Discussion, or Review Thread) followed by the author's responsive commit push; a mainline-only sync does not count. Count from platform history and handoff records, taking the larger count if they disagree; never reset across conversations. Exclude items at 3 or more rounds from repair (items awaiting final review may only sync mainline): no edits, pushes, replies, thread resolution, or labels. Send an unreviewed third-round head to review-and-merge for final review. If required in-scope issues remain afterward, only that item awaits human action. Record its link, count, and evidence only in the output. If the count is unknown, use normal classification and mark it unknown. An explicit user request naming that item in this round is an exception.
 
-## 交接记录
+## Handoff
 
-读取上轮交接并冻结待修清单前，以及写入交接记录或最终输出前，完整读取 [交接记录规则](references/handoff.md)。
+Before reading the previous handoff and freezing the queue, and before writing a handoff or final output, read [Handoff records](references/handoff.md) in full.
 
-## 完成条件
+## Completion conditions
 
-一个 Change Request 在以下情况下结束本轮处理：
+An item finishes this round when:
 
-- 所有已确认必修项已经修复并得到必要验证，提交已成功推送；或
-- 存在无法继续的具体阻塞，已经记录事实、尝试过的解决方式和可执行下一步；或
-- 复核后确认没有待修项，已经说明无需修改的依据。
+- All confirmed required changes are fixed, appropriately verified, committed, and successfully pushed; or
+- A concrete blocker prevents progress, with facts, attempted solutions, and an actionable next step recorded; or
+- Rechecking confirms no repair is needed, with supporting evidence recorded.
 
-不要因为一个分支推送完成而停止整个批次。继续处理冻结清单，直到每项都达到上述一种状态。
+One branch push does not end the batch. Continue until every frozen item reaches one of these states.
 
-## 输出
+## Output
 
-处理完整个冻结清单后，用中文汇总：
+After processing the entire frozen list, summarize:
 
-- 本轮开始时确定的待修清单及基线、实际待修项和跳过项。
-- 因往返达到 3 轮或以上而跳过修复的 Change Request，区分等待终审、等待平台必需检查或审批与终审未通过后等待人工处理，附轮次及计数依据。
-- 每个 Change Request 的必修条目、修改、验证、提交和推送链接或标识。
-- 已可复审但尚未验收的 Change Request。
-- 未解决阻塞、并发变化、权限问题和下一步。
-- 新发现问题的去重和归类处理结果。
+- The initial repair list and baseline, actual repair items, and skips.
+- Requests skipped at 3 or more rounds, distinguishing final-review waits, required-check/approval waits, and human action after failed final review; include counts and evidence.
+- Each request's required changes, edits, verification, commits, and push links or identifiers.
+- Requests ready for re-review but not yet accepted.
+- Unresolved blockers, concurrent changes, permission issues, and next steps.
+- Deduplication and classification of newly discovered issues.
 
-明确区分“已修改并推送”“等待复审”“验收成立”和“已合并”；本 Skill 不得产生最后一种状态。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+Distinguish “changed and pushed,” “awaiting re-review,” “acceptance met,” and “merged”; this skill must not produce the last state. Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.

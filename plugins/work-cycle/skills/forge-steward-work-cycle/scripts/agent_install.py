@@ -51,18 +51,18 @@ VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 TAG = re.compile(r"v(\d+\.\d+\.\d+)")
 PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
 
-ABSENT = "未安装 Agent"
-MISSING = "缺少"
-INCOMPLETE = "不完整"
-BEHIND = "落后"
-CURRENT = "最新"
-AHEAD = "高于最新正式版"
-UNKNOWN = "无法判断"
+ABSENT = "Agent not installed"
+MISSING = "Missing"
+INCOMPLETE = "Incomplete"
+BEHIND = "Behind"
+CURRENT = "Current"
+AHEAD = "Ahead of latest release"
+UNKNOWN = "Unknown"
 STATUSES = (ABSENT, MISSING, INCOMPLETE, BEHIND, CURRENT, AHEAD, UNKNOWN)
 
 
 class Unknown(Exception):
-    """The state cannot be determined; the message is a short everyday-Chinese reason."""
+    """The state cannot be determined; the message is a short everyday-English reason."""
 
 
 def expand(text):
@@ -90,7 +90,7 @@ def run_json(argv, timeout):
     """Run a read-only list command and parse its JSON output."""
     program = shutil.which(argv[0])
     if not program:
-        raise Unknown("找不到命令 " + argv[0])
+        raise Unknown("Command not found: " + argv[0])
     extra = {} if os.name == "nt" else {"start_new_session": True}
     # Output goes to an anonymous temporary file so a timed-out child cannot block on a pipe.
     with tempfile.TemporaryFile() as output:
@@ -98,20 +98,20 @@ def run_json(argv, timeout):
             process = subprocess.Popen([program] + list(argv[1:]), stdin=subprocess.DEVNULL, stdout=output,
                                        stderr=subprocess.DEVNULL, **extra)
         except OSError as error:
-            raise Unknown("无法运行 %s：%s" % (argv[0], error.strerror or error))
+            raise Unknown("Cannot run %s: %s" % (argv[0], error.strerror or error))
         try:
             code = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             stop(process)
-            raise Unknown("命令超时（%g 秒）" % timeout)
+            raise Unknown("Command timed out (%g seconds)" % timeout)
         output.seek(0)
         data = output.read()
     if code:
-        raise Unknown("命令返回 %d" % code)
+        raise Unknown("Command returned %d" % code)
     try:
         return json.loads(data.decode("utf-8-sig"))
     except ValueError:
-        raise Unknown("输出格式无法识别")
+        raise Unknown("Unrecognized output format")
 
 
 def fill(argv, values):
@@ -120,7 +120,7 @@ def fill(argv, values):
         for key, value in values.items():
             arg = arg.replace("{" + key + "}", value)
         if PLACEHOLDER.search(arg):
-            raise Unknown("数据文件中的命令缺少参数：" + arg)
+            raise Unknown("Command in catalog has an unresolved parameter: " + arg)
         result.append(arg)
     return result
 
@@ -134,25 +134,25 @@ def receipt_root(method):
                 return expand(value) / entry["suffix"]
         else:
             return expand(entry["path"])
-    raise Unknown("数据文件没有用户级目录")
+    raise Unknown("Catalog has no user-level directory")
 
 
 def from_list(method, values, timeout):
     data = run_json(fill(method["argv"], values), timeout)
     items = data if method["items"] is None else data.get(method["items"]) if isinstance(data, dict) else None
     if not isinstance(items, list):
-        raise Unknown("输出格式无法识别")
+        raise Unknown("Unrecognized output format")
     found, other = {}, set()
     suffix = method["id_suffix"]
     for item in items:
         if not isinstance(item, dict) or not isinstance(item.get(method["id_field"]), str):
-            raise Unknown("输出格式无法识别")
+            raise Unknown("Unrecognized output format")
         ident = item[method["id_field"]]
         if not ident.endswith(suffix):
             continue
         version = item.get(method["version_field"])
         if not isinstance(version, str):
-            raise Unknown("输出格式无法识别")
+            raise Unknown("Unrecognized output format")
         name = ident[:-len(suffix)]
         # Only user-level installs count; other scopes are noted separately.
         if item.get("scope", "user") != "user":
@@ -181,10 +181,10 @@ def from_receipts(method):
             data = None
         version = data.get(method["version_field"]) if isinstance(data, dict) else None
         if not isinstance(version, str):
-            raise Unknown("安装记录无法识别：" + path.name)
+            raise Unknown("Unrecognized installation receipt: " + path.name)
         found[path.name[len(prefix):]] = version
     if manual:
-        raise Unknown("有手工副本（%s），无法判断" % "、".join(manual))
+        raise Unknown("Manual copies (%s) prevent determining the state" % ", ".join(manual))
     return found, []
 
 
@@ -193,13 +193,13 @@ def command_values(agent, platform):
     where = agent["detect_agent"]
     for name in where.get("requires_commands", []):
         if not shutil.which(name):
-            raise Unknown("缺少命令 " + name)
+            raise Unknown("Missing command: " + name)
     values = {}
     if where.get("provides"):
         candidates = where.get("paths", {}).get(platform, [])
         paths = [path for path in candidates if expand(path).exists()]
         if not paths:
-            raise Unknown("找不到 %s，已查：%s" % (where["provides"], "、".join(candidates) or "本平台没有已核对的位置"))
+            raise Unknown("Cannot find %s; checked: %s" % (where["provides"], ", ".join(candidates) or "no verified locations for this platform"))
         values[where["provides"]] = str(expand(paths[0]))
     return values
 
@@ -221,7 +221,7 @@ def detect(agent, platform, timeout):
     elif method["method"] == "receipt":
         found, other = from_receipts(method)
     else:
-        raise Unknown("数据文件中的检测方式无法识别：" + str(method["method"]))
+        raise Unknown("Unrecognized detection method in the catalog: " + str(method["method"]))
     return True, found, other
 
 
@@ -243,12 +243,12 @@ def inspect(agent, retired, platform, timeout):
         versions = sorted(set(current.values()) | set(old.values()), key=lambda v: version_key(v) or ())
         bad = [version for version in versions if version_key(version) is None]
         if bad:
-            raise Unknown("版本号格式无法识别：" + "、".join(bad))
+            raise Unknown("Unrecognized version format: " + ", ".join(bad))
     except Unknown as error:
         record.update(status=UNKNOWN, reason=str(error))
         return record
     except OSError as error:
-        record.update(status=UNKNOWN, reason="无法读取：%s" % (error.strerror or error))
+        record.update(status=UNKNOWN, reason="Cannot read: %s" % (error.strerror or error))
         return record
     record.update(plugins=dict(sorted(current.items())), versions=versions,
                   missing=[name for name in PLUGINS if name not in current])
@@ -276,16 +276,16 @@ def classify(record, latest):
     elif target:
         record["status"] = CURRENT
     else:
-        record.update(status=UNKNOWN, reason="无法确认最新版本")
+        record.update(status=UNKNOWN, reason="Cannot confirm the latest version")
     return record
 
 
 def release(tag, draft, prerelease, source):
     if draft or prerelease:
-        raise Unknown("最新发布 %s 是草稿或预发布" % tag)
+        raise Unknown("Latest release %s is a draft or prerelease" % tag)
     match = TAG.fullmatch(tag) if isinstance(tag, str) else None
     if not match:
-        raise Unknown("最新发布的 Tag %s 不是 vX.Y.Z 形式" % tag)
+        raise Unknown("Latest release tag %s is not in vX.Y.Z format" % tag)
     return {"version": match.group(1), "tag": tag, "source": source}
 
 
@@ -297,16 +297,16 @@ def latest_release(repository, api_url, timeout):
             data = run_json(["gh", "release", "view", "--repo", repository, "--json", "tagName,isDraft,isPrerelease"],
                             timeout)
             if not isinstance(data, dict):
-                raise Unknown("输出格式无法识别")
+                raise Unknown("Unrecognized output format")
         except Unknown as error:
-            problems.append("gh：" + str(error))
+            problems.append("gh: " + str(error))
         else:
             try:
                 return release(data.get("tagName"), data.get("isDraft"), data.get("isPrerelease"), "gh")
             except Unknown as error:
                 return {"version": None, "error": str(error)}
     else:
-        problems.append("没有 gh")
+        problems.append("gh is unavailable")
     request = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json",
                                                        "User-Agent": "ForgeSteward-agent-check"})
     try:
@@ -318,8 +318,8 @@ def latest_release(repository, api_url, timeout):
     except Unknown as error:
         return {"version": None, "error": str(error)}
     except (OSError, ValueError) as error:
-        problems.append("GitHub 接口：%s" % (getattr(error, "reason", None) or error))
-    return {"version": None, "error": "；".join(problems)}
+        problems.append("GitHub API: %s" % (getattr(error, "reason", None) or error))
+    return {"version": None, "error": "; ".join(problems)}
 
 
 def load_catalog(path):
@@ -364,13 +364,13 @@ MARKETPLACE_COPY = ("plugins", "marketplaces")
 
 
 class Stop(Exception):
-    """apply stops before changing anything; the message is an everyday-Chinese reason."""
+    """apply stops before changing anything; the message is an everyday-English reason."""
 
 
 def file_error(error):
     """Short reason for an OSError, with the path it concerns when known."""
     reason = error.strerror or str(error)
-    return "%s（%s）" % (reason, error.filename) if error.filename else reason
+    return "%s (%s)" % (reason, error.filename) if error.filename else reason
 
 
 def remove_tree(path):
@@ -386,19 +386,19 @@ def run_step(argv, cwd, timeout):
     """Run one changing command without a shell; return (exit code or None, tail of its errors or output)."""
     program = argv[0] if os.path.isabs(argv[0]) else shutil.which(argv[0])
     if not program:
-        return None, "找不到命令 " + argv[0]
+        return None, "Command not found: " + argv[0]
     extra = {} if os.name == "nt" else {"start_new_session": True}
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         try:
             process = subprocess.Popen([program] + list(argv[1:]), cwd=str(cwd), stdin=subprocess.DEVNULL,
                                        stdout=output, stderr=errors, **extra)
         except OSError as error:
-            return None, "无法运行 %s：%s" % (argv[0], error.strerror or error)
+            return None, "Cannot run %s: %s" % (argv[0], error.strerror or error)
         try:
             code = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             stop(process)
-            return None, "命令超时（%g 秒）" % timeout
+            return None, "Command timed out (%g seconds)" % timeout
         except BaseException:
             stop(process)
             raise
@@ -432,11 +432,11 @@ def tag_commit(repository, tag, api_url, timeout):
             sha = data.get("sha") if isinstance(data, dict) else None
             if isinstance(sha, str) and SHA.fullmatch(sha):
                 return sha
-            problems.append("gh：输出格式无法识别")
+            problems.append("gh: Unrecognized output format")
         except Unknown as error:
-            problems.append("gh：" + str(error))
+            problems.append("gh: " + str(error))
     else:
-        problems.append("没有 gh")
+        problems.append("gh is unavailable")
     request = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json",
                                                        "User-Agent": "ForgeSteward-agent-install"})
     try:
@@ -445,10 +445,10 @@ def tag_commit(repository, tag, api_url, timeout):
         sha = data.get("sha") if isinstance(data, dict) else None
         if isinstance(sha, str) and SHA.fullmatch(sha):
             return sha
-        problems.append("GitHub 接口：输出格式无法识别")
+        problems.append("GitHub API: Unrecognized output format")
     except (OSError, ValueError) as error:
-        problems.append("GitHub 接口：%s" % (getattr(error, "reason", None) or error))
-    raise Unknown("查不到 %s 对应的提交（%s）" % (tag, "；".join(problems)))
+        problems.append("GitHub API: %s" % (getattr(error, "reason", None) or error))
+    raise Unknown("Cannot find the commit for %s (%s)" % (tag, "; ".join(problems)))
 
 
 def installer_steps(agent):
@@ -474,7 +474,7 @@ class Sources:
             except Unknown as error:
                 self.result = error
             except OSError as error:
-                self.result = Unknown("准备源码时出现意外的文件错误：" + file_error(error))
+                self.result = Unknown("Unexpected file error while preparing source: " + file_error(error))
         if isinstance(self.result, Unknown):
             raise self.result
         return self.result
@@ -491,7 +491,7 @@ class Sources:
         for copy in self.local_copies():
             if ((copy / ".git").exists() and git_output(copy, ["rev-parse", "HEAD"], timeout) == commit
                     and git_output(copy, ["status", "--porcelain"], timeout) == ""):
-                return copy, "用了本地已有的副本 %s（与 %s 的提交一致）" % (copy, tag)
+                return copy, "Used an existing local copy %s (its commit matches %s)" % (copy, tag)
         target = self.work / "source"
         clone = fill(installer_steps(agent)[0]["argv"], {"version": self.version, "source": str(target)})
         if self.options.source_url:
@@ -500,12 +500,12 @@ class Sources:
         code, text = run_step(clone, self.work, self.options.step_timeout)
         if code != 0:
             remove_tree(target)
-            raise Unknown("下载 %s 的源码失败：%s" % (tag, last_line(text) or "返回 %s" % code))
+            raise Unknown("Failed to download source for %s: %s" % (tag, last_line(text) or "returned %s" % code))
         head = git_output(target, ["rev-parse", "HEAD"], timeout)
         if head != commit:
             remove_tree(target)
-            raise Unknown("下载的源码提交 %s 与 Release %s 的提交 %s 不一致，没有安装" % (head or "未知", tag, commit))
-        return target, "下载了 %s 的源码到临时目录，提交已核对，用完已删除" % tag
+            raise Unknown("Downloaded source commit %s does not match Release %s commit %s; nothing installed" % (head or "unknown", tag, commit))
+        return target, "Downloaded source for %s to a temporary directory, verified its commit, and removed it after use" % tag
 
 
 def last_line(text):
@@ -522,9 +522,9 @@ def has_marketplace(agent, name, values, timeout):
         items = data if method["items"] is None else data.get(method["items"]) if isinstance(data, dict) else None
         if not isinstance(items, list) or not all(isinstance(item, dict) and isinstance(item.get(field), str)
                                                   for item in items):
-            raise Unknown("输出格式无法识别")
+            raise Unknown("Unrecognized output format")
     except Unknown as error:
-        raise Unknown("查不到市场是否存在：%s" % error)
+        raise Unknown("Cannot determine whether the marketplace exists: %s" % error)
     return any(item[field] == name for item in items)
 
 
@@ -573,12 +573,12 @@ def skill_steps(agent, record, version, source):
 def skip_reason(record):
     status = record["status"]
     if status == ABSENT:
-        return "本机没有这个 Agent"
+        return "This Agent is not installed on this computer"
     if status == CURRENT:
-        return "已是最新"
+        return "Already current"
     if status == AHEAD:
-        return "已装 %s，比目标版本新，不降级" % "、".join("v" + v for v in record.get("versions", []))
-    return "无法判断：" + record.get("reason", "")
+        return "Installed %s is newer than the target; no downgrade" % ", ".join("v" + v for v in record.get("versions", []))
+    return "Unknown: " + record.get("reason", "")
 
 
 def apply_agent(agent, record, version, retired, platform, options, sources, work, marketplace):
@@ -592,7 +592,7 @@ def apply_agent(agent, record, version, retired, platform, options, sources, wor
         entry["skipped"] = skip_reason(record)
         return entry
     per_skill = agent["detect_install"]["method"] == "receipt"
-    stage = "准备安装步骤"
+    stage = "preparing installation steps"
     try:
         try:
             if per_skill:
@@ -605,10 +605,10 @@ def apply_agent(agent, record, version, retired, platform, options, sources, wor
             entry["problems"].append(str(error))
             steps = []
         except (KeyError, IndexError, TypeError, StopIteration):
-            entry["problems"].append("数据文件中的安装命令无法识别")
+            entry["problems"].append("Unrecognized install command in the catalog")
             steps = []
         for argv, ok in steps:
-            stage = "运行 `%s` " % shown(argv)
+            stage = "running `%s`" % shown(argv)
             code, text = run_step(argv, work, options.step_timeout)
             step = {"argv": argv, "code": code, "ok": code in ok}
             if not step["ok"]:
@@ -619,7 +619,7 @@ def apply_agent(agent, record, version, retired, platform, options, sources, wor
                 break
     except OSError as error:
         # The rest of this agent's steps are skipped; the check below still decides whether it is done.
-        entry["problems"].append("%s时出现意外的文件错误：%s" % (stage, file_error(error)))
+        entry["problems"].append("%s encountered an unexpected file error: %s" % (stage, file_error(error)))
     after = classify(inspect(agent, retired, platform, options.command_timeout), version)
     entry["after"] = {key: after[key] for key in ("status", "versions", "missing", "reason") if key in after}
     entry["done"] = after["status"] == CURRENT
@@ -641,14 +641,14 @@ def apply_lock(cleanup):
     try:
         os.mkdir(str(lock))
     except FileExistsError:
-        raise Stop("另一个安装正在进行（锁目录 %s 已存在）。确认没有安装在运行后，再手动删除它" % lock)
+        raise Stop("Another installation is running (lock directory %s exists). Once no installation is running, remove it manually" % lock)
     except OSError as error:
-        raise Stop("无法建立锁目录 %s：%s" % (lock, error.strerror or error))
+        raise Stop("Cannot create lock directory %s: %s" % (lock, error.strerror or error))
     try:
         try:
             (lock / "owner").write_text("pid=%d\n" % os.getpid(), encoding="utf-8")
         except OSError as error:
-            raise Stop("无法写入锁目录：" + file_error(error))
+            raise Stop("Cannot write to lock directory: " + file_error(error))
         yield
     finally:
         tidy(lock, "lock", cleanup)
@@ -663,18 +663,18 @@ def apply(catalog, version, ids, options, platform=sys.platform):
             try:
                 result = check(catalog, api_url, options.command_timeout, platform)
             except OSError as error:
-                raise Stop("重新检查时出现意外的文件错误：" + file_error(error))
+                raise Stop("Unexpected file error while rechecking: " + file_error(error))
             latest = result["latest"]["version"]
             if latest is None:
-                raise Stop("无法确认最新版本：" + result["latest"].get("error", ""))
+                raise Stop("Cannot confirm the latest version: " + result["latest"].get("error", ""))
             if latest != version:
-                raise Stop("最新正式版已变成 v%s，不是同意的 v%s；请按新版本重新询问" % (latest, version))
+                raise Stop("Latest release changed to v%s from the agreed v%s; ask again for the new version" % (latest, version))
             records = {record["id"]: record for record in result["agents"]}
             retired = set(catalog.get("retired_plugins", []))
             try:
                 work = Path(tempfile.mkdtemp(prefix="forge-steward-apply-"))
             except OSError as error:
-                raise Stop("无法建立临时目录（%s）：%s" % (tempfile.gettempdir(), file_error(error)))
+                raise Stop("Cannot create temporary directory (%s): %s" % (tempfile.gettempdir(), file_error(error)))
             # Changes start here: from now on every agreed agent gets an entry, whatever goes wrong.
             try:
                 sources = Sources(catalog, version, work, options)
@@ -697,62 +697,62 @@ def shown(argv):
 def state_text(after):
     status = after["status"]
     if status == BEHIND or status == AHEAD:
-        return "%s（%s）" % (status, "、".join("v" + v for v in after.get("versions", [])))
+        return "%s (%s)" % (status, ", ".join("v" + v for v in after.get("versions", [])))
     if status == INCOMPLETE:
-        return "不完整，缺 " + "、".join(after.get("missing", []))
+        return "Incomplete; missing " + ", ".join(after.get("missing", []))
     if status == UNKNOWN:
-        return "无法判断：" + after.get("reason", "")
+        return "Unknown: " + after.get("reason", "")
     return status
 
 
 def cleanup_line(item):
     if item["kind"] == "lock":
-        return ("锁目录 %s 没能删除：%s。确认没有安装在运行后手动删除它，否则下次会提示“另一个安装正在进行”"
+        return ("Could not remove lock directory %s: %s. Once no installation is running, remove it manually; otherwise the next attempt will report another installation is running"
                 % (item["path"], item["reason"]))
-    return "临时目录 %s 没能删除：%s，可以手动删除" % (item["path"], item["reason"])
+    return "Could not remove temporary directory %s: %s; you can remove it manually" % (item["path"], item["reason"])
 
 
 def apply_lines(result):
-    """Everyday-Chinese lines telling the user what actually happened."""
+    """Everyday-English lines telling the user what actually happened."""
     cleanup = [cleanup_line(item) for item in result.get("cleanup", [])]
     if result["outcome"] == "stopped":
-        return ["没有做任何改动：" + result["reason"]] + cleanup
+        return ["No changes made: " + result["reason"]] + cleanup
     lines = []
     version = result["version"]
     for entry in result["agents"]:
         name = entry["name"]
         if "skipped" in entry:
-            line = "%s：没有处理，%s" % (name, entry["skipped"])
+            line = "%s: Skipped: %s" % (name, entry["skipped"])
         elif entry["done"]:
             if entry["before"] == MISSING:
-                line = "%s：已安装 v%s" % (name, version)
+                line = "%s: Installed v%s" % (name, version)
             elif entry["before"] == BEHIND:
-                line = "%s：已从 %s 升到 v%s" % (name, "、".join("v" + v for v in entry.get("before_versions", [])),
+                line = "%s: Upgraded from %s to v%s" % (name, ", ".join("v" + v for v in entry.get("before_versions", [])),
                                              version)
             else:
-                line = "%s：已补齐，现在是 v%s" % (name, version)
+                line = "%s: Completed the installation at v%s" % (name, version)
             refused = [step for step in entry["steps"] if not step["ok"]]
             if refused:
-                line += "；但有步骤没成功：" + "；".join("%s（%s）" % (shown(step["argv"]), last_line(step.get("output"))
-                                                                   or "返回 %s" % step["code"]) for step in refused)
+                line += "; some steps failed: " + "; ".join("%s (%s)" % (shown(step["argv"]), last_line(step.get("output"))
+                                                                   or "returned %s" % step["code"]) for step in refused)
             if entry["problems"]:
-                line += "；但" + "；".join(entry["problems"])
+                line += "; however, " + "; ".join(entry["problems"])
         else:
-            parts = ["复查结果：" + state_text(entry["after"])] + entry["problems"]
-            parts += ["`%s` 没成功：%s" % (shown(step["argv"]), last_line(step.get("output")) or "返回 %s" % step["code"])
+            parts = ["Recheck: " + state_text(entry["after"])] + entry["problems"]
+            parts += ["`%s` failed: %s" % (shown(step["argv"]), last_line(step.get("output")) or "returned %s" % step["code"])
                       for step in entry["steps"] if not step["ok"]]
-            line = "%s：没有装好，%s。解决后再同意一次，重新运行即可补齐" % (name, "；".join(parts))
+            line = "%s: Installation incomplete; %s. Resolve the problem, give consent again, and rerun to finish" % (name, "; ".join(parts))
         if entry.get("other_scopes"):
-            line += "（另有非用户级安装，没有改动）"
+            line += " (other installation scopes were left unchanged)"
         lines.append(line)
     lines += cleanup
     if any(entry.get("done") for entry in result["agents"]):
-        lines.append("新版本要在各 Agent 的下一个新会话里才生效。")
+        lines.append("The new version takes effect in the next new session of each Agent.")
     return lines
 
 
 def text_lines(result):
-    """Everyday-Chinese lines, worded exactly as the work-cycle report renders them."""
+    """Everyday-English lines, worded exactly as the work-cycle report renders them."""
     sys.dont_write_bytecode = True  # never leave __pycache__ inside the installed skill
     spec = importlib.util.spec_from_file_location("forge_steward_run_record", str(HERE / "run_record.py"))
     module = importlib.util.module_from_spec(spec)

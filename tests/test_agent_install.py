@@ -1,4 +1,4 @@
-"""校验其他 Agent 安装检查：用临时 HOME、临时 PATH 里的假命令和注入的发布数据模拟各种状态，不联网、不碰本机真实配置。"""
+"""Test Agent installation checks with temporary HOME/PATH, fake commands, and injected releases, without network or real user configuration."""
 
 import importlib.util
 import json
@@ -31,7 +31,7 @@ PLUGINS = list(install.PLUGINS)
 
 
 def snapshot(root):
-    """所有文件和目录的相对路径及字节内容，用于证明检查前后逐字节不变。"""
+    """Relative paths and bytes of all files/directories, proving checks leave them byte-identical."""
     state = {}
     for path in sorted(root.rglob("*")):
         key = path.relative_to(root).as_posix()
@@ -43,14 +43,14 @@ class Sandbox(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name).resolve()  # macOS 的 /var 是链接，安装器不接受链接路径
+        self.root = Path(self.temporary.name).resolve()  # macOS /var is a symlink; installers reject symlink paths
         self.home = self.root / "home"
         self.bin = self.root / "bin"
         self.impl = self.root / "impl"
         for path in (self.home, self.bin, self.impl):
             path.mkdir()
         catalog = json.loads((SKILL / "scripts/agents.json").read_text(encoding="utf-8"))
-        # 只保留数据文件里以 ~ 开头的应用位置，并让它们适用于当前平台，避免读到本机真实的 /Applications。
+        # Retain only ~ application locations and apply them to this platform, avoiding real /Applications.
         for agent in catalog["agents"]:
             darwin = agent["detect_agent"].get("paths", {}).get("darwin", [])
             agent["detect_agent"]["paths"] = {sys.platform: [p for p in darwin if p.startswith("~")]}
@@ -62,14 +62,14 @@ class Sandbox(unittest.TestCase):
         self.no_api = (self.root / "no-release.json").as_uri()
 
     def fake(self, name, stdout="", code=0, sleep=0):
-        """在临时 PATH 里放一个假命令：忽略参数，按预设输出、退出码和延迟返回。"""
+        """Put a fake command in temporary PATH: ignore arguments and return preset output, status, and delay."""
         if not isinstance(stdout, str):
             stdout = json.dumps(stdout)
         body = "import sys, time\ntime.sleep(%r)\nsys.stdout.write(%r)\nsys.exit(%d)\n" % (sleep, stdout, code)
         self.command(name, body)
 
     def command(self, name, body):
-        """安装假命令脚本；Windows 通过同一 Python 启动，其他平台直接执行。"""
+        """Install a fake command; Windows uses the same Python, other platforms execute it directly."""
         script = self.impl / (name + ".py")
         script.write_text(body, encoding="utf-8")
         if os.name == "nt":
@@ -138,8 +138,8 @@ class AgentStatusTests(Sandbox):
         self.assertEqual(result["latest"], {"version": LATEST, "tag": "v" + LATEST, "source": "gh"})
         agents = self.by_id(result)
         self.assertEqual({key: agent["status"] for key, agent in agents.items()},
-                         {"claude-code": "最新", "codex": "不完整", "zcode": "落后",
-                          "opencode": "高于最新正式版", "deepseek-harness": "缺少"})
+                         {"claude-code": "Current", "codex": "Incomplete", "zcode": "Behind",
+                          "opencode": "Ahead of latest release", "deepseek-harness": "Missing"})
         self.assertEqual(agents["claude-code"]["other_scopes"], ["prepare-work"])
         self.assertEqual(agents["codex"]["missing"], [p for p in PLUGINS if p not in ("prepare-work", "execute-work")])
         self.assertEqual(agents["zcode"]["versions"], ["1.2.2"])
@@ -148,12 +148,12 @@ class AgentStatusTests(Sandbox):
     def test_missing_plugins_in_a_present_agent(self):
         self.gh()
         self.fake("claude", claude_list({}))
-        self.assertEqual(self.by_id(self.run_check())["claude-code"]["status"], "缺少")
+        self.assertEqual(self.by_id(self.run_check())["claude-code"]["status"], "Missing")
 
     def test_absent_agents_are_not_listed(self):
         self.gh()
         result = self.run_check()
-        self.assertEqual({agent["status"] for agent in result["agents"]}, {"未安装 Agent"})
+        self.assertEqual({agent["status"] for agent in result["agents"]}, {"Agent not installed"})
         self.assertEqual(self.run_check(as_json=False), "")
 
     def test_bad_output_and_failures_only_affect_that_agent(self):
@@ -164,18 +164,18 @@ class AgentStatusTests(Sandbox):
         (self.home / ".zcode").mkdir()
         agents = self.by_id(self.run_check())
         self.assertEqual(agents["claude-code"], {"id": "claude-code", "name": "Claude Code",
-                                                 "status": "无法判断", "reason": "输出格式无法识别"})
-        self.assertEqual(agents["codex"]["reason"], "输出格式无法识别")
-        self.assertEqual(agents["zcode"]["reason"], "缺少命令 node")
-        self.assertEqual(agents["deepseek-harness"]["status"], "最新")
+                                                 "status": "Unknown", "reason": "Unrecognized output format"})
+        self.assertEqual(agents["codex"]["reason"], "Unrecognized output format")
+        self.assertEqual(agents["zcode"]["reason"], "Missing command: node")
+        self.assertEqual(agents["deepseek-harness"]["status"], "Current")
 
     def test_nonzero_exit_and_bad_version(self):
         self.gh()
         self.fake("claude", "", code=3)
         self.fake("codex", {"installed": [{"pluginId": "prepare-work@forge-steward", "version": "1.2"}]})
         agents = self.by_id(self.run_check())
-        self.assertEqual(agents["claude-code"]["reason"], "命令返回 3")
-        self.assertEqual(agents["codex"]["reason"], "版本号格式无法识别：1.2")
+        self.assertEqual(agents["claude-code"]["reason"], "Command returned 3")
+        self.assertEqual(agents["codex"]["reason"], "Unrecognized version format: 1.2")
 
     def test_command_timeout(self):
         self.gh()
@@ -184,17 +184,17 @@ class AgentStatusTests(Sandbox):
         began = time.monotonic()
         agents = self.by_id(self.run_check(timeout="1"))
         self.assertLess(time.monotonic() - began, 20)
-        self.assertEqual(agents["claude-code"]["status"], "无法判断")
-        self.assertTrue(agents["claude-code"]["reason"].startswith("命令超时"), agents["claude-code"]["reason"])
-        self.assertEqual(agents["deepseek-harness"]["status"], "最新")
+        self.assertEqual(agents["claude-code"]["status"], "Unknown")
+        self.assertTrue(agents["claude-code"]["reason"].startswith("Command timed out"), agents["claude-code"]["reason"])
+        self.assertEqual(agents["deepseek-harness"]["status"], "Current")
 
     def test_manual_copies_cannot_be_judged(self):
         self.gh()
         self.receipts(self.home / ".config/opencode/skills", {"prepare-work": LATEST}, manual=["execute-work"])
         self.receipts(self.home / ".dsh/skills", {}, manual=["review-and-merge"])
         agents = self.by_id(self.run_check())
-        self.assertEqual(agents["opencode"]["reason"], "有手工副本（forge-steward-execute-work），无法判断")
-        self.assertEqual(agents["deepseek-harness"]["reason"], "有手工副本（forge-steward-review-and-merge），无法判断")
+        self.assertEqual(agents["opencode"]["reason"], "Manual copies (forge-steward-execute-work) prevent determining the state")
+        self.assertEqual(agents["deepseek-harness"]["reason"], "Manual copies (forge-steward-review-and-merge) prevent determining the state")
 
     def test_user_roots_follow_environment_variables(self):
         self.gh()
@@ -204,8 +204,8 @@ class AgentStatusTests(Sandbox):
         self.receipts(self.root / "dsh/skills", every("1.0.0"))
         self.receipts(self.home / ".dsh/skills", every(LATEST))
         agents = self.by_id(self.run_check())
-        self.assertEqual(agents["opencode"]["status"], "最新")
-        self.assertEqual(agents["deepseek-harness"]["status"], "落后")
+        self.assertEqual(agents["opencode"]["status"], "Current")
+        self.assertEqual(agents["deepseek-harness"]["status"], "Behind")
 
     def test_output_file_matches_json_and_text_uses_report_wording(self):
         self.gh()
@@ -224,11 +224,11 @@ class AgentStatusTests(Sandbox):
                                            "installed": True} for name in PLUGINS]})
         target = self.root / "agent-check.json"
         text = self.run_check("--output", str(target), as_json=False)
-        self.assertEqual(text, "- Claude Code：v1.2.2，落后于最新 v1.2.3\n"
-                               "- Claude Code 可以安装或升级到 v1.2.3。要现在安装或升级吗？\n")
+        self.assertEqual(text, "- Claude Code: v1.2.2, behind latest v1.2.3\n"
+                               "- Claude Code can be installed or upgraded to v1.2.3. Install or upgrade now?\n")
         saved = json.loads(target.read_text(encoding="utf-8"))
-        self.assertEqual(self.by_id(saved)["claude-code"]["status"], "落后")
-        self.assertEqual(self.by_id(saved)["codex"]["status"], "最新")
+        self.assertEqual(self.by_id(saved)["claude-code"]["status"], "Behind")
+        self.assertEqual(self.by_id(saved)["codex"]["status"], "Current")
         self.assertEqual(saved["schema"], 1)
 
 
@@ -245,7 +245,7 @@ class CodexQueryTests(Sandbox):
         config = self.home / ".codex"
         (config / "plugins").mkdir(parents=True)
         (config / "config.toml").write_text("# keep configuration\n", encoding="utf-8")
-        # 查询失败时即使内部目录有看似可用的数据，也不能据此补结果。
+        # A failed query must not fill results from apparently usable internal data.
         (config / "plugins/installed.json").write_text(json.dumps(every(LATEST)), encoding="utf-8")
 
     def codex(self, stdout, mode="normal"):
@@ -307,7 +307,7 @@ sys.stdout.write(OUTPUT)
         self.assertEqual(results[0], results[1])
         self.assertEqual(results[0]["plugins"], every(LATEST))
         self.assertEqual(self.calls(), [self.ARGV, self.ARGV])
-        # 对照假命令确实区分远端冷/热路径；旧查询只在测试中执行。
+        # Ensure fake commands distinguish cold/warm remote paths; run the old query only in this test.
         for cold in (True, False):
             began = time.monotonic()
             legacy = subprocess.run([str(self.bin / ("codex.cmd" if os.name == "nt" else "codex")),
@@ -323,8 +323,8 @@ sys.stdout.write(OUTPUT)
         self.assertEqual([p.name for p in target.parent.iterdir()], ["agent-check.json"])
 
     def test_strict_parameters_preserve_four_states_and_ignore_other_market(self):
-        for versions, status in ((every(LATEST), "最新"), (every("1.2.2"), "落后"),
-                                 ({}, "缺少"), ({"prepare-work": LATEST}, "不完整")):
+        for versions, status in ((every(LATEST), "Current"), (every("1.2.2"), "Behind"),
+                                 ({}, "Missing"), ({"prepare-work": LATEST}, "Incomplete")):
             with self.subTest(status=status):
                 self.log.unlink(missing_ok=True)
                 self.codex(self.output(versions))
@@ -334,43 +334,43 @@ sys.stdout.write(OUTPUT)
                 self.assertEqual(agents["codex"]["status"], status)
                 self.assertEqual(agents["codex"]["plugins"], versions)
                 self.assertEqual(agents["codex"]["missing"], [p for p in PLUGINS if p not in versions])
-                self.assertEqual(agents["claude-code"]["status"], "最新")
+                self.assertEqual(agents["claude-code"]["status"], "Current")
                 self.assertEqual(result["schema"], 1)
                 self.assertEqual(self.calls(), [self.ARGV])
                 self.assertEqual(snapshot(self.home), before)
 
     def test_failures_only_mark_codex_unknown_without_retry_or_cache_fallback(self):
-        for stdout, mode, reason in (("", "exit", "命令返回 7"),
-                                     ("", "unsupported", "命令返回 2"),
-                                     ("not json", "raw", "输出格式无法识别"),
-                                     ({"installed": {}}, "raw", "输出格式无法识别"),
+        for stdout, mode, reason in (("", "exit", "Command returned 7"),
+                                     ("", "unsupported", "Command returned 2"),
+                                     ("not json", "raw", "Unrecognized output format"),
+                                     ({"installed": {}}, "raw", "Unrecognized output format"),
                                      ({"installed": [{"id": "prepare-work@forge-steward", "version": LATEST}]},
-                                      "raw", "输出格式无法识别"),
+                                      "raw", "Unrecognized output format"),
                                      ({"installed": [{"pluginId": "prepare-work@forge-steward", "release": LATEST}]},
-                                      "raw", "输出格式无法识别"),
-                                     (self.output(every(LATEST)), "timeout", "命令超时（1 秒）")):
+                                      "raw", "Unrecognized output format"),
+                                     (self.output(every(LATEST)), "timeout", "Command timed out (1 seconds)")):
             with self.subTest(mode=mode, stdout=stdout):
                 self.log.unlink(missing_ok=True)
                 self.codex(stdout, mode)
                 before = snapshot(self.home)
                 agents = self.by_id(self.run_check(timeout="1" if mode == "timeout" else "5"))
                 self.assertEqual(agents["codex"], {"id": "codex", "name": "Codex",
-                                                 "status": "无法判断", "reason": reason})
-                self.assertEqual(agents["claude-code"]["status"], "最新")
+                                                 "status": "Unknown", "reason": reason})
+                self.assertEqual(agents["claude-code"]["status"], "Current")
                 self.assertEqual(self.calls(), [self.ARGV])
                 self.assertFalse(self.remote_cache.exists())
                 self.assertEqual(snapshot(self.home), before)
                 if mode == "timeout":
-                    self.assertTrue(Path(str(self.child_marker) + ".started").exists(), "子进程必须实际开始运行")
+                    self.assertTrue(Path(str(self.child_marker) + ".started").exists(), "The child process must actually start")
                     time.sleep(3)
-                    self.assertFalse(self.child_marker.exists(), "超时后子进程不能继续写文件")
+                    self.assertFalse(self.child_marker.exists(), "The child process must not keep writing after timeout")
 
     def test_missing_cli_does_not_claim_plugins_are_missing(self):
         shutil.rmtree(self.home / ".codex")
-        self.assertEqual(self.by_id(self.run_check())["codex"]["status"], "未安装 Agent")
+        self.assertEqual(self.by_id(self.run_check())["codex"]["status"], "Agent not installed")
         (self.home / ".codex").mkdir()
         codex = self.by_id(self.run_check())["codex"]
-        self.assertEqual((codex["status"], codex["reason"]), ("无法判断", "找不到命令 codex"))
+        self.assertEqual((codex["status"], codex["reason"]), ("Unknown", "Command not found: codex"))
         self.assertFalse(self.log.exists())
 
 
@@ -391,7 +391,7 @@ class LatestReleaseTests(Sandbox):
                 result = self.run_check()
                 self.assertIsNone(result["latest"]["version"])
                 self.assertEqual(self.by_id(result)["claude-code"],
-                                 dict(self.by_id(result)["claude-code"], status="无法判断", reason="无法确认最新版本"))
+                                 dict(self.by_id(result)["claude-code"], status="Unknown", reason="Cannot confirm the latest version"))
 
     def test_api_is_used_when_gh_is_missing_or_fails(self):
         api = self.api({"tag_name": "v" + LATEST, "draft": False, "prerelease": False})
@@ -404,7 +404,7 @@ class LatestReleaseTests(Sandbox):
         self.fake("gh", "", code=1)
         result = self.run_check()
         self.assertIsNone(result["latest"]["version"])
-        self.assertTrue(result["latest"]["error"].startswith("gh：命令返回 1；GitHub 接口："), result["latest"])
+        self.assertTrue(result["latest"]["error"].startswith("gh: Command returned 1; GitHub API: "), result["latest"])
         lines = self.run_check(as_json=False).splitlines()
         self.assertEqual(lines, [])
 
@@ -437,9 +437,9 @@ class UsageAndSingleSourceTests(Sandbox):
                 self.assertFalse(text in source, "%s: %s" % (agent["id"], text))
 
 
-# 有状态的假 Agent 命令：记录每次调用的参数，按调用更新插件和市场状态，list 时按各 Agent 的格式输出。
-# 与实测一致：Claude Code、Codex 已有来源不同的市场时添加失败，ZCode 直接换来源；删除不存在的市场失败。
-# 状态里的 market_list 为 "bad" 时列出市场输出无法识别，为 "slow" 时 30 秒才返回。
+# Stateful fake Agent command: log arguments, update plugin/marketplace state, and emit each Agent's list format.
+# Match observations: Claude Code/Codex reject a different existing source; ZCode replaces it; removing an absent marketplace fails.
+# market_list="bad" yields unrecognized output; "slow" waits 30 seconds.
 AGENT_FAKE = r"""
 import json, os, re, sys, tempfile, time, uuid
 STATE, LOG, NAME, KIND, FAIL = %r, %r, %r, %r, %r
@@ -449,7 +449,7 @@ with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=LOG,
     json.dump([NAME] + args, log)
     log.write("\n")
     pending = log.name
-# Python 3.9 的 macOS monotonic_ns() 从进程启动计时，不能跨假命令排序。
+# macOS Python 3.9 monotonic_ns() starts at process launch and cannot order separate fake commands.
 tick = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) if hasattr(time, "clock_gettime_ns")
         else time.monotonic_ns())
 published = os.path.join(LOG, "%%020d-%%s.json" %% (tick, uuid.uuid4().hex))
@@ -511,7 +511,7 @@ with open(STATE, "w", encoding="utf-8") as file:
 
 
 class ApplySandbox(Sandbox):
-    """apply 的测试环境：临时 HOME、临时目录、临时 PATH 中的假命令、本地 Git 仓库充当发布源码，不联网。"""
+    """Offline apply environment: temporary HOME/directories/PATH commands and local Git release source."""
 
     @classmethod
     def setUpClass(cls):
@@ -559,7 +559,7 @@ class ApplySandbox(Sandbox):
         return path.as_uri()
 
     def agent(self, command, kind, plugins, fail=(), market="installed", market_list=None):
-        """放一个有状态的假 Agent 命令；plugins 是已装插件与版本，市场缺省按已装版本设置，None 表示没有市场。"""
+        """Create a stateful fake Agent; plugins maps installed versions, marketplace defaults to that version, and None means absent."""
         state = self.root / (command + "-state.json")
         if market == "installed":
             market = next(iter(plugins.values()), None)
@@ -595,7 +595,7 @@ class ApplySandbox(Sandbox):
         return [row for row in self.calls(name) if "marketplace" in row and "list" in row]
 
     def without_plugin_list(self, name):
-        """该假命令被调用的参数，去掉检查和复查时的列出插件。"""
+        """Arguments passed to the fake command, excluding plugin lists for checks and rechecks."""
         return [row for row in self.calls(name) if not ("list" in row and "marketplace" not in row)]
 
     def harness(self):
@@ -631,33 +631,33 @@ class ApplyHarnessTests(ApplySandbox):
     def test_only_harness_missing_installs_all_six_skills(self):
         skills = self.harness()
         before = snapshot(self.root / "home")
-        # 不同意：只做检查，或 apply 缺参数，HOME 与 DSH_HOME 都逐字节不变。
+        # Without consent: check only or apply with missing arguments leaves HOME and DSH_HOME byte-identical.
         self.run_check()
         self.assertEqual(self.apply(agents=None)[0], 2)
         self.assertEqual(snapshot(self.root / "home"), before)
         self.assertFalse(skills.exists())
         result = self.apply_json(0)
         entry = result["agents"][0]
-        self.assertEqual((entry["before"], entry["after"]["status"], entry["done"]), ("缺少", "最新", True))
-        self.assertIn("下载了 v%s 的源码" % LATEST, entry["source"])
+        self.assertEqual((entry["before"], entry["after"]["status"], entry["done"]), ("Missing", "Current", True))
+        self.assertIn("Downloaded source for v%s" % LATEST, entry["source"])
         self.assertEqual(self.installed(skills), {"forge-steward-" + name: LATEST for name in PLUGINS})
         self.assertEqual(list(self.tmp.iterdir()), [], "temporary source and lock must be removed")
         code, out, _ = self.apply()
         self.assertEqual(code, 0)
-        self.assertEqual(out.splitlines()[0], "- DeepSeek Harness：没有处理，已是最新")
+        self.assertEqual(out.splitlines()[0], "- DeepSeek Harness: Skipped: Already current")
 
     def test_text_result_and_next_session_note(self):
         self.harness()
         code, out, _ = self.apply()
         self.assertEqual(code, 0)
-        self.assertEqual(out, "- DeepSeek Harness：已安装 v%s\n- 新版本要在各 Agent 的下一个新会话里才生效。\n" % LATEST)
+        self.assertEqual(out, "- DeepSeek Harness: Installed v%s\n- The new version takes effect in the next new session of each Agent.\n" % LATEST)
 
     def test_matching_local_copy_is_used_and_kept(self):
         skills = self.harness()
         copy = self.home / ".claude/plugins/marketplaces/forge-steward"
         subprocess.run([self.real_git, "clone", "-q", self.src.as_uri(), str(copy)], check=True, capture_output=True)
         entry = self.apply_json(0, source=(self.root / "nowhere").as_uri())["agents"][0]
-        self.assertIn("本地已有的副本", entry["source"])
+        self.assertIn("existing local copy", entry["source"])
         self.assertEqual(len(self.installed(skills)), len(PLUGINS))
         self.assertTrue((copy / "scripts/deepseek.py").is_file())
 
@@ -668,35 +668,35 @@ class ApplyHarnessTests(ApplySandbox):
         (copy / "untracked.txt").write_text("local change\n", encoding="utf-8")
         entry = self.apply_json(1, source=(self.root / "nowhere").as_uri())["agents"][0]
         self.assertFalse(entry["done"])
-        self.assertTrue(entry["problems"][0].startswith("下载 v%s 的源码失败" % LATEST), entry["problems"])
+        self.assertTrue(entry["problems"][0].startswith("Failed to download source for v%s" % LATEST), entry["problems"])
         self.assertFalse(skills.exists() and any(skills.iterdir()))
         entry = self.apply_json(0)["agents"][0]
-        self.assertIn("下载了", entry["source"])
+        self.assertIn("Downloaded", entry["source"])
 
     def test_clone_commit_differs_from_release_stops_without_installing(self):
         skills = self.harness()
         entry = self.apply_json(1, commit_api=self.write("other.json", {"sha": "0" * 40}))["agents"][0]
-        self.assertIn("不一致，没有安装", entry["problems"][0])
+        self.assertIn("; nothing installed", entry["problems"][0])
         self.assertEqual(entry["steps"], [])
         self.assertFalse(skills.exists() and any(skills.iterdir()))
         self.assertEqual(list(self.tmp.iterdir()), [])
 
     def test_modified_or_unrecorded_copies_are_not_overwritten(self):
         skills = self.harness()
-        self.receipts(skills, {"prepare-work": "1.2.2"})  # 安装记录里的文件清单与实际内容不符，即被修改过
+        self.receipts(skills, {"prepare-work": "1.2.2"})  # Receipt files differ from actual contents, indicating a modified installation
         before = snapshot(skills / "forge-steward-prepare-work")
         code, out, _ = self.apply()
         self.assertEqual(code, 1)
         self.assertEqual(snapshot(skills / "forge-steward-prepare-work"), before)
         self.assertEqual(len(self.installed(skills)), len(PLUGINS))
-        self.assertIn("没有装好，复查结果：落后（v1.2.2、v%s）" % LATEST, out)
+        self.assertIn("Installation incomplete; Recheck: Behind (v1.2.2, v%s)" % LATEST, out)
         self.assertIn("Locally modified skill: " + str(skills / "forge-steward-prepare-work"), out)
         opencode = self.home / ".config/opencode/skills"
         self.receipts(opencode, {}, manual=["review-and-merge"])
         before = snapshot(opencode)
         code, out, _ = self.apply(agents="opencode")
         self.assertEqual((code, snapshot(opencode)), (0, before))
-        self.assertEqual(out, "- OpenCode：没有处理，无法判断：有手工副本（forge-steward-review-and-merge），无法判断\n")
+        self.assertEqual(out, "- OpenCode: Skipped: Unknown: Manual copies (forge-steward-review-and-merge) prevent determining the state\n")
 
 
 class ApplyPluginAgentTests(ApplySandbox):
@@ -722,8 +722,8 @@ class ApplyPluginAgentTests(ApplySandbox):
         before = snapshot(skills)
         result = self.apply_json(0, agents="codex,claude-code,deepseek-harness")
         entries = {entry["id"]: entry for entry in result["agents"]}
-        self.assertEqual(entries["claude-code"]["skipped"], "已是最新")
-        self.assertEqual(entries["deepseek-harness"]["skipped"], "已是最新")
+        self.assertEqual(entries["claude-code"]["skipped"], "Already current")
+        self.assertEqual(entries["deepseek-harness"]["skipped"], "Already current")
         self.assertTrue(entries["codex"]["done"])
         self.assertEqual(self.plugins_of(codex), every(LATEST))
         self.assertEqual(self.plugins_of(claude), every(LATEST))
@@ -737,7 +737,7 @@ class ApplyPluginAgentTests(ApplySandbox):
         self.assertEqual([row for row in self.calls("codex") if "list" not in row], expected)
         self.assertEqual(self.market_lists("codex"), [["plugin", "marketplace", "list", "--json"]])
         code, out, _ = self.apply(agents="codex")
-        self.assertEqual(out, "- Codex：没有处理，已是最新\n")
+        self.assertEqual(out, "- Codex: Skipped: Already current\n")
 
     def test_missing_agent_uses_upgrade_steps_without_uninstall_or_market_removal(self):
         claude = self.agent("claude", "claude", {})
@@ -746,7 +746,7 @@ class ApplyPluginAgentTests(ApplySandbox):
         self.assertEqual(self.plugins_of(claude), every(LATEST))
         self.assertEqual(self.changing_calls()[0],
                          ["plugin", "marketplace", "add", "philfanzhou/ForgeSteward@v" + LATEST, "--scope", "user"])
-        self.assertTrue(out.startswith("- Claude Code：已安装 v%s\n" % LATEST), out)
+        self.assertTrue(out.startswith("- Claude Code: Installed v%s\n" % LATEST), out)
 
     def test_leftover_old_marketplace_is_replaced_before_installing(self):
         for command, kind, agent_id, remove, add, put in (
@@ -767,7 +767,7 @@ class ApplyPluginAgentTests(ApplySandbox):
                 self.assertEqual(self.without_plugin_list(command),
                                  [["plugin", "marketplace", "list", "--json"], remove, add]
                                  + [[arg.format(name) for arg in put] for name in PLUGINS])
-                self.assertTrue(out.startswith("- %s：已安装 v%s\n" % (
+                self.assertTrue(out.startswith("- %s: Installed v%s\n" % (
                     "Claude Code" if command == "claude" else "Codex", LATEST)), out)
 
     def test_missing_marketplace_is_not_removed(self):
@@ -775,7 +775,7 @@ class ApplyPluginAgentTests(ApplySandbox):
         result = self.apply_json(0, agents="codex")
         entry = result["agents"][0]
         self.assertTrue(entry["done"], entry)
-        self.assertEqual(entry["after"]["status"], "最新")
+        self.assertEqual(entry["after"]["status"], "Current")
         self.assertEqual(self.plugins_of(codex), every(LATEST))
         self.assertFalse(any(row[:3] == ["plugin", "marketplace", "remove"] for row in self.calls("codex")))
         self.assertEqual(self.changing_calls(),
@@ -784,15 +784,15 @@ class ApplyPluginAgentTests(ApplySandbox):
                          + [["plugin", "add", name + "@forge-steward"] for name in PLUGINS])
 
     def test_unreadable_marketplace_list_leaves_that_agent_untouched(self):
-        # Windows CI 每次跑完整套测试时，都把发生过偶发失败的场景连续验证十次。
+        # Every full Windows CI suite repeats the formerly intermittent scenario ten times.
         for attempt in range(10 if os.name == "nt" else 1):
             with self.subTest(attempt=attempt):
                 self.assert_unreadable_marketplace_list_leaves_that_agent_untouched()
 
     def assert_unreadable_marketplace_list_leaves_that_agent_untouched(self):
-        for market_list, fail, reason in ((None, ["marketplace list"], "命令返回 1"),
-                                          ("bad", [], "输出格式无法识别"),
-                                          ("slow", [], "命令超时（2 秒）")):
+        for market_list, fail, reason in ((None, ["marketplace list"], "Command returned 1"),
+                                          ("bad", [], "Unrecognized output format"),
+                                          ("slow", [], "Command timed out (2 seconds)")):
             with self.subTest(market_list=market_list or "fail"):
                 self.clear_calls()
                 claude = self.agent("claude", "claude", every("1.2.2"), fail=fail, market_list=market_list)
@@ -800,18 +800,18 @@ class ApplyPluginAgentTests(ApplySandbox):
                 result = self.apply_json(1, agents="claude-code,codex", extra=("--command-timeout", "2"))
                 entries = {entry["id"]: entry for entry in result["agents"]}
                 claude_entry = entries["claude-code"]
-                self.assertEqual(claude_entry["problems"], ["查不到市场是否存在：" + reason])
+                self.assertEqual(claude_entry["problems"], ["Cannot determine whether the marketplace exists: " + reason])
                 self.assertEqual(claude_entry["steps"], [])
-                self.assertEqual(claude_entry["after"]["status"], "落后")
-                self.assertTrue(self.market_lists("claude"), "市场列表调用必须有完整记录")
+                self.assertEqual(claude_entry["after"]["status"], "Behind")
+                self.assertTrue(self.market_lists("claude"), "Marketplace list calls must be fully logged")
                 self.assertTrue(all("list" in row for row in self.calls("claude")))
                 self.assertEqual(self.plugins_of(claude), every("1.2.2"))
                 self.assertTrue(entries["codex"]["done"])
                 self.assertEqual(self.plugins_of(codex), every(LATEST))
         code, out, _ = self.apply("--command-timeout", "2", agents="claude-code")
         self.assertEqual(code, 1)
-        self.assertTrue(out.startswith("- Claude Code：没有装好，复查结果：落后（v1.2.2）；"
-                                       "查不到市场是否存在：命令超时（2 秒）。"), out)
+        self.assertTrue(out.startswith("- Claude Code: Installation incomplete; Recheck: Behind (v1.2.2); "
+                                       "Cannot determine whether the marketplace exists: Command timed out (2 seconds)."), out)
 
     def test_check_does_not_list_marketplaces(self):
         self.agent("claude", "claude", every("1.2.2"))
@@ -822,7 +822,7 @@ class ApplyPluginAgentTests(ApplySandbox):
         result = self.run_check(api=self.release)
         self.assertEqual({key: agent["status"] for key, agent in self.by_id(result).items()
                           if key in ("claude-code", "codex", "zcode")},
-                         {"claude-code": "落后", "codex": "缺少", "zcode": "最新"})
+                         {"claude-code": "Behind", "codex": "Missing", "zcode": "Current"})
         self.assertTrue(self.calls())
         self.assertFalse(any("marketplace" in row for row in self.calls()))
 
@@ -830,17 +830,17 @@ class ApplyPluginAgentTests(ApplySandbox):
         codex = self.agent("codex", "codex", every("1.3.0"))
         code, out, _ = self.apply(agents="codex")
         self.assertEqual(code, 0)
-        self.assertEqual(out, "- Codex：没有处理，已装 v1.3.0，比目标版本新，不降级\n")
+        self.assertEqual(out, "- Codex: Skipped: Installed v1.3.0 is newer than the target; no downgrade\n")
         self.assertEqual(self.changing_calls(), [])
         self.assertEqual(self.plugins_of(codex), every("1.3.0"))
 
     def test_failed_step_stops_that_agent_only_and_reports_rechecked_state(self):
-        self.zcode([])  # 建出 zcode.cjs；node 稍后换成有状态的假命令
+        self.zcode([])  # Create zcode.cjs; replace node with a stateful fake later
         zcode = self.agent("node", "zcode", every("1.2.2"), fail=["marketplace add"])
         codex = self.agent("codex", "codex", every("1.2.2"))
         result = self.apply_json(1, agents="zcode,codex")
         entries = {entry["id"]: entry for entry in result["agents"]}
-        self.assertEqual(entries["zcode"]["after"]["status"], "缺少")
+        self.assertEqual(entries["zcode"]["after"]["status"], "Missing")
         self.assertFalse(entries["zcode"]["done"])
         self.assertTrue(entries["codex"]["done"])
         self.assertEqual(self.plugins_of(zcode), {})
@@ -848,8 +848,8 @@ class ApplyPluginAgentTests(ApplySandbox):
         self.assertFalse(any("install" in row for row in self.calls("node")))
         code, out, _ = self.apply(agents="zcode")
         self.assertEqual(code, 1)
-        self.assertTrue(out.startswith("- ZCode：没有装好，复查结果：缺少；`node zcode.cjs plugins marketplace add "
-                                       "philfanzhou/ForgeSteward@v%s` 没成功：network is unreachable。" % LATEST), out)
+        self.assertTrue(out.startswith("- ZCode: Installation incomplete; Recheck: Missing; `node zcode.cjs plugins marketplace add "
+                                       "philfanzhou/ForgeSteward@v%s` failed: network is unreachable." % LATEST), out)
 
 
 class ApplyRefusalTests(ApplySandbox):
@@ -863,12 +863,12 @@ class ApplyRefusalTests(ApplySandbox):
                 self.assertEqual(self.apply(**dict({"agents": "codex"}, **options))[0], expect)
         code, out, _ = self.apply(version="1.2.4", agents="codex,deepseek-harness")
         self.assertEqual(code, 3)
-        self.assertEqual(out, "- 没有做任何改动：最新正式版已变成 v%s，不是同意的 v1.2.4；请按新版本重新询问\n" % LATEST)
+        self.assertEqual(out, "- No changes made: Latest release changed to v%s from the agreed v1.2.4; ask again for the new version\n" % LATEST)
         lock = self.tmp / "forge-steward-agent-install.lock"
         lock.mkdir()
         code, out, _ = self.apply(agents="codex,deepseek-harness")
         self.assertEqual(code, 3)
-        self.assertTrue(out.startswith("- 没有做任何改动：另一个安装正在进行"), out)
+        self.assertTrue(out.startswith("- No changes made: Another installation is running"), out)
         self.assertTrue(lock.is_dir(), "someone else's lock must not be removed")
         self.assertEqual(self.changing_calls(), [])
         self.assertEqual(self.plugins_of(codex), every("1.2.2"))
@@ -876,7 +876,7 @@ class ApplyRefusalTests(ApplySandbox):
         self.assertFalse(skills.exists())
 
 
-# 在子进程里加载脚本、替换其中一个函数制造文件错误，再照常运行 main；环境变量（HOME、PATH、TMPDIR）与其他测试相同。
+# Load the script in a subprocess, inject a file error into one function, then run main normally with the same HOME/PATH/TMPDIR as other tests.
 FAULT_RUNNER = r"""
 import importlib.util, sys
 from pathlib import Path
@@ -898,7 +898,7 @@ m.remove_tree = remove_tree
 
 
 class ApplyFileErrorTests(ApplySandbox):
-    """开始改动后的意外文件错误：不再返回 2，逐个 Agent 的结果照常输出。"""
+    """Unexpected file errors after changes start report per-Agent outcomes instead of exit 2."""
 
     def apply_with(self, fault, *extra, agents="deepseek-harness"):
         runner = self.root / "fault-runner" / "run.py"
@@ -917,17 +917,17 @@ class ApplyFileErrorTests(ApplySandbox):
         self.assertEqual(code, 1, out + err)
         self.assertEqual(self.installed(skills), {"forge-steward-" + name: LATEST for name in PLUGINS})
         lines = out.splitlines()
-        self.assertEqual(lines[0], "- DeepSeek Harness：已安装 v%s" % LATEST)
+        self.assertEqual(lines[0], "- DeepSeek Harness: Installed v%s" % LATEST)
         work = [path for path in self.tmp.iterdir() if path.name.startswith("forge-steward-apply-")]
         self.assertEqual(len(work), 1)
-        self.assertEqual(lines[1], "- 临时目录 %s 没能删除：Permission denied（%s），可以手动删除" % (work[0], work[0]))
-        self.assertEqual(lines[2], "- 新版本要在各 Agent 的下一个新会话里才生效。")
+        self.assertEqual(lines[1], "- Could not remove temporary directory %s: Permission denied (%s); you can remove it manually" % (work[0], work[0]))
+        self.assertEqual(lines[2], "- The new version takes effect in the next new session of each Agent.")
         self.assertFalse((self.tmp / install.LOCK_NAME).exists())
         code, out, err = self.apply_with(FAIL_REMOVE % "forge-steward-apply-", "--json")
         self.assertEqual(code, 1, out + err)
         result = json.loads(out)
         self.assertEqual(result["outcome"], "done")
-        self.assertEqual(result["agents"][0]["skipped"], "已是最新")
+        self.assertEqual(result["agents"][0]["skipped"], "Already current")
         [item] = result["cleanup"]
         self.assertEqual(item["kind"], "work")
         self.assertTrue(Path(item["path"]).name.startswith("forge-steward-apply-"), item)
@@ -940,16 +940,16 @@ class ApplyFileErrorTests(ApplySandbox):
         self.assertEqual(code, 1, out + err)
         self.assertEqual(len(self.installed(skills)), len(PLUGINS))
         self.assertEqual(out.splitlines(), [
-            "- DeepSeek Harness：已安装 v%s" % LATEST,
-            "- 锁目录 %s 没能删除：Permission denied（%s）。确认没有安装在运行后手动删除它，"
-            "否则下次会提示“另一个安装正在进行”" % (lock, lock),
-            "- 新版本要在各 Agent 的下一个新会话里才生效。"])
+            "- DeepSeek Harness: Installed v%s" % LATEST,
+            "- Could not remove lock directory %s: Permission denied (%s). Once no installation is running, remove it manually; "
+            "otherwise the next attempt will report another installation is running" % (lock, lock),
+            "- The new version takes effect in the next new session of each Agent."])
         self.assertTrue(lock.is_dir())
         shutil.rmtree(str(lock))
         result = json.loads(self.apply_with(FAIL_REMOVE % install.LOCK_NAME, "--json")[1])
         self.assertEqual(result["cleanup"], [{"kind": "lock", "path": str(lock),
-                                              "reason": "Permission denied（%s）" % lock}])
-        self.assertEqual(result["agents"][0]["skipped"], "已是最新")
+                                              "reason": "Permission denied (%s)" % lock}])
+        self.assertEqual(result["agents"][0]["skipped"], "Already current")
 
     def test_file_error_while_handling_one_agent_stays_in_its_entry(self):
         fault = """
@@ -969,11 +969,11 @@ m.run_step = run_step
         self.assertEqual(code, 1, out + err)
         result = json.loads(out)
         entries = {entry["id"]: entry for entry in result["agents"]}
-        problem = ("运行 `codex plugin remove execute-work@forge-steward` 时出现意外的文件错误："
-                   "Permission denied（/denied/output）")
+        problem = ("running `codex plugin remove execute-work@forge-steward` encountered an unexpected file error: "
+                   "Permission denied (/denied/output)")
         self.assertEqual(entries["codex"]["problems"], [problem])
         self.assertEqual(len(entries["codex"]["steps"]), 1)
-        self.assertEqual(entries["codex"]["after"]["status"], "落后")
+        self.assertEqual(entries["codex"]["after"]["status"], "Behind")
         self.assertFalse(entries["codex"]["done"])
         self.assertTrue(entries["claude-code"]["done"])
         self.assertEqual(self.plugins_of(claude), every(LATEST))
@@ -981,8 +981,8 @@ m.run_step = run_step
         self.assertEqual(result["cleanup"], [])
         code, out, _ = self.apply_with(fault, agents="codex")
         self.assertEqual(code, 1)
-        self.assertTrue(out.startswith("- Codex：没有装好，复查结果：落后（v1.2.2）；运行 `codex plugin remove "
-                                       "fix-feedback@forge-steward` 时出现意外的文件错误："), out)
+        self.assertTrue(out.startswith("- Codex: Installation incomplete; Recheck: Behind (v1.2.2); running `codex plugin remove "
+                                       "fix-feedback@forge-steward` encountered an unexpected file error: "), out)
 
     def test_file_error_after_the_last_step_is_still_reported_when_installed(self):
         fault = """
@@ -998,8 +998,8 @@ m.run_step = run_step
         code, out, err = self.apply_with(fault, agents="codex")
         self.assertEqual(code, 0, out + err)
         self.assertEqual(self.plugins_of(codex), every(LATEST))
-        self.assertEqual(out.splitlines()[0], "- Codex：已从 v1.2.2 升到 v%s；但运行 `codex plugin add "
-                         "work-cycle@forge-steward` 时出现意外的文件错误：Permission denied（/denied/output）" % LATEST)
+        self.assertEqual(out.splitlines()[0], "- Codex: Upgraded from v1.2.2 to v%s; however, running `codex plugin add "
+                         "work-cycle@forge-steward` encountered an unexpected file error: Permission denied (/denied/output)" % LATEST)
 
     def test_source_removal_error_is_reported_for_that_agent(self):
         skills = self.harness()
@@ -1015,8 +1015,8 @@ m.remove_tree = remove_tree
         self.assertEqual(code, 1, out + err)
         entry = json.loads(out)["agents"][0]
         self.assertEqual(len(entry["problems"]), 1)
-        self.assertTrue(entry["problems"][0].startswith("准备源码时出现意外的文件错误：Permission denied（"), entry)
-        self.assertEqual(entry["after"]["status"], "缺少")
+        self.assertTrue(entry["problems"][0].startswith("Unexpected file error while preparing source: Permission denied ("), entry)
+        self.assertEqual(entry["after"]["status"], "Missing")
         self.assertFalse(skills.exists() and any(skills.iterdir()))
 
     def test_work_directory_cannot_be_created_stops_before_any_change(self):
@@ -1028,7 +1028,7 @@ m.tempfile.mkdtemp = mkdtemp
 """
         code, out, err = self.apply_with(fault, agents="codex")
         self.assertEqual(code, 3, out + err)
-        self.assertEqual(out, "- 没有做任何改动：无法建立临时目录（%s）：Permission denied（/denied/tmp）\n" % self.tmp)
+        self.assertEqual(out, "- No changes made: Cannot create temporary directory (%s): Permission denied (/denied/tmp)\n" % self.tmp)
         self.assertEqual(self.changing_calls(), [])
         self.assertEqual(self.plugins_of(codex), every("1.2.2"))
         self.assertEqual(list(self.tmp.iterdir()), [])
@@ -1040,52 +1040,52 @@ class ReportLineTests(unittest.TestCase):
     def setUp(self):
         self.spec = record.load_report_spec()
 
-    def lines(self, agents, version=LATEST, error="网络不可用"):
+    def lines(self, agents, version=LATEST, error="Network unavailable"):
         latest = {"version": version} if version else {"version": None, "error": error}
         return record.agent_lines({"schema": 1, "latest": latest, "agents": agents}, self.spec)
 
     def test_each_status_wording(self):
         agents = [
-            {"name": "A", "status": "未安装 Agent"},
-            {"name": "B", "status": "缺少", "versions": [], "missing": PLUGINS},
-            {"name": "C", "status": "不完整", "versions": [LATEST], "missing": ["fix-feedback", "work-cycle"]},
-            {"name": "D", "status": "落后", "versions": ["1.2.1", "1.2.2"], "missing": []},
-            {"name": "E", "status": "最新", "versions": [LATEST], "missing": [], "other_scopes": ["prepare-work"]},
-            {"name": "F", "status": "高于最新正式版", "versions": ["1.3.0"], "missing": []},
-            {"name": "G", "status": "无法判断", "reason": "命令超时（20 秒）"},
+            {"name": "A", "status": "Agent not installed"},
+            {"name": "B", "status": "Missing", "versions": [], "missing": PLUGINS},
+            {"name": "C", "status": "Incomplete", "versions": [LATEST], "missing": ["fix-feedback", "work-cycle"]},
+            {"name": "D", "status": "Behind", "versions": ["1.2.1", "1.2.2"], "missing": []},
+            {"name": "E", "status": "Current", "versions": [LATEST], "missing": [], "other_scopes": ["prepare-work"]},
+            {"name": "F", "status": "Ahead of latest release", "versions": ["1.3.0"], "missing": []},
+            {"name": "G", "status": "Unknown", "reason": "Command timed out (20 seconds)"},
         ]
         self.assertEqual(self.lines(agents), [
-            "B：未安装（最新 v1.2.3）", "C：缺 fix-feedback、work-cycle（最新 v1.2.3）",
-            "D：v1.2.1、v1.2.2，落后于最新 v1.2.3",
-            "B、C、D 可以安装或升级到 v1.2.3。要现在安装或升级吗？"])
+            "B: Not installed (latest v1.2.3)", "C: Missing fix-feedback, work-cycle (latest v1.2.3)",
+            "D: v1.2.1, v1.2.2, behind latest v1.2.3",
+            "B, C, D can be installed or upgraded to v1.2.3. Install or upgrade now?"])
 
     def test_question_only_when_something_can_be_installed_or_upgraded(self):
-        newer = {"name": "A", "status": "高于最新正式版", "versions": ["1.3.0"], "missing": []}
-        unknown = {"name": "B", "status": "无法判断", "reason": "缺少命令 node"}
-        current = {"name": "C", "status": "最新", "versions": [LATEST], "missing": [], "other_scopes": ["x"]}
+        newer = {"name": "A", "status": "Ahead of latest release", "versions": ["1.3.0"], "missing": []}
+        unknown = {"name": "B", "status": "Unknown", "reason": "Missing command: node"}
+        current = {"name": "C", "status": "Current", "versions": [LATEST], "missing": [], "other_scopes": ["x"]}
         self.assertEqual(self.lines([newer, unknown, current]), [])
-        missing = {"name": "DeepSeek Harness", "status": "缺少", "versions": [], "missing": PLUGINS}
+        missing = {"name": "DeepSeek Harness", "status": "Missing", "versions": [], "missing": PLUGINS}
         self.assertEqual(self.lines([missing, current]), [
-            "DeepSeek Harness：未安装（最新 v1.2.3）",
-            "DeepSeek Harness 可以安装或升级到 v1.2.3。要现在安装或升级吗？"])
-        self.assertEqual(self.lines([dict(missing, status="缺少")], version=None),
+            "DeepSeek Harness: Not installed (latest v1.2.3)",
+            "DeepSeek Harness can be installed or upgraded to v1.2.3. Install or upgrade now?"])
+        self.assertEqual(self.lines([dict(missing, status="Missing")], version=None),
                          [])
 
     def test_all_latest_none_and_latest_unknown(self):
-        current = {"name": "A", "status": "最新", "versions": [LATEST], "missing": []}
+        current = {"name": "A", "status": "Current", "versions": [LATEST], "missing": []}
         self.assertEqual(self.lines([current, dict(current, name="B")]), [])
-        self.assertEqual(self.lines([{"name": "A", "status": "未安装 Agent"}]), [])
+        self.assertEqual(self.lines([{"name": "A", "status": "Agent not installed"}]), [])
         self.assertEqual(self.lines([
-            {"name": "A", "status": "无法判断", "reason": "无法确认最新版本", "versions": [LATEST], "missing": []},
-            {"name": "B", "status": "缺少", "versions": [], "missing": PLUGINS},
-            {"name": "C", "status": "不完整", "versions": [LATEST], "missing": ["work-cycle"]},
-            {"name": "D", "status": "无法判断", "reason": "缺少命令 node"}], version=None),
+            {"name": "A", "status": "Unknown", "reason": "Cannot confirm the latest version", "versions": [LATEST], "missing": []},
+            {"name": "B", "status": "Missing", "versions": [], "missing": PLUGINS},
+            {"name": "C", "status": "Incomplete", "versions": [LATEST], "missing": ["work-cycle"]},
+            {"name": "D", "status": "Unknown", "reason": "Missing command: node"}], version=None),
             [])
 
     def test_unusable_results_raise(self):
         for check in (None, {"schema": 2}, {"schema": 1, "latest": {"version": LATEST}, "agents": [{"name": "A"}]},
                       {"schema": 1, "latest": {"version": LATEST},
-                       "agents": [{"name": "A", "status": "落后", "versions": "1.0.0"}]}):
+                       "agents": [{"name": "A", "status": "Behind", "versions": "1.0.0"}]}):
             with self.subTest(check=check):
                 with self.assertRaises(ValueError):
                     record.agent_lines(check, self.spec)

@@ -1,27 +1,27 @@
-## 子 Agent 生命周期与恢复
+## Subagent lifecycle and recovery
 
-额度提醒、线程占用和实际调用失败分别判断。系统提示剩余额度较低、接近限制或建议减少并行时，仍派发必需阶段；不能推断创建能力消失、提前结束或伪造 `prepare-work` 的 `[]`。同仓库依赖阶段继续串行，不用新增无业务作用的探针确认额度。
+Distinguish quota warnings, occupied threads, and actual call failures. Low/near-limit quota warnings or suggestions to reduce concurrency still require stage dispatch; do not infer lost creation capability, stop early, or fabricate prepare-work's `[]`. Dependent stages in one repository remain sequential; do not use purposeless probes to test quota.
 
-## 阶段完成与线程释放
+## Completion and thread release
 
-保存本次阶段的 Agent 标识、任务范围、结论摘要、证据位置（Issue/Change Request 链接或记录位置）和远端状态核对结果后，再使用运行时实际提供的关闭或释放接口回收本次编排已完成的线程。完整结果留在子 Agent 输出或其持久化记录中，需要时按位置读取，不整份保存在编排上下文。完成状态不等于线程已释放；接口返回不确定时回查状态。不得关闭仍在执行的 Agent、编排 Agent、其他会话的 Agent，或删除会话、工作区和持久交接来腾出额度。
+Before releasing a completed thread through an actual runtime close/release API, save its Agent identifier, task scope, concise conclusion, evidence locations (Issue/Change Request links or records), and checked remote state. Full results remain in subagent output/persisted records for retrieval; do not retain all of them in orchestrator context. Completed does not mean released; recheck ambiguous API results. Never close active Agents, the orchestrator, or another conversation's Agents, or delete conversations/workspaces/persisted handoffs to free capacity.
 
-没有关闭接口时记录此限制，继续使用可用的创建与等待能力，不虚构工具或将“中断”视作一定释放线程。不能为节约额度让编排 Agent 代做阶段，也不能复用旧审查 Agent 代替规则要求的新 Agent 复审。
+If no close API exists, record that limit and continue with available create/wait capabilities. Do not invent a tool or assume interruption releases a thread. Capacity savings do not permit the orchestrator to perform stages or reuse old review Agents instead of required new reviewers.
 
-## 交回格式
+## Return format
 
-派发阶段子 Agent 时，要求它交回只写固定几项，每个 Issue 或 Change Request 一组：结果、链接（Issue 或 Change Request）、原因（一句）、下一步（一句）、证据位置。证据位置是 `run_record.py task-dir` 给出的该任务证据目录里的 `result.md`；阶段技能要求的完整汇报、过程和验证细节写在这里，不交回。需要编排 Agent 写入共享记录的内容也放进这个目录，交回时注明。
+Require only these fixed fields per Issue/Change Request: result, link, one-sentence reason, one-sentence next step, and evidence location. The evidence location is `result.md` in that task's directory from `run_record.py task-dir`; write the stage skill's full report, process, and verification details there instead of returning them. Put content the orchestrator must add to shared records in the same directory and identify it in the return.
 
-- 结果用[最终汇报](report.md)的结果词；该项还在流程中、这些词都不适用时（例如实现完已交出待审查、审查后需要修改或同步主线），写[调度表](concurrency.md#调度表)已有的步骤名（如“已交出”“待修复”），不另造词。
-- `prepare-work` 的结果是技能约定的一行 Issue 列表或 `[]`，其后每个入选 Issue 只附一句批内关系和需排队的资源，`[]` 时附一句原因。`check-workflow` 的结果沿用[启动检查](startup.md)的 `clean`、`pr-open`。遗留分支清理的结果写保留了哪些分支和工作区。
-- 编排 Agent 只把这几项记入调度表和 `handoff.json`；交回超出这几项时也只保存这几项。只有交回缺项或与远端状态不符、中断或上下文压缩后恢复、填写最终汇报的“异常与恢复”、用户问到细节时，才按证据位置读 `result.md`；与远端不符时以远端为准。
+- Use [Final report](report.md)'s result vocabulary. If none applies while work is in progress, such as implementation handed to review or review requiring repair/sync, use an existing [Scheduling table](concurrency.md#scheduling-table) step, such as “Handed off” or “Awaiting repair”; invent no new term.
+- prepare-work returns its required single-line Issue list or `[]`, followed only by one sentence per selected Issue describing batch relationships/queued resources, or one reason sentence for `[]`. check-workflow uses [Startup](startup.md)'s `clean`/`pr-open`. Leftover cleanup returns retained branches/workspaces.
+- Save only these fields in the scheduling table and `handoff.json`, even if more are returned. Read `result.md` only for missing fields, remote-state disagreement, recovery after interruption/compaction, the final report's “Errors and recovery,” or user-requested details. Remote state takes precedence over conflicting returns.
 
-## 实际调用失败后的恢复
+## Recover actual call failures
 
-创建或等待返回明确错误时才进入恢复；正常等待超时、阶段仍在运行及没有新消息不是启动失败，沿用原 Agent 等待。记录失败阶段、调用、原始错误、已知 Agent 标识和恢复尝试；一次失败不能直接证明环境不可用。
+Enter recovery only after a definite create/wait error. Ordinary wait timeouts, a still-running stage, or no new message are not startup failures; keep waiting on the original Agent. Record stage, operation, raw error, known Agent identifier, and recovery attempts. One failure does not prove the environment unavailable.
 
-1. 先通过运行时可用的状态查询或结果读取，核对该任务是否已成功创建、仍在运行或已有完整结果。创建返回结果不确定时，不能立即重复派发；若找到原 Agent，沿用它继续等待，读取到完整结果即可退出恢复并核对远端状态，不要求再次调用原失败操作。状态无法确认时只重试查询，不能冒险重复执行可能已产生外部写入的阶段。
-2. 线程上限、临时资源不足或传输错误时，回收符合上述条件的已完成线程；确有占用资源的本次运行任务时等候其结果。不因额度提示取消正常执行的任务，不修改用户额度、全局配置、权限或保护规则。
-3. 每次故障最多三轮状态核对（首次核对加两次追加核对）；查询报错或状态不明也消耗一轮。只有前两轮可以在核对后采取恢复动作并重试失败操作：已确认未创建才重试创建，等待错误则沿用原 Agent 等待或读取结果；状态不明不重试业务操作。第三轮只做最终状态或结果核对，不再重试创建或失败的等待调用，不能用上轮的“未创建”结论代替最后一次调用的状态。必要的短暂退避每次不超过 60 秒。没有关闭接口仍可有限重试，不能把缺少可选回收接口当作必需能力缺失。创建成功、创建结果不明时找到原任务、或等待/结果读取成功时，立即退出相应故障的恢复并继续原阶段；等待错误仅查到 running 不代表等待能力恢复，继续沿用本次故障的重试计数，不重置周期或 Review 往返轮数；同一故障持续时不能通过更名任务、更换调用方式或查询路径重置次数。
+1. Use available status/results APIs to determine whether the task was created, still runs, or has complete results. Never immediately redispatch an ambiguous creation. If found, keep the original Agent and wait; complete results end recovery and permit remote verification without repeating the failed operation. With unknown status, retry queries only; do not risk duplicate stages that may already have external writes.
+2. On thread limits, temporary resource shortages, or transport errors, release eligible completed threads above. Wait for this run's resource-using tasks when present. Do not cancel healthy tasks for quota warnings or modify user quotas, global configuration, permissions, or protection.
+3. At most three status-check rounds per failure: initial plus two follow-ups. Query errors/unknowns consume a round. Only the first two may recover and retry the failed operation after checking. Retry creation only when confirmed not created; for wait errors, wait/read results from the original Agent. Never retry business actions with unknown state. Round three only checks final status/results: no create or failed-wait retry. A prior “not created” result cannot stand in for the last call's status. Any short backoff is at most 60 seconds. Bounded retries remain possible without a close API; optional release capability is not required capability. Successful creation, finding the original task after ambiguous creation, or successful wait/result reading ends that failure's recovery immediately. Merely finding “running” after a wait error does not restore waiting capability; keep that failure's retry count without resetting cycles/review rounds. Renaming tasks or changing invocation/query methods cannot reset an ongoing failure's count.
 
-已明确确认必需创建或等待接口不存在、访问被确定拒绝，或必需技能缺失时，不重复不可成功的调用。三轮核对及可用恢复用尽后仍无法继续或安全确定任务状态时，保存交接并结束本次编排；原任务可能仍在运行时明确保留此不确定性，不声称已取消或不存在。实际错误、状态核对、恢复动作及结果、最后确认的远端状态、未完成阶段和恢复条件按 [最终汇报](report.md) 记入交接的 `exceptions`，在汇报的“异常与恢复”中列出；不能只引用“环境无法启动”作为证据，也不把调用失败说成业务阶段已完成。
+Do not repeat impossible calls once a required create/wait API is confirmed absent, access definitively denied, or a required skill missing. After three checks and available recovery are exhausted without safe continuation/status, save a handoff and end orchestration. If the original task may still run, retain that uncertainty; do not claim cancellation/absence. Record actual errors, status checks, recovery actions/results, last verified remote state, unfinished stages, and recovery conditions in handoff `exceptions` under [Final report](report.md), then show them in “Errors and recovery.” “Environment could not start” alone is not evidence, and a failed call is not a completed business stage.

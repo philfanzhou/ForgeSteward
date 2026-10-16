@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从当前 checkout 管理 DeepSeek Harness 技能；仅使用 Python 标准库。"""
+"""Manage DeepSeek Harness skills from this checkout using only the Python standard library."""
 
 import os
 from pathlib import Path
@@ -16,7 +16,7 @@ VERIFY_HINT = "Verify skill discovery and resource paths in a new DeepSeek Harne
 
 
 def expand_home(value):
-    # 与 resolveDshHome 一致，非空配置保留前后空白；~\\ 在 POSIX 也展开。
+    # Match resolveDshHome: retain whitespace in nonempty settings; expand Windows home prefixes on POSIX too.
     if value == "~":
         return Path.home()
     if value.startswith(("~/", "~\\")):

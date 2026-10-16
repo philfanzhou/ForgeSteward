@@ -3,26 +3,26 @@
   "cycles": [{"n": 1}, {"n": 2}],
   "requested_cycles": 10,
   "completed_cycles": 2,
-  "stop_reason": "没有可做的 Issue 而停止。",
-  "startup_check": "当前版本已检查过，跳过",
-  "startup_queue": {"count": 2, "note": "均已处理"},
-  "concurrency": {"enabled": true, "agent_limit": 3, "note": "两个 PR 同时跑 CI 时排队 5 分钟"},
-  "branch_cleanup": "删除 3 个已合并的分支；保留 #105、#108 的分支和工作区",
+  "stop_reason": "Stopped because no Issues were ready.",
+  "startup_check": "Already checked this version; skipped",
+  "startup_queue": {"count": 2, "note": "All handled"},
+  "concurrency": {"enabled": true, "agent_limit": 3, "note": "Two PRs running CI together queued for 5 minutes"},
+  "branch_cleanup": "Deleted 3 merged branches; retained branches and workspaces for #105 and #108",
   "change_requests": [
-    {"url": "https://example.test/pr/101", "number": 101, "issues": [80], "result": "已合并", "reason": "", "next": ""},
-    {"url": "https://example.test/pr/103", "number": 103, "issues": [82], "result": "已合并", "reason": "修复 1 次后通过", "next": ""},
-    {"url": "https://example.test/pr/105", "number": 105, "issues": [85, "other/repo#7"], "result": "等你审批", "reason": "检查全部通过，仓库要求维护者批准。", "next": "在 PR 页面批准"},
-    {"url": "https://example.test/pr/106", "number": 106, "issues": [86], "result": "等待 CI", "reason": "CI 排队超过 30 分钟", "next": "CI 通过后再审查"},
-    {"url": "https://example.test/pr/107", "number": 107, "issues": [87], "result": "等待外部审批", "reason": "需要安全团队放行", "next": ""},
-    {"url": "https://example.test/pr/108", "number": 108, "issues": [89], "result": "已暂停", "reason": "第三次修复后终审仍有必修问题\n详见 PR 评论", "next": "人工处理后重新运行"},
-    {"url": "https://example.test/pr/109", "number": 109, "issues": [], "result": "已关闭未合并", "reason": "与 #101 重复 | 已关闭", "next": ""}
+    {"url": "https://example.test/pr/101", "number": 101, "issues": [80], "result": "Merged", "reason": "", "next": ""},
+    {"url": "https://example.test/pr/103", "number": 103, "issues": [82], "result": "Merged", "reason": "Passed after one repair", "next": ""},
+    {"url": "https://example.test/pr/105", "number": 105, "issues": [85, "other/repo#7"], "result": "Awaiting your approval", "reason": "All checks passed; repository requires maintainer approval.", "next": "Approve on the PR page"},
+    {"url": "https://example.test/pr/106", "number": 106, "issues": [86], "result": "Waiting for CI", "reason": "CI queued for more than 30 minutes", "next": "Review after CI passes"},
+    {"url": "https://example.test/pr/107", "number": 107, "issues": [87], "result": "Waiting for external approval", "reason": "Security team approval required", "next": ""},
+    {"url": "https://example.test/pr/108", "number": 108, "issues": [89], "result": "Paused", "reason": "Final review after the third repair still found required fixes\nSee PR comments", "next": "Resolve manually and rerun"},
+    {"url": "https://example.test/pr/109", "number": 109, "issues": [], "result": "Closed without merge", "reason": "Duplicate of #101 | closed", "next": ""}
   ],
   "issues_without_change_request": [
-    {"issue": 88, "result": "已暂停", "reason": "“导出格式”没定，已在 Issue 里提问", "next": "回答后重新运行"},
-    {"issue": 90, "result": "未开始", "reason": "运行达到轮数上限", "next": ""}
+    {"issue": 88, "result": "Paused", "reason": "Export format is undecided; asked in the Issue", "next": "Answer and rerun"},
+    {"issue": 90, "result": "Not started", "reason": "Run reached the cycle limit", "next": ""}
   ],
   "exceptions": [
-    {"what": "创建审查子 Agent 时返回线程上限", "recovery": "核对确认未创建，回收 2 个已完成的线程后重试成功，审查照常完成"}
+    {"what": "Review subagent creation hit the thread limit", "recovery": "Confirmed no Agent was created; reclaimed 2 completed threads and retried successfully; review completed normally"}
   ],
-  "needs_you": ["本机默认 Python 低于 3.9，建议升级"]
+  "needs_you": ["Default local Python is older than 3.9; upgrade recommended"]
 }

@@ -5,32 +5,32 @@ description: Check branch cleanup settings, reconcile release tags, announcement
 
 # Check Workflow
 
-## 规则加载
+## Load the rules
 
-开始检查前，完整读取 [技能管理的规则与删除方式](references/skill-owned-rules.md)、[检查、删除与提交步骤](references/procedure.md) 和 [发布管线健康对账](references/release-audit.md)，再按本次授权模式执行。只读检查同样需要这些判定和执行规则；不能只凭入口摘要选择删除项。核对其他技能的等价条款时，同时检查该技能入口指向的规则文件。
+Before checking, read [Skill-owned rules and deletion](references/skill-owned-rules.md), [Check, delete, and submit](references/procedure.md), and [Release pipeline audit](references/release-audit.md) in full, then follow the authorized mode. Read-only checks need these decision and execution rules too; never select deletions from the entry summary alone. When comparing another skill's equivalent rules, also inspect the rule files linked from its entry.
 
-引用文件是本技能的必需规则，路径以本 `SKILL.md` 所在目录为基准，不以目标仓库或当前工作目录为基准。本技能规则文件的读取结果被截断时按行或段补读至文件末尾（不适用于 CI 日志、测试输出等其他工具结果）；文件缺失或不可读时说明具体路径和影响，不依据不完整规则继续受影响的操作。上下文压缩后，缺失当前阶段规则时重新读取对应文件。
+These references are required rules. Resolve paths relative to this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 
-## 目标与授权
+## Purpose and authorization
 
-工作流政策只在 ForgeSteward 的 prepare-work、execute-work、review-and-merge 和 fix-feedback 技能正文中维护，包括：Issue 开工前的条件、任务大小、Change Request 范围、审查意见分类与轮数、修复范围、合并与关闭任务、交接和授权。项目里另写一套同类规则，无论与技能措辞相同、更严格还是更宽松，都会形成第二个规则来源：技能执行时出现冲突，技能升级后项目规则又会过时。本技能删除这些规则，使工作流政策只以技能为准。
+Workflow policy belongs only in ForgeSteward's prepare-work, execute-work, review-and-merge, and fix-feedback skills: conditions for starting Issues, task size, Change Request scope, feedback classification and rounds, repair scope, merging and closing tasks, handoffs, and authorization. A second set in the project, whether identical, stricter, or looser, creates conflicting sources and becomes outdated as skills change. This skill removes that second source.
 
-本技能对受版本控制的项目文件只删除、不写入：不向项目添加规则、标记区块、读取指示或 Agent 入口，也不代写替代条款。项目仍需要、但技能明确交由仓库决定的约定（见[项目约定](references/skill-owned-rules.md#项目约定保留)）予以保留。另以只读方式检查托管平台的合并后自动删除源分支设置，记录启用、停用或无法确认；不修改仓库设置。合并后的实际分支清理由 `review-and-merge` 执行，本技能不合并或删除分支。
+For version-controlled project files, this skill only deletes: add no rules, marked blocks, reading instructions, Agent entries, or replacement clauses. Preserve conventions that the project still needs and the skills explicitly leave to the repository; see [Project conventions](references/skill-owned-rules.md#project-conventions-preserve). Also check the hosting platform's automatic source-branch deletion setting read-only and record enabled, disabled, or unknown; do not change repository settings. Actual post-merge branch cleanup belongs to `review-and-merge`; this skill neither merges nor deletes branches.
 
-用户明确调用本技能（包括仅选择技能、不附加 prompt）时，默认任务是：检查 → 删除 → 验证 → commit、push 并创建 Change Request（PR/MR），禁止合并。用户本轮的明确限制优先：仅检查时只报告删除候选，不写文件、不建分支；仅本地修改时不提交或推送。自动选中本技能、引用技能名称或询问用法，不构成外部发布授权。遵守目标仓库的权限、审批及分支保护，不以默认流程绕过限制。
+An explicit invocation, including selecting the skill with no prompt, authorizes the default flow: check → delete → verify → commit, push, and create a Change Request (PR/MR), never merge. Explicit limits in the current request take precedence: check-only means report candidates without editing or creating a branch; local-only means no commit or push. Automatic skill selection, mentioning its name, or asking about usage does not authorize external publication. Respect target-repository permissions, approvals, and branch protection; the default flow never overrides them.
 
-## 管理范围
+## Scope
 
-- **删除工作流政策条文**：候选文件中属于[技能管理的工作流政策](references/skill-owned-rules.md#技能管理的工作流政策)的规则句、列表项、章节、模板说明和检查项，不区分是项目自行编写还是旧版本增补。
-- **删除旧版标记区块**：`0.2.5`、`0.2.6` 写入根目录 `AGENTS.md` 的 `forge-steward:workflow` 与 `forge-steward:claude-rules` 区块，由脚本确定性删除。
-- **删除悬空引用**：全部内容都是工作流政策的文档整份删除；指向被删章节或文档的链接、目录项和读取指示一并删除。
+- **Delete workflow policy text:** rule sentences, list items, sections, template instructions, and checkboxes classified as [Skill-owned workflow policy](references/skill-owned-rules.md#skill-owned-workflow-policy), whether written by the project or added by older versions.
+- **Delete legacy marked blocks:** deterministically remove the `forge-steward:workflow` and `forge-steward:claude-rules` blocks that `0.2.5` and `0.2.6` inserted in root `AGENTS.md`, using the script.
+- **Delete dangling references:** delete documents containing only workflow policy, together with links, contents entries, and reading instructions pointing to deleted documents or sections.
 
-候选位置、判定方法、不删除的情形和删除方式见 [技能管理的规则与删除方式](references/skill-owned-rules.md)。不修改业务代码、依赖、测试、CI、分支保护、全局或用户级 Agent 配置；不修改 `CLAUDE.md` 的 `@AGENTS.md` 等入口导入，除非导入目标因本次删除而不存在；不安装插件，不整理 Issue，不自动运行其他技能，不合并。
+See [Skill-owned rules and deletion](references/skill-owned-rules.md) for candidate locations, classification, exclusions, and deletion methods. Do not modify business code, dependencies, tests, CI, branch protection, or global/user Agent configuration. Preserve entry imports such as `CLAUDE.md`'s `@AGENTS.md` unless this deletion removes their target. Do not install plugins, organize Issues, invoke other skills automatically, or merge.
 
-### 发布管线健康对账（只读）
+### Release pipeline audit (read-only)
 
-每次检查同时按 [发布对账规则](references/release-audit.md) 核对发布标签、发布公告（Release）与包 feed 的一致性、预发布标记、latest 指针及最近发布运行结果。判定基准和范围来自目标仓库自己的发布文档；缺少成文期望记为发现，对应判断为“无法确认”。结果只进最终汇报，与政策删除互不阻塞，沿用现有调用及 work-cycle 低频节奏。
+Each check also follows the [release audit rules](references/release-audit.md) to compare release tags, announcements (Releases), package feeds, prerelease flags, latest pointers, and recent release runs. Use the target repository's own release documentation for expectations and scope. Missing documented expectations are findings and make the corresponding judgment “unknown.” Include results only in the final report. The audit and policy deletion do not block each other; retain the existing invocation and infrequent work-cycle schedule.
 
-## 汇报与变更汇总
+## Report and change summary
 
-结束前完整读取 [汇报与变更汇总规则](references/reporting.md)，按实际文件状态汇报删除变更及交付状态，并单列发布核对结论、发现、无法确认与不适用项。纯对账或其他零修改运行同样明确说明“未修改项目文件”；对账发现不进入清理 Change Request 正文，不登记或修复。进度说明和提问、汇报、子 Agent 交回的结果及 Issue、Change Request 的正文和评论都使用日常中文（所属仓库另定语言时从其规定），不照搬本技能的内部术语，确需使用时首次附一句解释；artifact 一律写作“构建输出”。
+Before finishing, read [Reporting and change summary](references/reporting.md) in full. Report deletions and delivery from actual file state; separately list release conclusions, findings, unknowns, and inapplicable checks. Audit-only and other zero-change runs must explicitly say “No project files were changed.” Do not include audit findings in the cleanup Change Request body, file them, or fix them. Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.

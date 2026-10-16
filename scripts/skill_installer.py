@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""受管技能安装的共享核心；各 Agent 只适配路径与发现提示。"""
+"""Shared managed-skill installation core; Agent adapters only supply paths and discovery hints."""
 
 import argparse
 from contextlib import contextmanager
@@ -19,7 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 PREFIX = "forge-steward-"
 RECEIPT = ".forge-steward-install.json"
 LOCK = ".forge-steward.lock"
-# 历史调用名不是归属凭据；仅用于报告可能遗留的手工副本。
+# Legacy invocation names are not ownership evidence; only report possible leftover manual copies.
 LEGACY_NAMES = {"check-workflow", "find-work", "review-and-merge", "fix-feedback"}
 
 
@@ -45,14 +45,14 @@ def is_link(path):
 
 
 def reject_links(path):
-    # 检查尚未 resolve 的安装路径，防止配置目录链接把写入重定向到别处。
+    # Check the unresolved install path so config-directory symlinks cannot redirect writes.
     for item in (path, *path.parents):
         if is_link(item):
             raise InstallError("Symlink paths are not managed: " + str(item))
 
 
 def snapshot(directory):
-    """包括空目录；添加、删除、修改文件或链接都会使已安装内容不再匹配。"""
+    """Include empty directories; added, removed, or changed files or links invalidate the installed snapshot."""
     reject_links(directory)
     if not directory.is_dir():
         raise InstallError("Expected a skill directory: " + str(directory))
@@ -91,7 +91,7 @@ def catalog(repo):
             parts = text.split("---", 2)
             if len(parts) != 3 or parts[0].strip():
                 raise InstallError("Missing frontmatter: " + str(source))
-            # 本仓库使用单行 name/description；不实现通用 YAML 解析器。
+            # This repository uses single-line name/description; this is not a general YAML parser.
             names = re.findall(r"^name: ([a-z0-9-]+)\s*$", parts[1], re.MULTILINE)
             descriptions = re.findall(r"^description: (.+)$", parts[1], re.MULTILINE)
             if names != [source.name] or source.name != skill_name(source.name):
@@ -189,7 +189,7 @@ def transact(root, changes, revision):
     reject_links(root)
     root.mkdir(exist_ok=True)
     reject_links(root)
-    # 放在 skills 外，避免 Agent 在安装期间发现 staging/backup 中的 SKILL.md。
+    # Keep outside skills so Agents do not discover staging/backup SKILL.md files during installation.
     transaction = Path(tempfile.mkdtemp(prefix=".forge-steward-txn-", dir=str(root.parent)))
     journal = []
     try:
@@ -203,7 +203,7 @@ def transact(root, changes, revision):
             data = {"tool": "ForgeSteward", "schema": 1, "name": name,
                     "version": wanted["version"], "source": revision, "files": wanted["files"]}
             (staged / RECEIPT).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        # 所有选中项先验证、暂存，再改动安装目录。
+        # Validate and stage every selected item before changing installation directories.
         for name, current, wanted in changes:
             destination = root / name
             if read_install(destination) != current:
@@ -236,7 +236,7 @@ def transact(root, changes, revision):
 
 
 def report_uninstall_residues(root, names, all_skills, verify_hint):
-    """只读核对本次选择的名称；不跨作用域、不跟随链接、不推定归属。"""
+    """Read-only check of selected names; no cross-scope scans, followed links, or inferred ownership."""
     print("Residual scan (selected names, target directory only): " + str(root))
     reject_links(root)
     candidates = sorted(root.iterdir()) if root.exists() else []
@@ -292,7 +292,7 @@ def parser(adapter):
 def main(argv, repo, adapter):
     args = parser(adapter).parse_args(argv)
     try:
-        # 卸载只依赖已安装收据；原技能从新版本 checkout 删除后仍可卸载。
+        # Uninstall relies only on installed receipts, even if the skill was removed from the new checkout.
         available = {} if args.command == "uninstall" else catalog(repo)
         if args.command == "list":
             for name, item in available.items():
@@ -303,7 +303,7 @@ def main(argv, repo, adapter):
         root = adapter.target_root(args)
         print("Target: " + str(root))
         if args.all and args.command == "uninstall":
-            # iterdir 不像 glob 那样隐藏目录访问错误；扫描失败不得报卸载成功。
+            # Unlike glob, iterdir exposes directory access errors; failed scans must not report successful removal.
             names = sorted(p.name for p in root.iterdir()
                            if p.name.startswith(PREFIX) and (p / RECEIPT).exists()) if root.exists() else []
         else:
@@ -341,7 +341,7 @@ def main(argv, repo, adapter):
             except (InstallError, OSError, ValueError) as error:
                 failed = True
                 print("Error: " + str(error), file=sys.stderr)
-            # 即使预检或事务失败也展示仍在目标内的内容；错误退出码优先。
+            # Show what remains even after preflight or transaction failure; failure exit codes take precedence.
             residue_code = report_uninstall_residues(root, names, args.all, adapter.VERIFY_HINT)
             return 1 if failed else residue_code
         with locked(root):
