@@ -1,4 +1,4 @@
 interface:
   display_name: "Check Workflow - ForgeSteward"
-  short_description: "Check releases; remove duplicate rules and consolidate entries"
-  default_prompt: "Use $forge-steward-check-workflow to inspect branch cleanup settings and reconcile release evidence read-only, remove workflow policy rules that duplicate ForgeSteward skills (including legacy blocks), then safely consolidate tracked root Claude instructions into surviving root AGENTS.md under the bundled migration rules. Preserve project conventions and report release findings only. Validate, commit, push, and open a PR or MR for any cleanup without merging."
+  short_description: "Check releases, clean rules, set English collaboration"
+  default_prompt: "Use $forge-steward-check-workflow to inspect branch cleanup settings and reconcile release evidence read-only, remove duplicate ForgeSteward workflow policy (including legacy blocks), safely consolidate root Claude instructions under the bundled migration rules, then configure English collaboration defaults in an existing root entry under the bundled language rules. Preserve other project conventions and report release findings only. Validate, commit, push, and open a PR or MR for cleanup without merging."

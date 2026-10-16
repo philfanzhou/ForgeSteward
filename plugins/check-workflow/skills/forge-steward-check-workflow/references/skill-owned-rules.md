@@ -2,9 +2,9 @@
 
 ## Principle
 
-ForgeSteward's four skills alone define workflow policy. Remove project copies, which neither supplement nor replace it; preserve repository conventions.
+The four work skills alone define workflow policy. Remove project copies; preserve repository conventions.
 
-After deletion, constraints apply only on skill invocation. Other conversations/contributors no longer find them in project documents. This is intentional, not a retention reason.
+After deletion, constraints apply only on skill invocation; their absence in ordinary project conversations is intentional, not a retention reason.
 
 ## Skill-owned workflow policy
 
@@ -26,7 +26,7 @@ Delete rules in these dimensions regardless of strictness or authorship, includi
 
 Preserve conventions explicitly left to the repository:
 
-- Languages for documentation, Issues, Change Requests, reviews, and code comments; Issue/Change Request title, commit-message, and branch-name formats.
+- Documentation, code-comment and commit-message languages; title and branch formats. Collaboration language follows the narrow [English-default exception](collaboration-language.md).
 - Issue/Change Request template structure and completion guidance, such as “Scope,” “Acceptance criteria,” “Verification,” and “Compatibility impact” headings and their expected contents.
 - Merge methods, required checks, approval counts, and branch protection settings.
 - Build, test, migration, smoke-check, and other verification commands, plus engineering requirements to run particular checks or add certain tests for a class of change.
@@ -59,10 +59,10 @@ Retain these for maintainer decision, explaining why in the Change Request:
 - **Template:** preserve section headings and completion guidance; delete policy sentences, comments, and checkboxes. If all checks under a section are policy, delete that entire section.
 - **Whole document:** delete an entirely policy document, along with reading instructions, links, and contents entries pointing only to it.
 - **Legacy blocks:** use `scripts/remove_workflow_blocks.py`. If root `AGENTS.md` has no other content after deletion, delete it and its import in `CLAUDE.md`; if `CLAUDE.md` is then empty, delete it too.
-- Never rewrite, combine, or reformat retained text, relocate deleted rules, or write replacement clauses.
+- Never rewrite retained text, relocate deleted rules, or write replacement clauses except the separate [language operation](collaboration-language.md). Migration follows [its own rules](agent-entrypoints.md).
 
 ## Records and repeated runs
 
 Record each item's file, original line range, heading/first line, dimension and owning skill, equivalent skill clause, deletion method, and outcome (deleted, or undecided with reason).
 
-Before deleting, compare each clause to its owning skill's full text. If equivalent semantics are absent (for example, the project requires caller responsibilities but the skill only requires guarantees/non-guarantees), still delete under these rules since skills do not adopt project policy. Separately list a “skill gap” in the Change Request, quoting the original and missing semantics for maintainers to add to the skill. A same-dimension rule is no substitute for clause-by-clause comparison. Once deletion merges, repeated runs no longer find that content. Unchanged undecided items are reported again without a diff. New policy dimensions in a skill version may yield new candidates next run; that is a version change, not repeated editing.
+Compare each clause with its owning skill's full text. Missing equivalent semantics (for example caller responsibilities absent alongside guarantees/non-guarantees) do not preserve project workflow policy. Separately list a “skill gap” in the Change Request, quoting the original and missing semantics for maintainers to add to the skill. A same-dimension rule is no substitute for clause-by-clause comparison. Once deletion merges, repeated runs no longer find that content. Unchanged undecided items are reported again without a diff. New policy dimensions in a skill version may yield new candidates next run; that is a version change, not repeated editing.
