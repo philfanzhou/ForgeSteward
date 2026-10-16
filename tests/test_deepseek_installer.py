@@ -111,9 +111,19 @@ class DeepSeekInstallerTests(lifecycle.InstallerTests):
         self.assertEqual(list(self.isolated_home.iterdir()), [])
 
     def test_fixed_commit_update_and_rollback_tracks_source(self):
+        trace = self.base / "git-trace.jsonl"
+        environment = dict(os.environ, GIT_TRACE2_EVENT=str(trace))
+
         def git(*args):
-            return subprocess.check_output(["git", "-C", str(self.source), *args], text=True).strip()
+            if args[0] == "commit":
+                self.assertEqual(git("config", "--bool", "maintenance.auto"), "false")
+                self.assertEqual(git("config", "--int", "gc.auto"), "0")
+            return subprocess.check_output(["git", "-C", str(self.source), *args],
+                                           env=environment, text=True).strip()
         git("init", "-q")
+        # A detached maintenance process can otherwise race TemporaryDirectory cleanup.
+        git("config", "--local", "maintenance.auto", "false")
+        git("config", "--local", "gc.auto", "0")
         git("config", "user.name", "Fixture")
         git("config", "user.email", "fixture@example.invalid")
         git("add", "plugins")
@@ -130,6 +140,11 @@ class DeepSeekInstallerTests(lifecycle.InstallerTests):
         git("checkout", "-q", original)
         self.run_cli("update", "prepare-work")
         self.assertEqual(before, self.contents(self.installed()))
+        events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(sum(event.get("event") == "cmd_name" and event.get("name") == "commit"
+                             for event in events), 2)
+        self.assertFalse([event for event in events if event.get("event") == "child_start"
+                          and {"maintenance", "gc"}.intersection(event.get("argv", []))])
 
     def test_copy_failure_after_one_staged_item_preserves_batch(self):
         self.run_cli("install", "--all")
