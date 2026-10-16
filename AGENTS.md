@@ -61,7 +61,8 @@ Use these platform-neutral terms throughout the core design:
 
 ## User-facing wording
 
-- Skill requirements for user-facing or hosting-platform content, including final replies and reports, Issue and Change Request bodies, Comments, and Review Feedback replies, must default to clear, everyday English. Honor an explicit language requirement from the user or target repository.
+- Skill final user replies/reports and questions requiring a user decision must default to clear, everyday Chinese. Honor an explicit user language request; target-repository documentation rules do not change this display default.
+- Progress, internal subagent prompts/results, handoffs, run records and generated report evidence may stay in English. Hosting-platform titles, bodies, Comments and Review Feedback follow the owning repository's language rules, otherwise English.
 - Rules may use concise internal terminology, but output contracts must not require repeating it verbatim. Explain a necessary unfamiliar term in one sentence on first use.
 - Project-maintained content throughout the repository must be English. Keep technical Unicode test inputs and known legacy status aliases narrowly identified as data; do not hide untranslated prose in escapes. `tests/test_skill_wording.py` enforces the content policy and the existing prohibition on `triage` in file or directory names under `plugins/`.
 - Prefer familiar descriptions such as “build output” when they make an artifact's purpose clearer.

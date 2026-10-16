@@ -83,12 +83,12 @@ Migration: previously the first prepare-work `[]` skipped review, and preexistin
 
 ## Language and commit conventions (#83)
 
-The original #83 revision used everyday Chinese as the default while prioritizing target-repository language rules. The English migration changes that default to everyday English; explicit user/repository requirements still take precedence.
+The original #83 revision used everyday Chinese as the default while prioritizing target-repository language rules. The #118 English migration changed that default; current #121 rules restore Chinese user display independently of repository documentation language, while repository rules still govern hosting-platform content. Explicit user language requests override the display default.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
 | English commit messages required | Target contribution rules require English commits and Chinese PR bodies | Explicitly provide English merge title/body, including squash merges, instead of reusing the Chinese PR body |
-| English Issue/PR bodies required | Contribution rules require English Issue/PR bodies | Write bodies/comments in the required English; user reports, progress, and questions default to everyday English unless explicitly requested otherwise |
+| English Issue/PR bodies required | Contribution rules require English Issue/PR bodies | Write bodies/comments in the required English; final user reports and user-decision questions default to Chinese unless the user requests another language; progress may stay in English |
 | No language policy | No applicable convention | Use everyday English for Issue/PR bodies/comments and platform defaults for merge commits |
 
 ## Leftover branch cleanup once per run (#84)
@@ -135,14 +135,14 @@ The original #83 revision used everyday Chinese as the default while prioritizin
 
 ## Fixed final report format (#95)
 
-Sections, result vocabulary, and display-name mappings are defined only in work-cycle's `references/report.md`. `run_record.py report` reads that specification and renders `handoff.json` plus events. The table is a rule walkthrough; `tests/test_run_report.py` compares fixed examples byte for byte.
+Sections, result vocabulary, and display-name mappings are defined only in work-cycle's `references/report.md`. `run_record.py report` reads that specification and renders `handoff.json` plus events. The table is a rule walkthrough of generated English evidence; `tests/test_run_report.py` compares fixed examples byte for byte. User display follows #121 below, including all labels and the manual failure explanation.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
-| Normal finish | Complete handoff, all results in seven-value vocabulary | Print six required sections, add seventh only for available updates, save run `report.md`, return `0`; orchestrator pastes unchanged with at most one additional-notes paragraph |
+| Normal finish | Complete handoff, all results in seven-value vocabulary | Print six required sections, add seventh only for available updates, save run `report.md`, return `0`; orchestrator faithfully renders the complete report in the requested/default user display language, with at most one notes paragraph |
 | Repeat render | Identical data | Byte-identical output/report, without reading current time |
 | Invalid result | PR result `Ready to merge`, or a required field missing | Return `1`, list exact field errors such as `change_requests[2].result`, and do not write report; orchestrator corrects/retries at most 3 times |
-| Retries exhausted | Still `1` after three corrections | Use report template manually, starting `This report was written manually by the model because: ...` |
+| Retries exhausted | Still `1` after three corrections | Use the report template manually in the display language, including the meaning `This report was written manually by the model because: ...` |
 | Script cannot run | No Python 3.9+, Windows Store placeholder only, sandbox denial, or exit `2` | At startup try `python3`, `py -3`, then `python`; record absence in handoff. At end use annotated manual template and continue delivery |
 | User stops | PRs still reviewing and Issues not started | Still report; unfinished items become `Paused` with reasons, actionable ones appear under Needs your action |
 | Empty run | No PRs or exceptions | Still render first six sections with `- None` where empty; seventh depends on upgrades |
@@ -185,7 +185,7 @@ Real Codex queries were checked on macOS `0.157.1` on 2026-10-13: old query 0.94
 
 ## Ask at completion, install or upgrade after consent (#98)
 
-Show the final optional section only when the latest stable release is known and there are Missing/Incomplete/Behind Agents or an older session-package notice. With eligible Agents, end with their names/target version and one `Install or upgrade now?` question. With only a session notice, ask once about upgrading; do not derive `apply --agents` from the notice, and obtain explicit consent for actual Agents. After consent, orchestrator runs `scripts/agent_install.py apply --version X.Y.Z --agents <id,...>` and reports actual script results. Only work-cycle orchestrator does this; stage Agents neither check nor ask/install. The following are walkthroughs tested with temporary HOME/directories, stateful fake PATH commands, local temporary Git repositories, and injected releases, without network or real Agent configuration.
+Show the final optional section only when the latest stable release is known and there are Missing/Incomplete/Behind Agents or an older session-package notice. With eligible Agents, end with their names/target version and one `Install or upgrade now?` question. With only a session notice, ask once about upgrading; do not derive `apply --agents` from the notice, and obtain explicit consent for actual Agents. The English question above describes generated evidence; final user questions and installation results use the requested/default display language. After consent, orchestrator runs `scripts/agent_install.py apply --version X.Y.Z --agents <id,...>` and reports actual script results. Only work-cycle orchestrator does this; stage Agents neither check nor ask/install. The following are walkthroughs tested with temporary HOME/directories, stateful fake PATH commands, local temporary Git repositories, and injected releases, without network or real Agent configuration.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
@@ -253,8 +253,25 @@ Static checks do not prove model compliance or any specific token reduction. The
 
 ## English migration and record compatibility (#118)
 
-Current source rules, newly generated statuses, reports, errors, prompts, and manually prepared handoffs use clear English. Earlier releases used Chinese defaults; translating historical notes does not change that fact. No schema, field name, CLI command, persisted-record path, event model, or version number changes as part of this migration.
+The #118 migration made source rules, generated report evidence and statuses English; #121 below changes only user display defaults. Internal prompts and manually prepared handoffs may stay in English. Earlier releases used Chinese defaults; translating historical notes does not change that fact. No schema, field name, CLI command, persisted-record path, event model, or version number changes as part of this migration.
 
 The single report specification in `references/report.md` defines current vocabularies and exact aliases for known legacy Chinese result and Agent-state values. On reading structured `handoff.json` or `agent-check.json`, readers map only those known fields in an in-memory copy before validation, counting, and upgrade filtering. Equivalent old, new, or mixed values produce the same merged/actionable counts and upgrade candidates. Unknown values remain invalid. Invalid Agent-check data retains the existing behavior of omitting the optional upgrade section, while invalid handoff data still fails validation. Old free-form records missing required fields still use the existing manual fallback.
 
 Reading does not rewrite original input files or translate user-provided free text such as reasons, next actions, Agent names, or external command errors. New handoff prose must use the required language. Keep original records for recovery. Old readers may reject new English enum values; when rolling source back, use saved old records or continue generating reports with the new reader. Do not automatically reverse-translate or overwrite user records. The migration neither upgrades installed plugins nor grants installation or release authorization.
+
+## Chinese user display with English evidence (#121)
+
+The six Skill entries default final user replies/reports and questions requiring a user decision to everyday Chinese; an explicit user language request wins. Repository documentation language does not override this display default. Progress and internal subagent prompts/results, handoffs and run records may stay in English. Hosting-platform content follows the owning repository's rules, otherwise English. Prepare-work still returns only its exact single-line Issue list or `[]`.
+
+The report generator, English specification, fixtures, input aliases and saved records remain unchanged. The orchestrator renders the complete report for the user under `references/report.md`; it does not introduce runtime translation or overwrite evidence. These walkthroughs check the instruction contract against existing fixtures, not live model translation quality:
+
+| Scenario and evidence | Expected display and preserved facts | Outcome of rule walkthrough |
+| --- | --- | --- |
+| Full report, `tests/fixtures/run_report/full.md` | Translate all headings, seven outcome meanings, reasons/actions, run/timing labels and errors/recovery; retain PR links, Issue numbers, counts and section order | Every mandatory source section and item remains required in the Chinese rendering, including paused PR and Issue actions |
+| Empty reports, `empty-zero.md` and `empty-no-events.md` | Keep the first six sections, render empty markers, zero timings or missing-record explanation; omit the optional upgrade section | Empty runs still produce a complete Chinese report without inventing work or an upgrade action |
+| Upgrade report, `empty-agents.md` | Render notices, actionable Agent states and the single consent question; retain Agent names and versions | Optional-section conditions and explicit installation consent remain unchanged |
+| English or another explicit language | English request receives unchanged generated output; another requested language receives the same complete faithful rendering | User override applies to final reports and decision questions, including upgrades |
+| Generation fails after allowed retries | Render the manual template and failure explanation in the requested/default display language, retaining known timings or missing-record meaning | Failure does not hide recovery or overwrite prior saved report/input data |
+| Internal stage handoff or target requires English docs | Stage results/records may stay English; final display remains Chinese; platform content follows target rules | Internal and hosting language choices do not override user display |
+
+Reverting this presentation policy restores English display instructions without migrating statuses, schemas, fixtures or saved data. No version bump, release or installation change is part of #121.

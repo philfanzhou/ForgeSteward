@@ -33,4 +33,4 @@ Clean only task-owned temporary environments that are clean and contain no uniqu
 
 ## Final report
 
-Cover all items using [Final report](references/reporting.md). Use clear, everyday English for progress, questions, reports, subagent handoffs, and Issue/Change Request bodies and comments, unless the user or owning repository explicitly specifies another language. Do not copy internal jargon into these outputs; explain any necessary term on first use. Prefer plain terms such as “build output” when referring to artifacts.
+Cover all items using [Final report](references/reporting.md). Use clear, everyday Chinese for final user replies/reports and questions requiring a user decision, unless the user explicitly requests another language. Progress, internal subagent prompts/results, handoffs and run records may stay in English. Hosting-platform titles, bodies, Comments and Review Feedback follow the owning repository's language rules, otherwise English. Avoid internal jargon; explain unfamiliar terms on first use; prefer plain terms such as “build output”.
