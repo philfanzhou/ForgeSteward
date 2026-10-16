@@ -134,7 +134,7 @@ class SandboxIsolationTests(Sandbox):
         self.command("cache-probe", "import json, subprocess, sys\n"
                      "exec(%r)\n"
                      "child = subprocess.run([sys.executable, '-c', %r], check=True, capture_output=True)\n"
-                     "sys.stdout.write(child.stdout.decode('utf-8'))\n" % (probe, probe))
+                     "print(child.stdout.decode('utf-8').strip())\n" % (probe, probe))
         command = [str(self.bin / ("cache-probe.cmd" if os.name == "nt" else "cache-probe"))]
 
         # A separate control HOME proves fresh imports would write at the forced cache destination.
