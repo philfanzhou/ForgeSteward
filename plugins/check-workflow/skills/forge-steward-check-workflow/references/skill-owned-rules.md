@@ -2,7 +2,7 @@
 
 ## Principle
 
-ForgeSteward's four skills alone define workflow policy. Project policies neither supplement nor replace them. check-workflow removes this second source, preserving conventions explicitly left to the repository.
+ForgeSteward's four skills alone define workflow policy. Remove project copies, which neither supplement nor replace it; preserve repository conventions.
 
 After deletion, constraints apply only on skill invocation. Other conversations/contributors no longer find them in project documents. This is intentional, not a retention reason.
 
@@ -31,13 +31,13 @@ Preserve conventions explicitly left to the repository:
 - Merge methods, required checks, approval counts, and branch protection settings.
 - Build, test, migration, smoke-check, and other verification commands, plus engineering requirements to run particular checks or add certain tests for a class of change.
 - Architecture boundaries, security constraints, compatibility/migration requirements, configuration/deployment contracts, documentation updates, versioning, and release processes.
-- Agent entry and loading mechanisms, such as `CLAUDE.md` importing `@AGENTS.md`.
+- Agent entry/loading mechanisms, except [root Claude migration](agent-entrypoints.md).
 
 When a rule mixes workflow policy and project conventions, delete only its policy portion under the methods below.
 
 ## Candidate locations
 
-- Root/nested `AGENTS.md` and `CLAUDE.md`; report `AGENTS.override.md` without editing it.
+- Root/nested `AGENTS.md` and `CLAUDE.md`, plus root `.claude/CLAUDE.md`; report `AGENTS.override.md` without editing it.
 - `CONTRIBUTING.md` and documents in `docs/` or elsewhere about collaboration, delivery, review, or Agent workflows.
 - Issue/Change Request templates, such as `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md`, `.gitlab/issue_templates/`, and `.gitlab/merge_request_templates/`.
 
