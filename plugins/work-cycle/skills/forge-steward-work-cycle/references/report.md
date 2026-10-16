@@ -1,8 +1,8 @@
 # Final report
 
-This file alone defines final-report sections, order and English source wording; other rules define field contents.
+Generate the final work-cycle report only from this file. It defines the sections, order, and wording; other rules only say what to record in each field.
 
-Before recording results or generating reports, read [all report input fields](report-data.md) in full. Vocabulary and output format remain here.
+Before recording results or generating a report, read [all report input fields](report-data.md) in full. This required reference defines the input fields; the vocabulary and output format remain here.
 
 ## Result vocabulary
 
@@ -16,18 +16,17 @@ Before recording results or generating reports, read [all report input fields](r
 - Closed without merge
 - Not started
 
- `Awaiting your approval`: checks passed; repository policy requires maintainer approval. `Waiting for external approval`: another person/system must approve. `Paused`: failed final review after repair three, a real blocker, or unfinished work when stopped; explain why. `Not started`: Issue has no PR. On user stop, still report; mark unfinished items `Paused` with reasons.
+ `Awaiting your approval` means all checks passed and repository policy requires maintainer approval. `Waiting for external approval` means another person or system must approve. `Paused` covers a failed final review after the third repair, a real blocker, or work unfinished when the run stops; explain the reason. `Not started` means the Issue has no PR. If the user stops midway, still generate a report and mark unfinished items `Paused` with reasons.
 
 ## Generation and fallback
 
-1. Run `report` in [run records](run-record.md). Saved run-directory `report.md` is authoritative English evidence; never rewrite it or machine-translate saved records or legacy/user free text on disk.
-2. Present a complete Chinese rendering to the user by default. An explicit user language request overrides this default: for English, present the generated output unchanged; for other languages, render it faithfully. Translate headings, outcome labels, all reasons/actions, timing labels, errors/recovery and any upgrade question. Preserve section order, every result/count/reason/action, optional-section conditions, Issue/PR identities, URLs, version strings, commands and technical identifiers. Do not append the raw English report to a translated final reply. Append at most one display-language notes paragraph.
-3. Exit `1` means invalid data. Correct the fields listed in `handoff.json` and retry, at most three times.
-4. If it still fails, exits `2`, Python is unavailable, or the script cannot run, write the template below manually in the requested/default display language, including the failure explanation meaning `This report was written manually by the model because: ...`; keep the remaining format and rendering guarantees above. Use `summary` timings or derive them from events; if neither exists, render `No record`.
+1. At the end, run the `report` subcommand in [run records](run-record.md) and paste its output unchanged. At most, append one additional-notes paragraph. It also saves `report.md` in the run directory.
+2. Exit `1` means invalid data. Correct the fields listed in `handoff.json` and retry, at most three times.
+3. If it still fails, exits `2`, Python is unavailable, or the script cannot run, write the template below manually. Start with `This report was written manually by the model because: ...`; keep the remaining format. Use `summary` timings or derive them from events; if neither exists, write `No record`.
 
 ## Specification
 
-The script reads sections, outcomes, and display names here. This sole specification and its English template are source evidence for rendering, not a second final English block. `result_aliases` and `agents.aliases` contain exact legacy input values as Unicode escapes for compatibility data, not output prose. Map aliases in memory before validation; reject unknown values and targets outside current vocabulary. Never rewrite inputs or translate free text. Schema, fields and CLI stay unchanged. On rollback, old readers may reject English values: retain original records; use old copies or the new reader, never reverse-write user data.
+The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` contain exact legacy input values as Unicode escapes for compatibility data, not output prose. Readers map these fields in memory before validation, never rewrite input files or translate free text, and reject unknown values. Alias targets must belong to the current vocabulary. Schema, fields, and CLI remain unchanged. Old readers may not accept new English values: on rollback, retain original records and use old copies or the new reader; do not reverse-write user data.
 
 ```json report-spec
 {
