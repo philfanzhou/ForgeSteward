@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -19,6 +20,88 @@ spec.loader.exec_module(record)
 
 def git(*arguments, cwd):
     subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True)
+
+
+def run_concurrent(commands, timeout=30):
+    """Start all writers before waiting, and reap every child even on interruption."""
+    processes = []
+    try:
+        for command in commands:
+            processes.append(subprocess.Popen(command, stdout=subprocess.PIPE,
+                                              stderr=subprocess.PIPE, text=True))
+        results = []
+        for process in processes:
+            stdout, stderr = process.communicate(timeout=timeout)
+            results.append(subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr))
+        return results
+    finally:
+        # Stop all live writers first; never leave one writing into a removed fixture.
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+        for process in processes:
+            try:
+                process.communicate(timeout=5)
+            finally:
+                process.stdout.close()
+                process.stderr.close()
+
+
+class ConcurrentChildTests(unittest.TestCase):
+    def setUp(self):
+        self.children = []
+        popen = subprocess.Popen
+        self.popen = popen
+
+        def launch(*args, **kwargs):
+            child = popen(*args, **kwargs)
+            self.children.append(child)
+            return child
+
+        self.patch = mock.patch.object(subprocess, "Popen", side_effect=launch)
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def assert_reaped(self):
+        self.assertTrue(self.children)
+        for child in self.children:
+            self.assertIsNotNone(child.poll())
+            self.assertTrue(child.stdout.closed)
+            self.assertTrue(child.stderr.closed)
+
+    def test_nonzero_child_preserves_stderr_and_reaps_later_children(self):
+        results = run_concurrent([[sys.executable, "-c", "import sys; sys.stderr.write('initial error'); sys.exit(2)"],
+                                  [sys.executable, "-c", "print('later writer')"]])
+        with self.assertRaisesRegex(AssertionError, "initial error"):
+            self.assertEqual([r.returncode for r in results], [0, 0], repr(results))
+        self.assert_reaped()
+
+    def test_launch_failure_reaps_started_children(self):
+        with self.assertRaises(OSError):
+            run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"],
+                            [str(Path(__file__).parent / "missing-event-writer")]])
+        self.assert_reaped()
+
+    def test_timeout_reaps_all_children(self):
+        with self.assertRaises(subprocess.TimeoutExpired):
+            run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"]] * 2, timeout=0.1)
+        self.assert_reaped()
+
+    def test_interruption_reaps_all_children(self):
+        real_communicate = self.popen.communicate
+        interrupted = False
+
+        def communicate(child, *args, **kwargs):
+            nonlocal interrupted
+            if not interrupted:
+                interrupted = True
+                raise KeyboardInterrupt()
+            return real_communicate(child, *args, **kwargs)
+
+        with mock.patch.object(self.popen, "communicate", new=communicate):
+            with self.assertRaises(KeyboardInterrupt):
+                run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"]] * 2)
+        self.assert_reaped()
 
 
 class RunRecordTests(unittest.TestCase):
@@ -83,18 +166,17 @@ class RunRecordTests(unittest.TestCase):
         self.assertEqual((review["result"], review["seconds"]), ("running", None))
 
     def test_concurrent_events_are_all_recorded_as_whole_lines(self):
-        run_id = self.start()["run_id"]
-        command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", run_id,
-                   "--stage", "implement", "--status", "started", "--detail", "x" * 900]
-        processes = [subprocess.Popen(command + ["--task", "implement-%d" % index], stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, text=True) for index in range(8)]
-        for process in processes:
-            self.assertEqual(process.wait(), 0)
-            process.stdout.close()
-            process.stderr.close()
-        path = record.run_dir(record.runs_root(self.repo), run_id)
-        self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
-                         ["implement-%d" % index for index in range(8)])
+        # Require every wave to succeed; repeated contention exposes short lock transitions.
+        for wave in range(20):
+            with self.subTest(wave=wave):
+                run_id = self.start()["run_id"]
+                command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", run_id,
+                           "--stage", "implement", "--status", "started", "--detail", "x" * 900]
+                results = run_concurrent([command + ["--task", "implement-%d" % index] for index in range(8)])
+                self.assertEqual([result.returncode for result in results], [0] * 8, repr(results))
+                path = record.run_dir(record.runs_root(self.repo), run_id)
+                self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
+                                 ["implement-%d" % index for index in range(8)])
 
     def test_prune_keeps_newest_runs_and_ignores_foreign_directories(self):
         root = record.runs_root(self.repo)
