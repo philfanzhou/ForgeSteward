@@ -59,6 +59,8 @@ class Sandbox(unittest.TestCase):
         self.env = {key: value for key, value in os.environ.items()
                     if key not in ("OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "DSH_HOME")}
         self.env.update(PATH=str(self.bin), HOME=str(self.home), USERPROFILE=str(self.home))
+        # Bare fake Python commands and their descendants must not add bytecode to the HOME being checked.
+        self.env["PYTHONDONTWRITEBYTECODE"] = "1"
         self.no_api = (self.root / "no-release.json").as_uri()
 
     def fake(self, name, stdout="", code=0, sleep=0):
@@ -121,6 +123,86 @@ def claude_list(versions, scope="user"):
 
 def every(version):
     return {name: version for name in PLUGINS}
+
+
+class SandboxIsolationTests(Sandbox):
+    def test_fake_command_and_descendant_do_not_write_bytecode(self):
+        module = self.impl / "cache_probe.py"
+        module.write_text("value = 123\n", encoding="utf-8")
+        probe = ("import json, sys; sys.path.insert(0, %r); import cache_probe; "
+                 "print(json.dumps([sys.dont_write_bytecode, cache_probe.__cached__]))") % str(self.impl)
+        self.command("cache-probe", "import json, subprocess, sys\n"
+                     "exec(%r)\n"
+                     "child = subprocess.run([sys.executable, '-c', %r], check=True, capture_output=True)\n"
+                     "print(child.stdout.decode('utf-8').strip())\n" % (probe, probe))
+        command = [str(self.bin / ("cache-probe.cmd" if os.name == "nt" else "cache-probe"))]
+
+        # A separate control HOME proves fresh imports would write at the forced cache destination.
+        control_home = self.root / "control-home"
+        control_home.mkdir()
+        control = dict(self.env, HOME=str(control_home), USERPROFILE=str(control_home),
+                       PYTHONPYCACHEPREFIX=str(control_home / "Library/Caches/python"))
+        control.pop("PYTHONDONTWRITEBYTECODE")
+        result = subprocess.run(command, env=control, capture_output=True, check=True)
+        reports = [json.loads(line) for line in result.stdout.decode("utf-8").splitlines()]
+        self.assertEqual(len(reports), 2)
+        for disabled, cached in reports:
+            self.assertFalse(disabled)
+            self.assertTrue(Path(cached).is_file(), cached)
+            self.assertIn(control_home, Path(cached).parents)
+
+        self.env["PYTHONPYCACHEPREFIX"] = str(self.home / "Library/Caches/python")
+        before = snapshot(self.home)
+        result = subprocess.run(command, env=self.env, capture_output=True, check=True)
+        reports = [json.loads(line) for line in result.stdout.decode("utf-8").splitlines()]
+        self.assertEqual(len(reports), 2)
+        for disabled, cached in reports:
+            self.assertTrue(disabled)
+            self.assertFalse(Path(cached).exists(), cached)
+            self.assertIn(self.home, Path(cached).parents)
+        self.assertEqual(snapshot(self.home), before)
+
+    def test_read_only_snapshot_rejects_real_check_process_writes(self):
+        self.gh()
+        for relative, action in ((".codex/config.toml", "add"), (".codex/config.toml", "edit"),
+                                 ("Library/Caches/installer-write", "add"),
+                                 ("Library/Caches/installer-write", "edit"), ("empty-directory", "remove")):
+            with self.subTest(path=relative, action=action):
+                target = self.home / relative
+                if action == "remove":
+                    target.mkdir()
+                before = snapshot(self.home)
+                fault = """
+real_check = m.check
+def check(*args, **kwargs):
+    result = real_check(*args, **kwargs)
+    target = Path.home() / %r
+    if %r == "remove":
+        target.rmdir()
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(%r, encoding="utf-8")
+    return result
+m.check = check
+""" % (relative, action, action)
+                runner = self.root / "fault-runner.py"
+                runner.write_text(FAULT_RUNNER % (str(SCRIPT), fault), encoding="utf-8")
+                result = subprocess.run([sys.executable, "-B", str(runner), "check", "--catalog", str(self.catalog),
+                                         "--release-api", self.no_api, "--json"], env=self.env, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+                self.assertEqual(json.loads(result.stdout)["latest"]["version"], LATEST)
+                after = snapshot(self.home)
+                if action == "remove":
+                    self.assertNotIn(relative, after)
+                else:
+                    self.assertEqual(after[relative], action.encode("utf-8"))
+                    if action == "edit":
+                        self.assertEqual(before[relative], b"add")
+                    else:
+                        self.assertNotIn(relative, before)
+                        self.assertNotIn(target.parent.relative_to(self.home).as_posix(), before)
+                with self.assertRaises(AssertionError):
+                    self.assertEqual(after, before)
 
 
 class AgentStatusTests(Sandbox):
