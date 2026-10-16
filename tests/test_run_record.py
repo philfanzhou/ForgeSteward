@@ -191,13 +191,16 @@ class RunRecordTests(unittest.TestCase):
         kernel.CreateFileW.restype = wintypes.HANDLE
         kernel.CloseHandle.argtypes = [wintypes.HANDLE]
         kernel.CloseHandle.restype = wintypes.BOOL
+        kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                      wintypes.LPVOID, wintypes.DWORD]
+        kernel.SetFileInformationByHandle.restype = wintypes.BOOL
         run_id = self.start()["run_id"]
         path = record.run_dir(record.runs_root(self.repo), run_id)
         guard = path / ".events.lock"
         guard.mkdir()
-        # Retain a delete-sharing handle after the previous writer removes its guard.
-        # Windows keeps this directory pending deletion until that handle closes.
-        handle = kernel.CreateFileW(str(guard), 0, 7, None, 3, 0x02000000, None)
+        # Explicit legacy delete disposition keeps the directory pending deletion.
+        # Recent Windows versions can unlink immediately with ordinary rmdir.
+        handle = kernel.CreateFileW(str(guard), 0x00010000, 7, None, 3, 0x02000000, None)
         self.assertNotEqual(handle, ctypes.c_void_p(-1).value, ctypes.WinError(ctypes.get_last_error()))
         mkdir = record.os.mkdir
         observed = []
@@ -214,7 +217,10 @@ class RunRecordTests(unittest.TestCase):
                 raise
 
         try:
-            guard.rmdir()
+            delete = ctypes.c_ubyte(1)
+            self.assertTrue(kernel.SetFileInformationByHandle(handle, 4, ctypes.byref(delete),
+                                                             ctypes.sizeof(delete)),
+                            ctypes.WinError(ctypes.get_last_error()))
             stderr = io.StringIO()
             with mock.patch.object(record.os, "mkdir", side_effect=create):
                 with redirect_stderr(stderr), redirect_stdout(io.StringIO()):
