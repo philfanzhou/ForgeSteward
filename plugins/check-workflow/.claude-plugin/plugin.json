@@ -1,6 +1,6 @@
 {
   "name": "check-workflow",
-  "version": "0.2.24",
+  "version": "0.2.25",
   "description": "Check branch cleanup settings and releases read-only, remove duplicate ForgeSteward workflow rules, safely consolidate root Claude instructions, and configure English collaboration defaults in an existing root entry; submit cleanup as a PR or MR without merging. Release findings are reported only.",
   "author": {
     "name": "philfanzhou",
