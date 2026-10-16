@@ -33,7 +33,11 @@ def run_concurrent(commands, timeout=30):
                                               stderr=subprocess.PIPE, text=True))
         results = []
         for process in processes:
-            stdout, stderr = process.communicate(timeout=timeout)
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired as error:
+                raise AssertionError("Writer timed out; earlier results: %r; current stderr: %r" %
+                                     (results, error.stderr)) from error
             results.append(subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr))
         return results
     finally:
@@ -85,8 +89,14 @@ class ConcurrentChildTests(unittest.TestCase):
         self.assert_reaped()
 
     def test_timeout_reaps_all_children(self):
-        with self.assertRaises(subprocess.TimeoutExpired):
+        with self.assertRaisesRegex(AssertionError, "Writer timed out"):
             run_concurrent([[sys.executable, "-c", "import time; time.sleep(60)"]] * 2, timeout=0.1)
+        self.assert_reaped()
+
+    def test_timeout_preserves_an_earlier_child_error(self):
+        with self.assertRaisesRegex(AssertionError, "initial error"):
+            run_concurrent([[sys.executable, "-c", "import sys; sys.stderr.write('initial error'); sys.exit(2)"],
+                            [sys.executable, "-c", "import time; time.sleep(60)"]], timeout=1)
         self.assert_reaped()
 
     def test_interruption_reaps_all_children(self):
@@ -175,7 +185,10 @@ class RunRecordTests(unittest.TestCase):
                 command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", run_id,
                            "--stage", "implement", "--status", "started", "--detail", "x" * 900]
                 results = run_concurrent([command + ["--task", "implement-%d" % index] for index in range(8)])
-                self.assertEqual([result.returncode for result in results], [0] * 8, repr(results))
+                diagnostics = "\n".join("writer %d: exit %s; stdout=%r; stderr=%r" %
+                                        (index, result.returncode, result.stdout, result.stderr)
+                                        for index, result in enumerate(results))
+                self.assertEqual([result.returncode for result in results], [0] * 8, diagnostics)
                 path = record.run_dir(record.runs_root(self.repo), run_id)
                 self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
                                  ["implement-%d" % index for index in range(8)])
@@ -212,8 +225,9 @@ class RunRecordTests(unittest.TestCase):
             except PermissionError as error:
                 if args[0] == str(guard):
                     observed.append(error.winerror)
-                    kernel.CloseHandle(handle)
-                    handle = None
+                    if handle is not None:
+                        kernel.CloseHandle(handle)
+                        handle = None
                 raise
 
         try:
@@ -227,12 +241,100 @@ class RunRecordTests(unittest.TestCase):
                     result = record.main(["--repo", str(self.repo), "event", "--run", run_id,
                                           "--task", "windows-writer", "--stage", "implement", "--status", "started"])
             self.assertEqual(result, 0, stderr.getvalue())
-            self.assertEqual(observed, [5], "Expected real ERROR_ACCESS_DENIED from pending deletion")
+            self.assertEqual(set(observed), {5}, "Expected real ERROR_ACCESS_DENIED from pending deletion")
             self.assertEqual([event["task"] for event in record.read_events(path)], ["windows-writer"])
             self.assertFalse(guard.exists())
         finally:
             if handle is not None:
                 kernel.CloseHandle(handle)
+
+    def test_event_retries_transient_windows_guard_access_denied(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        guard = path / ".events.lock"
+        mkdir = record.os.mkdir
+        error = PermissionError(13, "Windows guard pending deletion", str(guard))
+        error.winerror = 5
+        denied = False
+
+        def create(*args, **kwargs):
+            nonlocal denied
+            if args[0] == str(guard) and not denied:
+                denied = True
+                raise error
+            return mkdir(*args, **kwargs)
+
+        with mock.patch.object(record.os, "mkdir", side_effect=create):
+            with mock.patch.object(record.time, "sleep") as sleep:
+                record.add_event(path, "writer", "implement", "started", None, None, datetime.now(timezone.utc))
+        sleep.assert_called_once_with(0.01)
+        self.assertEqual([event["task"] for event in record.read_events(path)], ["writer"])
+        self.assertFalse(guard.exists())
+
+    def test_unavailable_guard_times_out_without_appending_or_removing_it(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        guard = path / ".events.lock"
+        guard.mkdir()
+        mkdir = record.os.mkdir
+        windows_error = PermissionError(13, "Windows guard access denied", str(guard))
+        windows_error.winerror = 5
+        for error in (FileExistsError(17, "guard already held", str(guard)), windows_error):
+            with self.subTest(error=error):
+                def create(*args, **kwargs):
+                    if args[0] == str(guard):
+                        raise error
+                    return mkdir(*args, **kwargs)
+
+                with mock.patch.object(record.os, "mkdir", side_effect=create):
+                    with mock.patch.object(record.time, "monotonic", side_effect=[100, 111]):
+                        with self.assertRaisesRegex(ValueError, "Timed out waiting for") as raised:
+                            record.add_event(path, "blocked", "implement", "started", None, None,
+                                             datetime.now(timezone.utc))
+                self.assertIs(raised.exception.__cause__, error)
+                self.assertIn(str(error), str(raised.exception))
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
+                self.assertTrue(guard.is_dir())
+
+    def test_unrelated_guard_errors_fail_immediately_and_preserve_events(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        guard = path / ".events.lock"
+        mkdir = record.os.mkdir
+        for error in (PermissionError(13, "unrelated permission denied"), OSError(5, "I/O failure")):
+            with self.subTest(error=error):
+                def create(*args, **kwargs):
+                    if args[0] == str(guard):
+                        raise error
+                    return mkdir(*args, **kwargs)
+
+                with mock.patch.object(record.os, "mkdir", side_effect=create):
+                    with mock.patch.object(record.time, "sleep") as sleep:
+                        with self.assertRaises(OSError) as raised:
+                            record.add_event(path, "denied", "implement", "started", None, None,
+                                             datetime.now(timezone.utc))
+                self.assertIs(raised.exception, error)
+                sleep.assert_not_called()
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
+                self.assertFalse(guard.exists())
+
+    def test_failed_append_releases_only_its_owned_guard_and_keeps_prior_lines(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        for operation in ("open", "write"):
+            with self.subTest(operation=operation):
+                with mock.patch.object(record.os, operation, side_effect=PermissionError("append denied")):
+                    with self.assertRaisesRegex(PermissionError, "append denied"):
+                        record.add_event(path, "denied", "implement", "started", None, None,
+                                         datetime.now(timezone.utc))
+                self.assertFalse((path / ".events.lock").exists())
+                self.assertEqual((path / "events.jsonl").read_bytes(), before)
 
     def test_prune_keeps_newest_runs_and_ignores_foreign_directories(self):
         root = record.runs_root(self.repo)

@@ -122,9 +122,13 @@ def add_event(path, task, stage, status, wait, detail, moment):
         try:
             os.mkdir(str(guard))
             break
-        except FileExistsError:
+        except OSError as error:
+            # A Windows delete-pending directory rejects recreation with access denied.
+            # Retry only this guard acquisition; retain other filesystem errors.
+            if not isinstance(error, FileExistsError) and getattr(error, "winerror", None) != 5:
+                raise
             if time.monotonic() > deadline:
-                raise ValueError("Timed out waiting for " + str(guard))
+                raise ValueError("Timed out waiting for %s: %s" % (guard, error)) from error
             time.sleep(0.01)
     try:
         fd = os.open(str(path / "events.jsonl"), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
