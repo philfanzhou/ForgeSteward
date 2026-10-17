@@ -2,12 +2,14 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -19,6 +21,18 @@ spec.loader.exec_module(lock)
 
 def git(*arguments, cwd):
     subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True)
+
+
+def stamp(hours_ago=0):
+    moment = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+    return moment.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def owner_arguments(run, task, attempt=1):
+    arguments = ["--run", run, "--task", task]
+    if attempt != 1:
+        arguments += ["--attempt", str(attempt)]
+    return arguments
 
 
 class ResourceLockTests(unittest.TestCase):
@@ -39,85 +53,216 @@ class ResourceLockTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-B", str(SCRIPT), "--repo", str(repo or self.repo), *arguments],
                               capture_output=True, text=True)
 
+    def acquire(self, resource, run, task, attempt=1, *arguments, repo=None):
+        return self.run_cli("acquire", resource, *owner_arguments(run, task, attempt), *arguments, repo=repo)
+
+    def release(self, resource, run, task, attempt=1):
+        return self.run_cli("release", resource, *owner_arguments(run, task, attempt))
+
+    def status(self, resource=None):
+        arguments = ["status"] + ([resource] if resource else [])
+        result = self.run_cli(*arguments)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def seed_slot(self, record, resource="db", capacity=1):
+        path = lock.locks_root(self.repo) / resource
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "capacity").write_text(str(capacity) + "\n", encoding="utf-8")
+        slot = path / "slot-0"
+        slot.mkdir()
+        (slot / "holder.json").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        return slot
+
+    def owner_record(self, run, task, attempt, pid, process_start=None, acquired_at=None):
+        return {"resource": "db", "owner": lock.owner_key(run, task, attempt), "run": run, "task": task,
+                "attempt": attempt, "pid": pid, "process_start": process_start,
+                "note": "", "acquired_at": acquired_at or stamp()}
+
+    def exited_pid(self):
+        process = subprocess.Popen([sys.executable, "-c", "pass"])
+        process.wait()
+        return process.pid
+
     def test_acquire_release_and_exclusive_by_default(self):
-        first = self.run_cli("acquire", "db", "--holder", "issue-1")
+        first = self.acquire("db", "run-a", "implement-167")
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertEqual(first.stdout.strip(), "ACQUIRED slot-0")
-        busy = self.run_cli("acquire", "db", "--holder", "issue-2")
+        busy = self.acquire("db", "run-b", "implement-167")
         self.assertEqual(busy.returncode, 1)
-        self.assertIn("issue-1", busy.stdout)
-        self.assertEqual(self.run_cli("release", "db", "--holder", "issue-1").returncode, 0)
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "issue-2").returncode, 0)
+        self.assertIn("run-a/implement-167/1", busy.stdout)
+        self.assertEqual(self.release("db", "run-a", "implement-167").returncode, 0)
+        self.assertEqual(self.acquire("db", "run-b", "implement-167").returncode, 0)
 
-    def test_capacity_allows_that_many_holders_and_is_fixed_on_first_use(self):
-        for holder in ("a", "b"):
-            self.assertEqual(self.run_cli("acquire", "heavy", "--holder", holder, "--capacity", "2").returncode, 0)
-        self.assertEqual(self.run_cli("acquire", "heavy", "--holder", "c", "--capacity", "2").returncode, 1)
-        mismatch = self.run_cli("acquire", "heavy", "--holder", "c", "--capacity", "3")
-        self.assertEqual(mismatch.returncode, 2)
-        self.assertIn("capacity", mismatch.stderr)
-
-    def test_same_holder_retry_reports_held_without_taking_a_second_slot(self):
-        self.assertEqual(self.run_cli("acquire", "heavy", "--holder", "a", "--capacity", "2").returncode, 0)
-        retry = self.run_cli("acquire", "heavy", "--holder", "a", "--capacity", "2")
-        self.assertEqual((retry.returncode, retry.stdout.strip()), (0, "HELD"))
-        self.assertEqual(self.run_cli("acquire", "heavy", "--holder", "b", "--capacity", "2").returncode, 0)
-
-    def test_only_the_holder_can_release(self):
-        self.run_cli("acquire", "simulator", "--holder", "issue-1")
-        refused = self.run_cli("release", "simulator", "--holder", "issue-2")
+    def test_two_runs_with_the_same_stage_identifiers_cannot_share_or_release(self):
+        self.assertEqual(self.acquire("db", "run-a", "implement-167").returncode, 0)
+        busy = self.acquire("db", "run-b", "implement-167")
+        self.assertEqual(busy.returncode, 1)
+        self.assertIn("run-a/implement-167/1", busy.stdout)
+        waited = self.acquire("db", "run-b", "implement-167", 1, "--wait", "1")
+        self.assertEqual(waited.returncode, 1)
+        refused = self.release("db", "run-b", "implement-167")
         self.assertEqual(refused.returncode, 2)
         self.assertIn("does not hold", refused.stderr)
-        self.assertEqual(self.run_cli("acquire", "simulator", "--holder", "issue-2").returncode, 1)
+        report = self.status("db")
+        self.assertEqual([holder["owner"] for holder in report[0]["holders"]], ["run-a/implement-167/1"])
+        self.assertEqual(self.release("db", "run-a", "implement-167").returncode, 0)
+        self.assertEqual(self.acquire("db", "run-b", "implement-167").returncode, 0)
+
+    def test_same_owner_retry_is_idempotent_and_attempts_are_distinct(self):
+        self.assertEqual(self.acquire("heavy", "run-a", "a", 1, "--capacity", "2").returncode, 0)
+        retry = self.acquire("heavy", "run-a", "a", 1, "--capacity", "2")
+        self.assertEqual((retry.returncode, retry.stdout.strip()), (0, "HELD"))
+        self.assertEqual(len(self.status("heavy")[0]["holders"]), 1)
+        second_attempt = self.acquire("heavy", "run-a", "a", 2, "--capacity", "2")
+        self.assertEqual(second_attempt.returncode, 0, second_attempt.stderr)
+        self.assertEqual(sorted(h["owner"] for h in self.status("heavy")[0]["holders"]),
+                         ["run-a/a/1", "run-a/a/2"])
+
+    def test_capacity_allows_that_many_owners_and_is_fixed_on_first_use(self):
+        for run in ("run-a", "run-b"):
+            self.assertEqual(self.acquire("heavy", run, "worker", 1, "--capacity", "2").returncode, 0)
+        self.assertEqual(self.acquire("heavy", "run-c", "worker", 1, "--capacity", "2").returncode, 1)
+        mismatch = self.acquire("heavy", "run-c", "worker", 1, "--capacity", "3")
+        self.assertEqual(mismatch.returncode, 2)
+        self.assertIn("capacity", mismatch.stderr)
+        self.assertEqual(len(self.status("heavy")[0]["holders"]), 2)
+
+    def test_only_the_owner_key_can_release(self):
+        self.assertEqual(self.acquire("simulator", "run-a", "issue-1").returncode, 0)
+        refused = self.release("simulator", "run-b", "issue-1")
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("does not hold", refused.stderr)
+        self.assertEqual(self.acquire("simulator", "run-b", "issue-1").returncode, 1)
 
     def test_wait_times_out_and_succeeds_once_released(self):
-        self.run_cli("acquire", "merge", "--holder", "pr-1")
+        self.assertEqual(self.acquire("merge", "run-a", "pr-1").returncode, 0)
         started = time.monotonic()
-        self.assertEqual(self.run_cli("acquire", "merge", "--holder", "pr-2", "--wait", "1").returncode, 1)
+        self.assertEqual(self.acquire("merge", "run-b", "pr-2", 1, "--wait", "1").returncode, 1)
         self.assertGreaterEqual(time.monotonic() - started, 1)
-        root = lock.locks_root(self.repo)
-        lock.release(root, "merge", "pr-1")
-        self.assertEqual(lock.acquire(root, "merge", 1, "pr-2", None, 1), "ACQUIRED slot-0")
+        self.assertEqual(self.release("merge", "run-a", "pr-1").returncode, 0)
+        self.assertEqual(self.acquire("merge", "run-b", "pr-2").returncode, 0)
 
     def test_simultaneous_acquirers_get_exactly_capacity_slots(self):
-        command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "acquire", "docker", "--capacity", "2"]
-        processes = [subprocess.Popen(command + ["--holder", "h%d" % index], stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, text=True) for index in range(8)]
+        command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "acquire", "docker",
+                   "--capacity", "2"]
+        processes = [subprocess.Popen(command + ["--run", "run-%d" % index, "--task", "docker"],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                     for index in range(8)]
         codes = [process.wait() for process in processes]
         for process in processes:
             process.stdout.close()
             process.stderr.close()
         self.assertEqual(sorted(codes), [0, 0, 1, 1, 1, 1, 1, 1])
-        report = json.loads(self.run_cli("status", "docker").stdout)
+        report = self.status("docker")
         self.assertEqual(sorted(h["slot"] for h in report[0]["holders"]), ["slot-0", "slot-1"])
 
-    def test_invalid_names_and_holders_are_rejected(self):
+    def test_invalid_names_components_and_attempts_are_rejected(self):
         for name in ("", "DB", "../x", "a b", "x" * 65):
             with self.subTest(name=name):
-                self.assertEqual(self.run_cli("acquire", name, "--holder", "a").returncode, 2)
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "a\nb").returncode, 2)
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "a", "--capacity", "0").returncode, 2)
+                self.assertEqual(self.acquire(name, "run-a", "a").returncode, 2)
+        for run in ("", "a/b", "a b", "-a", "a" * 65):
+            with self.subTest(run=run):
+                self.assertEqual(self.acquire("db", run, "a").returncode, 2)
+        for attempt in ("0", "10000", "x"):
+            with self.subTest(attempt=attempt):
+                self.assertEqual(self.run_cli("acquire", "db", "--run", "run-a", "--task", "a",
+                                              "--attempt", attempt).returncode, 2)
+        self.assertEqual(self.run_cli("acquire", "db", "--task", "a").returncode, 2)
+        self.assertEqual(self.run_cli("acquire", "db", "--run", "run-a").returncode, 2)
+        self.assertEqual(self.run_cli("acquire", "db", "--holder", "a").returncode, 2)
+        self.assertEqual(self.acquire("db", "run-a", "a", 1, "--capacity", "0").returncode, 2)
+        self.assertEqual(self.run_cli("status", "DB").returncode, 2)
 
-    def test_status_reports_holders_and_note(self):
-        self.run_cli("acquire", "port-5432", "--holder", "issue-7", "--note", "integration tests")
-        report = json.loads(self.run_cli("status").stdout)
+    def test_status_reports_owner_metadata_age_and_note(self):
+        result = self.run_cli("acquire", "port-5432", "--run", "run-a", "--task", "issue-7",
+                              "--note", "integration tests")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self.status()
         self.assertEqual(report[0]["resource"], "port-5432")
         self.assertEqual(report[0]["capacity"], 1)
-        self.assertEqual(report[0]["holders"][0]["holder"], "issue-7")
-        self.assertEqual(report[0]["holders"][0]["note"], "integration tests")
+        holder = report[0]["holders"][0]
+        self.assertEqual(holder["owner"], "run-a/issue-7/1")
+        self.assertEqual((holder["run"], holder["task"], holder["attempt"]), ("run-a", "issue-7", 1))
+        self.assertGreater(holder["pid"], 0)
+        self.assertTrue(holder["process_start"] or holder["process_start_error"])
+        self.assertEqual(holder["note"], "integration tests")
+        self.assertTrue(holder["acquired_at"].endswith("Z"))
+        self.assertGreaterEqual(holder["age_seconds"], 0)
+        self.assertIn(holder["liveness"], ("alive", "stopped", "unknown"))
+        self.assertFalse(holder["legacy"])
+
+    def test_stale_slot_is_reported_and_can_be_recovered_after_the_owner_stopped(self):
+        dead = self.exited_pid()
+        slot = self.seed_slot(self.owner_record("run-a", "review-pr-45", 2, dead, acquired_at=stamp(2)))
+        report = self.status("db")
+        holder = report[0]["holders"][0]
+        self.assertEqual(holder["owner"], "run-a/review-pr-45/2")
+        self.assertEqual(holder["liveness"], "stopped")
+        self.assertGreaterEqual(holder["age_seconds"], 7200)
+        self.assertTrue(slot.is_dir(), "status must not remove a stale slot")
+        released = self.release("db", "run-a", "review-pr-45", 2)
+        self.assertEqual(released.returncode, 0, released.stderr)
+        self.assertEqual(released.stdout.strip(), "RELEASED slot-0")
+        self.assertEqual(self.status("db")[0]["holders"], [])
+
+    def test_active_slot_is_never_released_by_another_process(self):
+        start, _ = lock.process_start(os.getpid())
+        slot = self.seed_slot(self.owner_record("run-a", "implement-167", 1, os.getpid(), process_start=start))
+        holder = self.status("db")[0]["holders"][0]
+        self.assertEqual(holder["liveness"], "alive")
+        refused = self.release("db", "run-a", "implement-167")
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("Refusing", refused.stderr)
+        self.assertTrue(slot.is_dir(), "an active slot must not be removed")
+
+    def test_reused_process_id_is_not_treated_as_the_same_owner(self):
+        start, _ = lock.process_start(os.getpid())
+        if start is None:
+            self.skipTest("process start times are unavailable on this platform")
+        self.seed_slot(self.owner_record("run-a", "implement-167", 1, os.getpid(),
+                                         process_start=start + "-different"))
+        holder = self.status("db")[0]["holders"][0]
+        self.assertEqual(holder["liveness"], "stopped")
+        self.assertIn("different start time", holder["liveness_detail"])
+        self.assertEqual(self.release("db", "run-a", "implement-167").returncode, 0)
+
+    def test_legacy_holder_is_reported_read_only(self):
+        slot = self.seed_slot({"resource": "db", "holder": "implement-167", "note": "old format",
+                               "acquired_at": stamp(1)})
+        holder = self.status("db")[0]["holders"][0]
+        self.assertEqual(holder["owner"], "implement-167")
+        self.assertTrue(holder["legacy"])
+        self.assertEqual(holder["liveness"], "unknown")
+        self.assertIn("no owner process ID", holder["liveness_detail"])
+        refused = self.release("db", "run-a", "implement-167")
+        self.assertEqual(refused.returncode, 2)
+        self.assertTrue(slot.is_dir())
+
+    def test_run_level_ownership_is_exclusive(self):
+        reserved = self.acquire("run", "run-a", "run", 1, "--capacity", "2")
+        self.assertEqual(reserved.returncode, 2)
+        self.assertIn("capacity 1", reserved.stderr)
+        self.assertEqual(self.acquire("run", "run-a", "run").returncode, 0)
+        busy = self.acquire("run", "run-b", "run")
+        self.assertEqual(busy.returncode, 1)
+        self.assertIn("run-a/run/1", busy.stdout)
+        self.assertEqual(self.acquire("run", "run-b", "run", 1, "--wait", "1").returncode, 1)
+        self.assertEqual(self.release("run", "run-a", "run").returncode, 0)
+        self.assertEqual(self.acquire("run", "run-b", "run").returncode, 0)
 
     def test_worktrees_share_locks_and_project_files_stay_untouched(self):
         worktree = Path(self.temporary.name) / "worktree"
         git("worktree", "add", "-q", "--detach", str(worktree), cwd=self.repo)
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "main-checkout").returncode, 0)
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "worktree", repo=worktree).returncode, 1)
+        self.assertEqual(self.acquire("db", "run-a", "main-checkout").returncode, 0)
+        self.assertEqual(self.acquire("db", "run-b", "worktree", 1, repo=worktree).returncode, 1)
         status = subprocess.run(["git", "status", "--porcelain"], cwd=self.repo, capture_output=True, text=True)
         self.assertEqual(status.stdout, "")
 
     def test_non_repository_is_an_error(self):
         outside = Path(self.temporary.name) / "plain"
         outside.mkdir()
-        self.assertEqual(self.run_cli("acquire", "db", "--holder", "a", repo=outside).returncode, 2)
+        self.assertEqual(self.acquire("db", "run-a", "a", 1, repo=outside).returncode, 2)
 
 
 if __name__ == "__main__":
