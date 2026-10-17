@@ -1,8 +1,8 @@
 # Final report
 
-Generate the final work-cycle report only from this file. It defines the sections, order, and wording; other rules only say what to record in each field.
+Generate the final work-cycle report only from this file. It defines sections, order, and wording; other rules only say what to record.
 
-Before recording results or generating a report, read [all report input fields](report-data.md) in full. This required reference defines the input fields; the vocabulary and output format remain here.
+Before recording results or generating a report, read [report input fields](report-data.md) in full. It defines input fields; the vocabulary and output format remain here.
 
 ## Result vocabulary
 
@@ -16,17 +16,17 @@ Before recording results or generating a report, read [all report input fields](
 - Closed without merge
 - Not started
 
- `Awaiting your approval` means all checks passed and repository policy requires maintainer approval. `Waiting for external approval` means another person or system must approve. `Paused` covers a failed final review after the third repair, a real blocker, or work unfinished when the run stops; explain the reason. `Not started` means the Issue has no PR. If the user stops midway, still generate a report and mark unfinished items `Paused` with reasons.
+`Awaiting your approval` means all checks passed and repository policy requires maintainer approval. `Waiting for external approval` means another person or system must approve. `Paused` covers a failed third-repair final review, a real blocker, or unfinished work when the run stops; explain the reason. `Not started` means the Issue has no PR. If the user stops, still report and mark unfinished items `Paused` with reasons.
 
 ## Generation and fallback
 
-1. At the end, run the `report` subcommand in [run records](run-record.md) and paste its output unchanged. At most, append one additional-notes paragraph. It also saves `report.md` in the run directory.
+1. At the end, run `report` in [run records](run-record.md) and paste its output unchanged. Append at most one additional-notes paragraph; it also saves `report.md` in the run directory.
 2. Exit `1` means invalid data. Correct the fields listed in `handoff.json` and retry, at most three times.
-3. If it still fails, exits `2`, Python is unavailable, or the script cannot run, write the template below manually. Start with `This report was written manually by the model because: ...`; keep the remaining format. Use `summary` timings or derive them from events; if neither exists, write `No record`.
+3. If it still fails, exits `2`, Python is unavailable, or the script cannot run, write the template below manually. Start with `This report was written manually by the model because: ...`; keep the remaining format. Use `summary` timings or events; if neither exists, write `No record`.
 
 ## Specification
 
-The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` contain exact legacy input values as Unicode escapes for compatibility data, not output prose. Readers map these fields in memory before validation, never rewrite input files or translate free text, and reject unknown values. Alias targets must belong to the current vocabulary. Existing fields and the CLI remain unchanged; `release_audit` is optional. Old readers may not accept new English values: on rollback, retain original records and use old copies or the new reader; do not reverse-write user data.
+The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` hold exact legacy inputs as Unicode escapes for compatibility, not output prose. Readers map them in memory before validation, never rewrite inputs or translate free text, and reject unknown values. Targets must belong to the current vocabulary. Existing fields and the CLI are unchanged; `release_audit` is optional. Older readers may reject new English values: on rollback, retain original records and use old copies or the new reader; never reverse-write user data.
 
 ```json report-spec
 {
@@ -47,7 +47,7 @@ The script reads sections, outcomes, and display names here. This is the only sh
     "\u672a\u5f00\u59cb": "Not started"
   },
   "stages": {"check-workflow": "Rule checks", "prepare": "Preparation", "implement": "Implementation", "review": "Review", "fix": "Repair", "merge": "Merge", "cleanup": "Cleanup"},
-  "waits": {"ci": "Waiting for CI", "lock": "Waiting for local resources"},
+  "waits": {"ci": "Waiting for CI", "lock": "Waiting for local resources", "review": "Review wait", "external": "Waiting for external approval", "other": "Other waits"},
   "agents": {
     "absent": "Agent not installed",
     "current": "Current",
@@ -107,7 +107,7 @@ Conclusion: <merged PR count> PRs merged; <action count> items need your action.
 
 ### Time spent
 - Total <duration>: Preparation 12, Implementation 48, Review 25 (minutes)
-- Including Waiting for CI <duration>, Waiting for local resources <duration>
+- Including Waiting for CI <duration>, Waiting for local resources <duration>, Review wait <duration>, Waiting for external approval <duration>, Other waits <duration>
 
 ### Errors and recovery
 - <what>. Recovery: <recovery>
@@ -127,4 +127,4 @@ Filling rules:
 - Release audit: include this bullet only when `release_audit` is present. Use its summary, display name, every listed finding and unknown, and evidence location; omit `Findings:`/`Unknowns:` parts when empty, and never drop a listed item. Older handoffs stay unchanged.
 - Concurrency disabled or returned to serial: `Concurrency: Disabled; Reason: <serial_reason>`. Omit the separator and suffix for empty notes, likewise for the existing-PR note.
 - Last section: follow section-seven rules in [installation checks](agent-check.md).
-- Time spent: total is the interval between first and last event; below one hour use `Y min`, otherwise `X h Y min`. Show only stages with completed records, in specification order, then unknown stage names alphabetically as-is. With no stages, omit the colon and suffix. Round minutes to the nearest integer. Missing CI/local-resource waits are `0 min`; with no events, the whole section is `- No record`.
+- Time spent: total is first-to-last event; below one hour use `Y min`, otherwise `X h Y min`. Show only stages with completed records, in specification order, then unknown stage names alphabetically as-is. With no stages, omit the colon and suffix. Round minutes to the nearest integer. Missing waits are `0 min`; with no events, the section is `- No record`.

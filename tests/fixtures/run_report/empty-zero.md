@@ -17,7 +17,7 @@ Conclusion: 0 PRs merged; 0 items need your action. Completed 0 cycles (limit 3)
 
 ### Time spent
 - Total 0 min: Preparation 0 (minutes)
-- Including Waiting for CI 0 min, Waiting for local resources 0 min
+- Including Waiting for CI 0 min, Waiting for local resources 0 min, Review wait 0 min, Waiting for external approval 0 min, Other waits 0 min
 
 ### Errors and recovery
 - None

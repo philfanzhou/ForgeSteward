@@ -335,7 +335,9 @@ def load_report_spec(path=REPORT_RULES):
                  and spec["merged"] in results and set(spec["needs_you"]) <= set(results)
                  and set(spec["issue_only"]) <= set(results)
                  and all(isinstance(k, str) and isinstance(v, str) for k, v in spec["stages"].items())
-                 and set(spec["waits"]) == {"ci", "lock"} and isinstance(spec["title"], str)
+                 and set(spec["waits"]) == set(WAITS)
+                 and all(isinstance(value, str) and value for value in spec["waits"].values())
+                 and isinstance(spec["title"], str)
                  and valid_agent_spec(spec["agents"])
                  and valid_release_audit(spec["release_audit_results"])
                  and valid_aliases(spec["result_aliases"], results))
@@ -688,7 +690,7 @@ def render_report(data, summary, spec, agents=None):
         lines.append("- Total " + duration(summary["wall_seconds"]) + (": %s (minutes)" % stages if stages else ""))
         waits = summary["wait_seconds"]
         lines.append("- Including " + ", ".join("%s %s" % (spec["waits"][kind], duration(waits.get(kind, 0)))
-                                        for kind in ("ci", "lock")))
+                                                for kind in spec["waits"]))
 
     lines += ["", "### " + titles[5]]
     lines.extend(["- %s. Recovery: %s" % (trim(item["what"]), trim(item["recovery"]))

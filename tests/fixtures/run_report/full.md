@@ -30,7 +30,7 @@ Conclusion: 2 PRs merged; 4 items need your action. Completed 2 cycles (limit 10
 
 ### Time spent
 - Total 1 h 42 min: Preparation 12, Implementation 48, Review 25, Repair 9, audit 2 (minutes)
-- Including Waiting for CI 31 min, Waiting for local resources 4 min
+- Including Waiting for CI 31 min, Waiting for local resources 4 min, Review wait 5 min, Waiting for external approval 15 min, Other waits 3 min
 
 ### Errors and recovery
 - Review subagent creation hit the thread limit. Recovery: Confirmed no Agent was created; reclaimed 2 completed threads and retried successfully; review completed normally
