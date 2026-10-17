@@ -25,7 +25,7 @@ This document covers `work-cycle` in `0.2.16`, with later revisions identified b
 | External requirements pending | Code final review after third repair passed, CI unfinished | Record platform waiting rather than code failure; after conditions change, recheck merge requirements without another code final review |
 | CI failure after repair | Repair deterministically breaks required CI | Same repair subagent fixes/pushes within that repair, without another exchange or waiting for review to discover it |
 | Other PRs conflict after merge | First PR merges, others conflict or become stale under up-to-date-branch policy | Review records main-sync requirement; repair syncs original branch, reruns affected verification, and pushes without consuming an exchange; a new reviewer checks afterward |
-| CI still running | Required review checks unfinished | Review other items first, then revisit. Merge if checks finish within the repository-history-based limit, or 30 minutes without history; timeout or delayed start becomes waiting for external checks |
+| CI still running | Required review checks unfinished | Review other items first, then revisit. Merge if checks finish within the single CI wait limit defined in `ci.md`; timeout or delayed start becomes waiting for external checks |
 | Implementation impossible | Execution confirms an Issue cannot be implemented | Record reason/unblock conditions on original Issue and remove stale ready marker; next preparation reuses conclusion while conditions stay unchanged |
 | Subagent needs clarification | Stage requires a user question | Record question on original Issue/Change Request and in return, continue independent work, and return promptly without blocking all orchestration |
 | Unchanged PR on rereview | Repair changed other PRs; this one's head, feedback, checks, and relevant main remain unchanged | New reviewer reuses conclusion and confirms only checks, approvals, conflicts, and protection; changed PRs get normal review |
@@ -232,14 +232,14 @@ Not guaranteed: automatic rollback after a failed step (report actual state/reco
 
 ## Logs, CI waiting, and subagent returns (#99)
 
-Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's own `references/ci.md`, byte-identical under `tests/test_shared_ci_rules.py`. Existing wait limits, external-wait timeout classification, and one retry for unrelated failures remain unchanged. Return format is in work-cycle `references/subagent-lifecycle.md`, under Return format. The table is a rule walkthrough.
+Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's own `references/ci.md`, byte-identical under `tests/test_shared_ci_rules.py`. That file defines the single CI wait limit, including its fallback and absolute cap; external-wait timeout classification and one retry for unrelated failures remain unchanged. Return format is in work-cycle `references/subagent-lifecycle.md`, under Return format. The table is a rule walkthrough.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
 | Long log, middle-step failure | Thousands of CI lines, step 3 fails | Read only failed-step log, e.g. `gh run view <run-id> --log-failed`, working backward from error; repair/classify, post a few error lines/run link, not entire log |
 | Earlier root cause | Failed step says missing dependency caused during install | Expand backward in chunks or read previous step; not restricted to the tail |
 | Truncated rule vs log | Both repair.md and CI log reads truncate | Reread rule to EOF per entry requirements; read only needed log portions under ci.md |
-| GitHub CI wait | Checks running after push | Run `gh pr checks <number> --watch --interval 60`, discard output, inspect exit status (0 passed, 1 failures, 8 pending), then read final result once; respect existing total limit |
+| GitHub CI wait | Checks running after push | Run `gh pr checks <number> --watch --interval 60`, discard output, inspect exit status (0 passed, 1 failures, 8 pending), then read final result once; respect the single CI wait limit in `ci.md` |
 | Tool wait shorter than CI | Checks need 25 minutes, tool maximum 10 | Run in background or resume bounded segments, examining exit status only; overall limit unchanged, exceeded means external waiting |
 | No checks yet | Command immediately says no checks reported | Treat as not started; poll at least one minute apart until limit, then external waiting |
 | Platform has no blocking watcher | Status query only | Query summary counts at least one minute apart, read full result once finished |
