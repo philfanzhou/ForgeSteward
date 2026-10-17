@@ -8,7 +8,7 @@ Enable when the runtime can run subagents in the background and read their progr
 
 ### Run-level ownership
 
-A checkout runs one work-cycle at a time. Before the first stage dispatch, acquire the reserved `run` resource with this run's ID (`--run <run-id> --task run`) and hold it until the run ends. A second run gets `BUSY`: wait or report busy without dispatching, and never release another run's slot. Recovery follows [Resource locks](verification.md) after confirming the owner stopped. This prevents two runs from silently sharing `stage-Issue-or-PR-number` task identifiers.
+A checkout runs one work-cycle at a time. Before the first stage dispatch, acquire the reserved `run` resource with this run's ID (`--run <run-id> --task run`) and hold it until the run ends. A second run gets `BUSY`; wait or report busy and never release its slot. Recovery follows [Resource locks](verification.md) after confirming the owner stopped. This prevents two runs from sharing `stage-Issue-or-PR-number` task identifiers.
 
 ### Concurrency limits and order
 
