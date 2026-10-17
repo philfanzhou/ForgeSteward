@@ -118,10 +118,11 @@ class CheckWorkflowGateTests(unittest.TestCase):
     def test_active_holder_lock_is_never_removed(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "state.json"
-            lock, owner = self.write_lock(path, pid=os.getpid())
+            lock, _ = self.write_lock(path, pid=os.getpid())
+            before = lock.read_bytes()
             with self.assertRaisesRegex(ValueError, "owner process %d" % os.getpid()):
                 gate.claim(path, "main", "0.2.13", self.now)
-            self.assertEqual(lock.read_bytes(), (json.dumps(owner) + "\n").encode("utf-8"))
+            self.assertEqual(lock.read_bytes(), before)
 
     def test_bare_legacy_lock_is_reported_and_preserved(self):
         with tempfile.TemporaryDirectory() as temporary:
