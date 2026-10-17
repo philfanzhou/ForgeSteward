@@ -26,7 +26,7 @@ Delete rules in these dimensions regardless of strictness or authorship, includi
 
 Preserve conventions explicitly left to the repository:
 
-- Documentation, code-comment and commit-message languages; title and branch formats. Collaboration language follows the narrow [English-default exception](collaboration-language.md).
+- Code-comment languages, title and branch formats. Documentation, Issue/Change Request text, and future commit messages follow the [English working environment](english-conversion.md).
 - Issue/Change Request template structure and completion guidance, such as “Scope,” “Acceptance criteria,” “Verification,” and “Compatibility impact” headings and their expected contents.
 - Merge methods, required checks, approval counts, and branch protection settings.
 - Build, test, migration, smoke-check, and other verification commands, plus engineering requirements to run particular checks or add certain tests for a class of change.
