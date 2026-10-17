@@ -49,6 +49,7 @@ List only long-lived branches named in documentation/CI, such as `develop` or `r
 - Prune records whose directories no longer exist with `git worktree prune`; git skips locked records.
 - Remove with `git worktree remove`, never `--force`, only when all hold: its branch is deletable under the table's merged, closed, or missing-upstream cases; no uncommitted/untracked files; unlocked; not current; not caller-listed active; and beneath ForgeSteward's workspace directory `<repository-parent>/<repository-name>-forge-steward/`. Delete the branch after removing its worktree.
 - Leave worktrees elsewhere (such as `~/.codex/worktrees/`, `.claude/worktrees/`, or user-created locations), detached HEAD worktrees, and those used by other conversations/tools untouched; list reasons and retain their branches under “never delete.”
+- Post-merge removal under [Complete tasks after merging](post-merge.md) uses these same conditions and report rules.
 
 ### Deletion and limits
 
