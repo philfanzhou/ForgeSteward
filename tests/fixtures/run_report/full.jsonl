@@ -7,6 +7,12 @@
 {"at": "2026-10-10T01:56:00Z", "task": "implement-80", "stage": "implement", "status": "wait-end", "wait": "lock"}
 {"at": "2026-10-10T02:00:00Z", "task": "implement-80", "stage": "implement", "status": "finished"}
 {"at": "2026-10-10T02:00:00Z", "task": "review-pr-101", "stage": "review", "status": "started"}
+{"at": "2026-10-10T02:00:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-start", "wait": "review"}
+{"at": "2026-10-10T02:05:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-end", "wait": "review"}
+{"at": "2026-10-10T02:05:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-start", "wait": "external"}
+{"at": "2026-10-10T02:20:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-end", "wait": "external"}
+{"at": "2026-10-10T02:20:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-start", "wait": "other"}
+{"at": "2026-10-10T02:23:00Z", "task": "review-pr-101", "stage": "review", "status": "wait-end", "wait": "other"}
 {"at": "2026-10-10T02:25:00Z", "task": "review-pr-101", "stage": "review", "status": "finished"}
 {"at": "2026-10-10T02:25:00Z", "task": "fix-pr-103", "stage": "fix", "status": "started"}
 {"at": "2026-10-10T02:34:00Z", "task": "fix-pr-103", "stage": "fix", "status": "failed"}

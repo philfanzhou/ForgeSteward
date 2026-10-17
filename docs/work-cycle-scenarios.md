@@ -120,7 +120,7 @@ The cleanup stage runs only after no other stage remains active and before repor
 | Workspace ownership | Orchestrator dispatches and then completes a stage in a workspace | `workspaces.json` in the run directory gets or replaces one entry with task, branch, absolute workspace path, owning stage, status, and update time; dispatch sets `active` and completion sets `finished`, `failed`, or `paused`; the file stays in Git metadata and `handoff.json` keeps its schema |
 | CI wait | Subagent waits 8 minutes after push | Record `wait-start`/`wait-end` with type `ci`; include time in summary |
 | Recovery | Orchestrator context compacted | Read run-directory `handoff.json` first to restore progress |
-| Final report | Run ends | Include wall time, aggregate stage durations, and total CI/lock waits |
+| Final report | Run ends | Include wall time, aggregate stage durations, and totals for every wait type in the report specification |
 | Script unavailable | Recording command errors | Explain in session handoff and continue delivery |
 
 ## Retry unrelated CI failures once (#86)
@@ -147,7 +147,7 @@ The cleanup stage runs only after no other stage remains active and before repor
 
 ## Fixed final report format (#95)
 
-Sections, result vocabulary, and display-name mappings are defined only in work-cycle's `references/report.md`. `run_record.py report` reads that specification and renders `handoff.json` plus events. The table is a rule walkthrough; `tests/test_run_report.py` compares fixed examples byte for byte.
+Sections, result vocabulary, and display-name mappings are defined only in work-cycle's `references/report.md`. `run_record.py report` reads that specification and renders `handoff.json` plus events. Time spent renders every wait type in specification order and shows `0 min` for a type with no recorded duration. The table is a rule walkthrough; `tests/test_run_report.py` compares fixed examples byte for byte.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
@@ -159,7 +159,8 @@ Sections, result vocabulary, and display-name mappings are defined only in work-
 | User stops | PRs still reviewing and Issues not started | Still report; unfinished items become `Paused` with reasons, actionable ones appear under Needs your action |
 | Empty run | No PRs or exceptions | Still render first six sections with `- None` where empty; seventh depends on upgrades |
 | No events | Recording became unavailable, events.jsonl empty | Time spent section says `- No record` |
-| Zero time | All events at same instant | Report `Total 0 min`, CI/resource waits `0 min` |
+| Zero time | All events at same instant | Report `Total 0 min`, all waits `0 min` |
+| Approval or external wait | Review waits 1 h 30 min for maintainer approval, then 45 min for an external security approval | Time spent lists `Review wait 1 h 30 min` and `Waiting for external approval 45 min` after the CI and local-resource values; a wait type with no recorded duration shows `0 min` |
 | Optional upgrade section | No `agent_check`, due to old records or skipped check | Omit seventh section and render six normally; saved checks use filtering below |
 | Old free-form record | handoff.json predates required structured fields | Return `1` with missing fields and use manual fallback; migration is not required |
 

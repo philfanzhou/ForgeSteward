@@ -99,8 +99,20 @@ class RunReportTests(unittest.TestCase):
 
     def test_empty_sections_and_zero_durations(self):
         text = self.assert_golden("empty.json", "zero.jsonl", "empty-zero.md")
-        self.assertIn("- Total 0 min: Preparation 0 (minutes)\n- Including Waiting for CI 0 min, Waiting for local resources 0 min\n", text)
+        expected_waits = ", ".join(name + " 0 min" for name in self.spec["waits"].values())
+        self.assertIn("- Total 0 min: Preparation 0 (minutes)\n- Including " + expected_waits + "\n", text)
         self.assertEqual(text.count("- None\n"), 3)
+
+    def test_time_spent_renders_every_wait_type_with_nonzero_durations(self):
+        self.assertEqual(list(self.spec["waits"]), list(record.WAITS))
+        text = self.assert_golden("full.json", "full.jsonl", "full.md")
+        line = next(line for line in text.splitlines() if line.startswith("- Including "))
+        durations = ("31 min", "4 min", "5 min", "15 min", "3 min")
+        positions = []
+        for name, value in zip(self.spec["waits"].values(), durations):
+            self.assertIn(name + " " + value, line)
+            positions.append(line.index(name))
+        self.assertEqual(positions, sorted(positions))
 
     def test_release_audit_finding_and_unknown_reach_run_overview(self):
         data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
@@ -401,6 +413,22 @@ class RunReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Malformed report-spec"):
                 record.load_report_spec(path)
 
+    def test_wait_spec_must_cover_every_wait_type_with_display_names(self):
+        text = RULES.read_text(encoding="utf-8")
+        missing = dict(self.spec["waits"])
+        missing.pop("other")
+        empty = dict(self.spec["waits"], review="")
+        for waits in (missing, empty):
+            with self.subTest(waits=waits):
+                spec = deepcopy(self.spec)
+                spec["waits"] = waits
+                rewritten = re.sub(r"```json report-spec\n.*?\n```",
+                                   lambda _: "```json report-spec\n" + json.dumps(spec) + "\n```", text, flags=re.S)
+                path = self.skill / "references/report.md"
+                path.write_text(rewritten, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "Malformed report-spec"):
+                    record.load_report_spec(path)
+
     def test_agent_check_field_must_name_one_file_or_reason(self):
         data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
         for check, problem in (([], "agent_check must be an object"),
@@ -487,6 +515,12 @@ class SingleDefinitionTests(unittest.TestCase):
         self.assertTrue(template[2].startswith(self.spec["sections"][0] + ": "))
         self.assertIn("The first six sections always appear in order", text)
         self.assertIn("Omit the entire section when there is no action available", text)
+        wait_line = next(line for line in template if line.startswith("- Including "))
+        positions = [wait_line.index(name) for name in self.spec["waits"].values()]
+        self.assertEqual(positions, sorted(positions))
+        for name in self.spec["waits"].values():
+            self.assertIn(name, wait_line)
+        self.assertIn("Missing waits are `0 min`", text)
         for word in self.spec["results"]:
             self.assertIn("- " + word, text)
 
