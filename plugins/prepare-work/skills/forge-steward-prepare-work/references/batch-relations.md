@@ -15,7 +15,7 @@ Each selected Issue's handoff must include three audited, non-speculative items 
 
 ### Verification resource inventory
 
-When first needed this run, read test configuration, container orchestration, startup scripts, and CI. Separate local commands requiring no shared resources from those using fixed ports, local databases/caches, containers, simulators/devices, browser profiles, fixed/global write locations, shared remote test environments, or accounts. Record existing isolation options such as configurable ports, database names, container project names, and temporary directories; do not change repository configuration for isolation. Save the inventory in a writable tracker and reuse it across continuous-run cycles, inspecting only changes.
+When first needed this run, read test configuration, container orchestration, startup scripts, and CI. Separate local commands requiring no shared resources from those using fixed ports, local databases/caches, containers, simulators/devices, browser profiles, fixed/global write locations, shared remote test environments, or accounts. Record existing isolation options such as configurable ports, database names, container project names, and temporary directories; do not change repository configuration for isolation. Save the inventory in a writable tracker or repository-designated location; when neither exists, keep it in the original Issue handoff or run record. Reuse it across continuous-run cycles, inspecting only changes.
 
 ### Output order
 
