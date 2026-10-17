@@ -4,7 +4,7 @@ Avoid making completed items wait for the whole batch. Workload, stage standards
 
 ### Enable or fall back
 
-Enable when the runtime can run subagents in the background and read their progress (handoffs, messages, or status) while active, and [Resource locks](verification.md) work. Otherwise run serially under [Cycles, handoffs, and stopping](cycles.md), without treating it as failure or reducing work. After background-dispatch/progress-read failure, apply [Lifecycle and recovery](agents.md). If progress remains unknown, make that portion serial and await its stage before dependent dispatch.
+Enable when the runtime can run subagents in the background and read their progress (handoffs, messages, or status) while active, and [Resource locks](verification.md) work. Otherwise run serially under [Cycles, handoffs, and stopping](cycles.md), without treating it as failure or reducing work. After background-dispatch/progress-read failure, apply [Lifecycle and recovery](subagent-lifecycle.md). If progress remains unknown, make that portion serial and await its stage before dependent dispatch.
 
 ### Concurrency limits and order
 

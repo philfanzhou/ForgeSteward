@@ -220,7 +220,7 @@ Not guaranteed: automatic rollback after a failed step (report actual state/reco
 
 ## Logs, CI waiting, and subagent returns (#99)
 
-Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's own `references/ci.md`, byte-identical under `tests/test_shared_ci_rules.py`. Existing wait limits, external-wait timeout classification, and one retry for unrelated failures remain unchanged. Return format is in work-cycle `references/agents.md`, under Return format. The table is a rule walkthrough.
+Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's own `references/ci.md`, byte-identical under `tests/test_shared_ci_rules.py`. Existing wait limits, external-wait timeout classification, and one retry for unrelated failures remain unchanged. Return format is in work-cycle `references/subagent-lifecycle.md`, under Return format. The table is a rule walkthrough.
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
@@ -235,7 +235,7 @@ Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's
 | Normal subagent completion | Implementation #12 hands off PR | Return Handed off, PR link, one reason sentence, one next-step sentence, and task evidence result.md; orchestrator records schedule without reading full result.md |
 | Missing/conflicting return | Return says PR submitted but remote cannot find it | Read result.md and verify remote; remote state wins |
 | Excessive process return | Hundreds of narrative lines returned | Save only fixed fields, not process in handoff |
-| No return after failure | Create/wait errors | Use existing agents.md recovery rules |
+| No return after failure | Create/wait errors | Use existing subagent-lifecycle.md recovery rules |
 | User stops | PR still in review | Generate report; unfinished work Paused |
 | Concurrent evidence | Three subagents run | Task IDs distinguish evidence directories; result.md files cannot overwrite each other |
 | Sensitive logs | Failure log includes token | Quote only relevant error lines, without copying token into PR/Issue/return |

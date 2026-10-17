@@ -429,7 +429,7 @@ class SingleDefinitionTests(unittest.TestCase):
                 self.assertNotIn(self.spec["sections"][-1], text, path.name)
                 self.assertNotIn("Waiting for external approval", text, path.name)
         for name in ("SKILL.md", "references/run-record.md", "references/cycles.md",
-                     "references/concurrency.md", "references/agents.md"):
+                     "references/concurrency.md", "references/subagent-lifecycle.md"):
             self.assertIn("report.md", (SKILL / name).read_text(encoding="utf-8"), name)
 
 
