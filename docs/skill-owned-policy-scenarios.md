@@ -43,7 +43,7 @@ Migration: older versions retained remote source branches when automatic deletio
 | R17 | review-and-merge | Source is a fork, protection unknown, or deletion permission missing | Preserve uncertain/unauthorized branches, record why, and continue other frozen items |
 | R18 | review-and-merge | Automatic deletion enabled and platform already removed remote branch | Reread and record platform cleanup; safe local cleanup may continue |
 | X01 | fix-feedback | Two exchanges done, more required feedback, and an unrelated refactor commit exists | Pause coding for an audit; remove that change and register follow-up, then fix required items. Third push goes to review-and-merge for final review |
-| X02 | fix-feedback | Three exchanges reached and required feedback remains | Skip automatic repair: no edits, push, or thread reply. Send an unreviewed new head to review-and-merge; wait for human handling only if final review still finds problems |
+| X02 | fix-feedback | Three rounds completed; a third-round head was pushed | (a) Third-round head not yet finally reviewed: no automatic repair; fix-feedback never merges and may push only a conflict-free mainline sync, then send the head to review-and-merge for one final review. (b) Third-round head finally reviewed with required in-scope feedback remaining: do not repair, push, reply, or merge; pause only that item for human action |
 | X03 | fix-feedback | Repository sets a five-round review budget | Use Skill rules and stop automatic repair after three exchanges rather than adopting the repository budget |
 
 These scenarios were compared with the four Skills' current entries/references. Preserve input, Skill version, output, and remote state for any real-run deviations and later revision.
