@@ -15,6 +15,7 @@ from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 SKILL = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle"
+CHECK_WORKFLOW = REPO / "plugins/check-workflow/skills/forge-steward-check-workflow"
 SCRIPT = SKILL / "scripts/run_record.py"
 RULES = SKILL / "references/report.md"
 FIXTURES = REPO / "tests/fixtures/run_report"
@@ -100,6 +101,75 @@ class RunReportTests(unittest.TestCase):
         text = self.assert_golden("empty.json", "zero.jsonl", "empty-zero.md")
         self.assertIn("- Total 0 min: Preparation 0 (minutes)\n- Including Waiting for CI 0 min, Waiting for local resources 0 min\n", text)
         self.assertEqual(text.count("- None\n"), 3)
+
+    def test_release_audit_finding_and_unknown_reach_run_overview(self):
+        data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+        data["release_audit"] = {
+            "result": "findings",
+            "summary": "Release v1.2.3 has one finding and one unknown",
+            "evidence": ".git/forge-steward/runs/run-1/check-workflow/result.md",
+            "findings": ["Tag v1.2.3 has no matching announcement"],
+            "unknowns": ["The package feed query timed out"],
+        }
+        path = self.make_run(data)
+        source = (path / "handoff.json").read_bytes()
+        first = self.report(path)
+        self.assertEqual(first.returncode, 0, first.stderr.decode("utf-8", "replace"))
+        text = first.stdout.decode("utf-8")
+        self.assertIn("\n- Release audit: ", text)
+        line = next(line for line in text.splitlines() if line.startswith("- Release audit: "))
+        self.assertIn("Release v1.2.3 has one finding and one unknown", line)
+        self.assertIn("Result: Findings", line)
+        self.assertIn("Findings: Tag v1.2.3 has no matching announcement", line)
+        self.assertIn("Unknowns: The package feed query timed out", line)
+        self.assertIn("Evidence: .git/forge-steward/runs/run-1/check-workflow/result.md", line)
+        self.assertLess(text.index("- Startup check:"), text.index("- Release audit:"))
+        self.assertLess(text.index("- Release audit:"), text.index("- Existing PRs:"))
+        self.assertEqual((path / "handoff.json").read_bytes(), source)
+        self.assertEqual(self.report(path).stdout, first.stdout)
+
+    def test_release_audit_result_display_names(self):
+        cases = (("clean", "Clean", {}), ("findings", "Findings", {"findings": ["A finding"]}),
+                 ("incomplete", "Incomplete", {}), ("not-run", "Not run", {}))
+        for state, display, extra in cases:
+            with self.subTest(state=state):
+                data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+                data["release_audit"] = dict({"result": state, "summary": "Audit summary", "evidence": "result.md"}, **extra)
+                self.assertEqual(record.check_handoff(data, self.spec), [])
+                path = self.make_run(data)
+                outcome = self.report(path)
+                self.assertEqual(outcome.returncode, 0, outcome.stderr)
+                self.assertIn("- Release audit: Audit summary; Result: " + display + ";", outcome.stdout.decode("utf-8"))
+
+    def test_handoff_without_release_audit_keeps_golden_output(self):
+        path = self.make_run("empty.json", "zero.jsonl")
+        outcome = self.report(path)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertEqual(outcome.stdout, expected("empty-zero.md"))
+        self.assertNotIn("Release audit:", outcome.stdout.decode("utf-8"))
+
+    def test_release_audit_malformed_values_fail_with_field_errors(self):
+        base = {"result": "clean", "summary": "Coverage was complete", "evidence": "result.md"}
+        cases = (
+            ({"result": "pending"}, 'release_audit.result must be one of: clean, findings, incomplete, not-run: "pending"'),
+            ({"result": "findings"}, "release_audit.findings must list at least one finding when result is findings"),
+            ({"summary": " "}, "release_audit.summary must be nonempty text"),
+            ({"evidence": ""}, "release_audit.evidence must be nonempty text"),
+            ({"findings": "one"}, "release_audit.findings must be a list"),
+            ({"unknowns": [""]}, "release_audit.unknowns[0] must be nonempty text"),
+            ({"summary": "Leaked api_key=example-value"}, "release_audit.summary must contain redacted text only"),
+            ({"extra": "x"}, "release_audit has unknown fields: extra"),
+        )
+        for patch, problem in cases:
+            with self.subTest(patch=patch):
+                data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
+                data["release_audit"] = dict(base, **patch)
+                path = self.make_run(data)
+                result = self.report(path)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(problem, result.stderr.decode("utf-8"))
+                self.assertEqual(result.stdout, b"")
+                self.assertFalse((path / "report.md").exists())
 
     def test_no_events_reports_no_record(self):
         text = self.assert_golden("empty.json", None, "empty-no-events.md")
@@ -431,6 +501,39 @@ class SingleDefinitionTests(unittest.TestCase):
         for name in ("SKILL.md", "references/run-record.md", "references/cycles.md",
                      "references/concurrency.md", "references/subagent-lifecycle.md"):
             self.assertIn("report.md", (SKILL / name).read_text(encoding="utf-8"), name)
+
+
+class ReleaseAuditRuleTests(unittest.TestCase):
+    """The audit-only limit and the startup recording obligation stay explicit in the rules."""
+
+    def sentence_with(self, path, phrase):
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(phrase, text, path)
+        return next(sentence for sentence in re.split(r"(?<=\.)\s+", text) if phrase in sentence)
+
+    def test_entry_limits_release_audit_only_to_a_read_only_report(self):
+        sentence = self.sentence_with(CHECK_WORKFLOW / "SKILL.md", "release-audit-only")
+        self.assertIn("only the read-only audit and report", sentence)
+        self.assertIn("no project changes", sentence)
+        self.assertIn("delivery", sentence)
+
+    def test_procedure_finishes_audit_only_with_zero_project_writes(self):
+        sentence = self.sentence_with(CHECK_WORKFLOW / "references/procedure.md", "release-audit-only")
+        self.assertIn("Reporting", sentence)
+        self.assertIn("zero project writes", sentence)
+        self.assertIn("never fix, file, or deliver", sentence)
+
+    def test_reporting_names_audit_only_as_a_zero_change_run(self):
+        text = (CHECK_WORKFLOW / "references/reporting.md").read_text(encoding="utf-8")
+        self.assertIn("release-audit-only", text)
+        self.assertIn("No project files were changed", text)
+
+    def test_startup_records_release_audit_before_cleanup(self):
+        text = (SKILL / "references/startup.md").read_text(encoding="utf-8")
+        self.assertIn("`release_audit`", text)
+        self.assertIn("result.md", text)
+        self.assertIn("never infer a clean audit", text)
+        self.assertIn("never blocks", text)
 
 
 if __name__ == "__main__":

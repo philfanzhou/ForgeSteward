@@ -28,6 +28,17 @@ RUN_ID = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{4}")
 TASK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 STATUSES = ("started", "finished", "failed", "wait-start", "wait-end")
 WAITS = ("ci", "lock", "review", "external", "other")
+RELEASE_AUDIT_STATES = ("clean", "findings", "incomplete", "not-run")
+SECRET_TEXT = re.compile(
+    r"(?i)(?:bearer\s+[a-z0-9._~+/=-]{16,}"
+    r"|gh[pousr]_[a-z0-9]{20,}"
+    r"|github_pat_[a-z0-9_]{20,}"
+    r"|xox[baprs]-[a-z0-9-]{10,}"
+    r"|sk-[a-z0-9]{20,}"
+    r"|AKIA[0-9A-Z]{16}"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----"
+    r"|\b(?:password|passwd|secret|token|api[_-]?key)\b\s*[:=]\s*[^\s;,]{8,}"
+    r"|https?://[^/\s:@]+:[^/\s@]+@)")
 MAX_DETAIL = 1000
 REPORT_RULES = Path(__file__).resolve().parent.parent / "references" / "report.md"
 SPEC_FENCE = "```json report-spec"
@@ -212,6 +223,7 @@ def load_report_spec(path=REPORT_RULES):
                  and all(isinstance(k, str) and isinstance(v, str) for k, v in spec["stages"].items())
                  and set(spec["waits"]) == {"ci", "lock"} and isinstance(spec["title"], str)
                  and valid_agent_spec(spec["agents"])
+                 and valid_release_audit(spec["release_audit_results"])
                  and valid_aliases(spec["result_aliases"], results))
     except (KeyError, TypeError, AttributeError):
         valid = False
@@ -238,6 +250,18 @@ def valid_agent_spec(agents):
             and agents["current"] in agents["statuses"]
             and valid_aliases(agents["aliases"], [agents["absent"]] + list(agents["statuses"]))
             and bool(agents["ask_for"]) and set(agents["ask_for"]) <= set(agents["statuses"]) - {agents["current"]})
+
+
+def valid_release_audit(results):
+    """The optional audit field has exactly the four contract states and distinct display names."""
+    return (isinstance(results, dict) and set(results) == set(RELEASE_AUDIT_STATES)
+            and all(isinstance(value, str) and value for value in results.values())
+            and len(set(results.values())) == len(results))
+
+
+def contains_secret(text):
+    """Report text must not copy tokens, passwords, credentialed URLs, or private keys."""
+    return bool(SECRET_TEXT.search(text))
 
 
 def is_int(value):
@@ -345,6 +369,29 @@ def check_handoff(data, spec):
             name = need(check, "file", "agent_check", "text")
             if name is not None and (name in (".", "..") or "/" in name or "\\" in name):
                 problems.append("agent_check.file must be a filename in the run directory")
+    audit = need(data, "release_audit", "", "object", optional=True)
+    if audit is not None:
+        states = spec["release_audit_results"]
+        state = need(audit, "result", "release_audit", "free")
+        if state is not None and state not in states:
+            problems.append("release_audit.result must be one of: %s: %s"
+                            % (", ".join(states), json.dumps(state, ensure_ascii=False)))
+        for key in ("summary", "evidence"):
+            value = need(audit, key, "release_audit", "text")
+            if value is not None and contains_secret(value):
+                problems.append("release_audit.%s must contain redacted text only" % key)
+        findings = need(audit, "findings", "release_audit", "list", optional=True)
+        unknowns = need(audit, "unknowns", "release_audit", "list", optional=True)
+        for key, items in (("findings", findings), ("unknowns", unknowns)):
+            for index, item in enumerate(items or []):
+                value = need({"": item}, "", "release_audit.%s[%d]" % (key, index), "text")
+                if value is not None and contains_secret(value):
+                    problems.append("release_audit.%s[%d] must contain redacted text only" % (key, index))
+        if state == "findings" and not findings:
+            problems.append("release_audit.findings must list at least one finding when result is findings")
+        extra = sorted(set(audit) - {"result", "summary", "evidence", "findings", "unknowns"})
+        if extra:
+            problems.append("release_audit has unknown fields: " + ", ".join(extra))
     return problems
 
 
@@ -498,8 +545,19 @@ def render_report(data, summary, spec, agents=None):
         parallel = "Disabled; Reason: " + trim(mode["serial_reason"])
     if trim(mode.get("note", "")):
         parallel += "; " + trim(mode["note"])
-    lines += ["", "### " + titles[3], "- Startup check: " + trim(data["startup_check"]),
-              "- Existing PRs: " + queued,
+    lines += ["", "### " + titles[3], "- Startup check: " + trim(data["startup_check"])]
+    audit = data.get("release_audit")
+    if audit:
+        parts = [trim(audit["summary"]), "Result: " + spec["release_audit_results"][audit["result"]]]
+        findings = [trim(item) for item in audit.get("findings", [])]
+        if findings:
+            parts.append("Findings: " + "; ".join(findings))
+        unknowns = [trim(item) for item in audit.get("unknowns", [])]
+        if unknowns:
+            parts.append("Unknowns: " + "; ".join(unknowns))
+        parts.append("Evidence: " + flat(audit["evidence"]))
+        lines.append("- Release audit: " + "; ".join(parts))
+    lines += ["- Existing PRs: " + queued,
               "- Cycles: %d / %d; Stop reason: %s" % (data["completed_cycles"], data["requested_cycles"],
                                           trim(data["stop_reason"])),
               "- Concurrency: " + parallel, "- Branch cleanup: " + trim(data["branch_cleanup"])]

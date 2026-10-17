@@ -252,6 +252,20 @@ Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's
 
 Static checks do not prove model compliance or any specific token reduction. These instructions do not specify commands for CI systems outside the hosting platform.
 
+## Release-audit results and audit-only runs (#142)
+
+[Issue #142](https://github.com/philfanzhou/ForgeSteward/issues/142) connects check-workflow's read-only release audit to the final report without adding an eighth section or changing the five-field subagent return. The full audit stays in the stage's `result.md`; the orchestrator reads its release-audit part before deciding cleanup and saves the optional `release_audit` field in `handoff.json`. `report.md` renders one "Release audit" bullet after "Startup check" in "Run overview". These are rule walkthroughs, not independent Agent runs.
+
+| Scenario | Input and state | Expected behavior |
+| --- | --- | --- |
+| Release finding and unknown | The stage's `result.md` confirms a Tag without an announcement and an unreadable package feed; the cleanup check finds no policy candidates | Record `release_audit` with result `findings`, the summary, both items, and the `result.md` path. The final report shows the summary, finding, unknown, and evidence. Do not fix, file, or add the finding to the cleanup body; finish the zero-change run with “No project files were changed” and no empty Change Request |
+| Healthy audit | The audit coverage is complete and consistent; a deletion candidate exists | Record `release_audit` with result `clean`. The cleanup Change Request and its delivery proceed normally; the audit line does not gate them |
+| Incomplete audit | The release-audit part of `result.md` is missing or unreadable, or the stage failed after claiming the run | Record `release_audit` with result `incomplete` and the reason. Never record `clean`. Independent cleanup changes may still be delivered |
+| Skipped audit | The startup gate skips check-workflow for its version or cooldown | Record `release_audit` with result `not-run` and the skip reason; invent no evidence path |
+| Older handoff | `handoff.json` has no `release_audit` field | Render the existing sections and bullets as before; the new field is optional and old records stay valid |
+
+The release audit is read-only and its findings never block cleanup delivery. `tests/test_run_report.py` renders a fixed finding and unknown and rejects malformed values.
+
 ## English migration and record compatibility (#118)
 
 Current source rules, newly generated statuses, reports, errors, prompts, and manually prepared handoffs use clear English. Earlier releases used Chinese defaults; translating historical notes does not change that fact. No schema, field name, CLI command, persisted-record path, event model, or version number changes as part of this migration.
