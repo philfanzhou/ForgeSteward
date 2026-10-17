@@ -513,9 +513,9 @@ class ReleaseAuditRuleTests(unittest.TestCase):
 
     def test_entry_limits_release_audit_only_to_a_read_only_report(self):
         sentence = self.sentence_with(CHECK_WORKFLOW / "SKILL.md", "release-audit-only")
-        self.assertIn("read-only audit", sentence)
-        for phrase in ("no project edits", "branch", "commit", "Change Request", "deletion/migration/language steps"):
-            self.assertIn(phrase, sentence)
+        self.assertIn("only the read-only audit and report", sentence)
+        self.assertIn("no project changes", sentence)
+        self.assertIn("delivery", sentence)
 
     def test_procedure_finishes_audit_only_with_zero_project_writes(self):
         sentence = self.sentence_with(CHECK_WORKFLOW / "references/procedure.md", "release-audit-only")
