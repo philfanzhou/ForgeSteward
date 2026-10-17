@@ -57,6 +57,17 @@ List only long-lived branches named in documentation/CI, such as `develop` or `r
 - Record failures such as permissions/protection and continue. If someone already deleted the branch, record absent rather than failed.
 - Delete at most 50 branches per run, counting remote/local separately. Associated worktree removals/pruning do not count. Order by oldest last-commit time, then name on ties. List excess items for next time.
 
+### Audit record
+
+- When the work-cycle dispatch supplies a run directory, write `cleanup.md` there once before returning. The run directory is shared Git metadata, so write it directly; only this cleanup stage writes the file, and no tracked files change. A standalone invocation without a run directory reports the same audit in its result. If the run directory cannot be written, return the same audit in the result and report the write failure; do not claim the file exists.
+- List every remote branch, local branch, and worktree checked, with its outcome:
+  - Deleted, with the deletion-time commit, reason, and recovery.
+  - Retained or listed only, with the reason.
+  - Failed, with the error.
+  - Unqueried, with the failed query or permission gap.
+  - Deferred branches under the 50-branch limit, with the count and order for the next run.
+- State when a category had nothing to check. The report summary returned to the caller must agree with this file.
+
 ### Report
 
 Use everyday English unless the user or repository specifies another language:
