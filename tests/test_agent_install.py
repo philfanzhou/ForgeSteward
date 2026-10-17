@@ -314,6 +314,42 @@ class AgentStatusTests(Sandbox):
         self.assertEqual(saved["schema"], 1)
 
 
+class ClassificationTests(Sandbox):
+    """A mixed installation stays actionable: AHEAD only when nothing installed is below the target."""
+
+    def status(self, versions, missing=()):
+        return install.classify({"versions": list(versions), "missing": list(missing)}, "1.2.0")["status"]
+
+    def test_mixed_newer_and_older_installation_is_behind(self):
+        self.assertEqual(self.status(["1.3.0", "1.1.0"]), "Behind")
+
+    def test_any_older_version_is_behind(self):
+        self.assertEqual(self.status(["1.1.0", "1.0.0"]), "Behind")
+
+    def test_all_newer_versions_are_ahead(self):
+        self.assertEqual(self.status(["1.3.0", "1.4.0"]), "Ahead of latest release")
+
+    def test_newer_versions_with_one_equal_are_ahead(self):
+        self.assertEqual(self.status(["1.3.0", "1.2.0"]), "Ahead of latest release")
+
+    def test_missing_plugin_alongside_a_newer_version_is_incomplete(self):
+        self.assertEqual(self.status(["1.3.0"], ["work-cycle"]), "Incomplete")
+
+    def test_single_version_states_are_unchanged(self):
+        self.assertEqual(self.status(["1.2.0"]), "Current")
+        self.assertEqual(self.status([]), "Missing")
+
+    def test_mixed_receipts_are_reported_as_upgradeable(self):
+        self.gh("v1.2.0")
+        self.receipts(self.home / ".dsh/skills", dict(every("1.1.0"), **{"prepare-work": "1.3.0"}))
+        agent = self.by_id(self.run_check())["deepseek-harness"]
+        self.assertEqual(agent["status"], "Behind")
+        self.assertEqual(agent["versions"], ["1.1.0", "1.3.0"])
+        self.assertEqual(self.run_check(as_json=False),
+                         "- DeepSeek Harness: v1.1.0, v1.3.0, behind latest v1.2.0\n"
+                         "- DeepSeek Harness can be installed or upgraded to v1.2.0. Install or upgrade now?\n")
+
+
 class CodexQueryTests(Sandbox):
     ARGV = ["plugin", "list", "--marketplace", "forge-steward", "--json"]
 

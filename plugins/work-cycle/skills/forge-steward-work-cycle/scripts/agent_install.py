@@ -260,19 +260,23 @@ def inspect(agent, retired, platform, timeout):
 
 
 def classify(record, latest):
-    """Set the status of an inspected agent against the latest formal release (None when unknown)."""
+    """Set the status of an inspected agent against the latest formal release (None when unknown).
+
+    Any installed version below the target wins over a newer one, so a mixed installation is
+    actionable; AHEAD only means nothing installed is below the target.
+    """
     if "status" in record:
         return record
     keys = [version_key(version) for version in record["versions"]]
     target = version_key(latest) if latest else None
     if not keys:
         record["status"] = MISSING
-    elif target and any(key > target for key in keys):
-        record["status"] = AHEAD
     elif target and any(key < target for key in keys):
         record["status"] = BEHIND
     elif record["missing"]:
         record["status"] = INCOMPLETE
+    elif target and any(key > target for key in keys):
+        record["status"] = AHEAD
     elif target:
         record["status"] = CURRENT
     else:
