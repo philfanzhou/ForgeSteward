@@ -27,8 +27,8 @@ Migration: older versions retained remote source branches when automatic deletio
 | R02 | review-and-merge | Change Request links a tracker or a supposedly single task is feature-sized | Record an in-scope blocker and do not merge |
 | R03 | review-and-merge | Two exchanges completed; current review finds two commits unrelated to acceptance | Block as in-scope, require removing them and registering separately |
 | R04 | review-and-merge | Third repair pushed, head not finally reviewed, cross-document state contradictions remain | Review that head once, record concrete acceptance gaps, pause it, and continue other independent reviews/merges; no fourth automatic repair |
-| R15 | review-and-merge | Third repair pushed, head not finally reviewed, all acceptance/platform requirements met | Merge after final review; do not skip merely because three rounds elapsed |
-| R16 | review-and-merge | Final review after third repair recorded required in-scope problems; next cycle sees same head | Skip without repeat review/comments; continue other Change Requests |
+| R27 | review-and-merge | Third repair pushed, head not finally reviewed, all acceptance/platform requirements met | Merge after final review; do not skip merely because three rounds elapsed |
+| R28 | review-and-merge | Final review after third repair recorded required in-scope problems; next cycle sees same head | Skip without repeat review/comments; continue other Change Requests |
 | R05 | review-and-merge | New session: platform timeline shows two exchanges, handoff says one | Use the higher count, two, review normally and first audit every commit; never reset |
 | R06 | review-and-merge | Three exchanges reached; user explicitly requests this item's review now | Review normally and disclose the round count |
 | R07 | review-and-merge | Merged; local `main` is behind remote and workspace clean | Fast-forward with `git merge --ff-only origin/main`; if impossible or dirty, preserve and report without reset |
