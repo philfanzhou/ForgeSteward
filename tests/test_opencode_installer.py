@@ -101,7 +101,7 @@ class InstallerTests(unittest.TestCase):
                          "references/agent-entrypoints.md", "references/collaboration-language.md",
                          "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
-        for resource in ("references/startup.md", "references/cycles.md", "references/agents.md",
+        for resource in ("references/startup.md", "references/cycles.md", "references/subagent-lifecycle.md",
                          "references/concurrency.md", "references/verification.md",
                          "references/run-record.md", "references/agent-check.md", "scripts/check_workflow_gate.py",
                          "scripts/resource_lock.py", "scripts/run_record.py", "scripts/agent_install.py",

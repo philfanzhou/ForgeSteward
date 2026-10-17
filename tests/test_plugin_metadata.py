@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 
@@ -82,6 +83,20 @@ class PluginMetadataTests(unittest.TestCase):
                     relative = source["path"] if isinstance(source, dict) else source
                     self.assertEqual((REPO / relative).resolve(), REPO / "plugins" / plugin["name"])
                     self.assertTrue((REPO / relative / "plugin.json").is_file())
+
+    def test_reference_filenames_do_not_collide_with_instruction_entries(self):
+        # A reference named agents.md or claude.md is exposed as AGENTS.md or CLAUDE.md on
+        # case-insensitive filesystems, where an Agent may auto-load it as an instruction entry.
+        tracked = subprocess.check_output(["git", "ls-files", "-z", "--", "plugins"], cwd=REPO)
+        references = [name for name in tracked.decode().split("\0")
+                      if re.fullmatch(r"plugins/[^/]+/skills/[^/]+/references/.+", name)]
+        self.assertTrue(references, "No tracked Skill references found; an empty inventory must not pass")
+        collisions = sorted(name for name in references
+                            if Path(name).name.casefold() in {"agents.md", "claude.md"})
+        self.assertEqual(
+            collisions, [],
+            "Skill reference names must not match AGENTS.md or CLAUDE.md ignoring case, because "
+            "case-insensitive filesystems would load them as instruction entries; rename: " + repr(collisions))
 
     def test_orchestrator_bundled_version_matches_unified_version(self):
         bundled = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/scripts/VERSION"
