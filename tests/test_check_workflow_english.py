@@ -101,7 +101,7 @@ class EnglishWorkingEnvironmentRuleTests(unittest.TestCase):
         for phrase in (
             "read [English working environment](english-conversion.md) and plan its rule",
             "followed by the planned [language operation](collaboration-language.md) and [English working environment](english-conversion.md) rule",
-            "the fixed [English working environment](english-conversion.md) section and separable documentation or collaboration rule replacements it defines",
+            "the [English working environment](english-conversion.md) section, its translation, and separable documentation or collaboration rule replacements it defines",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
