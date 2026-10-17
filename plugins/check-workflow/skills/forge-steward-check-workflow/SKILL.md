@@ -25,7 +25,7 @@ An explicit invocation, including selecting the skill with no prompt, authorizes
 - **Delete legacy marked blocks:** deterministically remove the `forge-steward:workflow` and `forge-steward:claude-rules` blocks that `0.2.5` and `0.2.6` inserted in root `AGENTS.md`, using the script.
 - **Consolidate Claude entries:** after policy deletion, follow [Claude entry migration](references/agent-entrypoints.md) for tracked root `CLAUDE.md` and `.claude/CLAUDE.md`; report unsafe/nested entries unchanged.
 - **Configure collaboration language:** after migration, apply [Collaboration language](references/collaboration-language.md) in a safe existing root entry; report unresolved conflicts unchanged.
-- **Delete dangling references:** delete documents containing only workflow policy, together with links, contents entries, and reading instructions pointing to deleted documents or sections.
+- **Delete dangling references:** delete policy-only content, with links, contents entries, and reading instructions to it from candidate locations; retain and report externally referenced content.
 
 See [Deletion rules](references/skill-owned-rules.md) for locations and methods. Do not modify business code, dependencies, tests, CI, branch protection, or global/user Agent configuration. Preserve entry mechanisms except this defined migration or imports whose target this cleanup deletes. Do not install plugins, organize Issues, invoke other skills automatically, or merge.
 

@@ -206,7 +206,7 @@ The maintainer decided Issue/Change Request/Review workflow policy belongs only 
 
 ### Limited scenarios
 
-`tests/test_check_workflow_blocks.py` automatically verifies J01–J08 in temporary directories. J09–J19 are manual walkthroughs, not independent Agent end-to-end tests.
+`tests/test_check_workflow_blocks.py` automatically verifies J01–J08 in temporary directories. J09–J20 are manual walkthroughs, not independent Agent end-to-end tests.
 
 | ID | Input/state | Expected result |
 | --- | --- | --- |
@@ -224,11 +224,12 @@ The maintainer decided Issue/Change Request/Review workflow policy belongs only 
 | J12 | Language policy requires Chinese Issue titles and conventional-commit PR titles | Preserve; not a candidate |
 | J13 | Issue template has scope/acceptance fields, no-empty-ready and one-task-one-PR directions, and delivery-constraints section | Preserve fields/filling guidance; delete policy sentences and entire delivery-constraints section |
 | J14 | PR template has review-convergence policy checklist and project-build verification section | Remove former, preserve latter |
-| J15 | README links a candidate section | Preserve for decision |
+| J15 | README links a candidate section; a code comment or script also references it | Preserve the section and report the README, code comment, and script referrers for maintainer decision; do not delete the referenced section |
 | J16 | Removing numbered middle item breaks numbering, or deleting clause breaks grammar | Preserve for decision without rewriting retained contents |
 | J17 | ADR/release notes describe older review process | Historical description; preserve |
 | J18 | Check-only request | Report blocks/candidates without writes/branch |
 | J19 | Project ready rule requires caller responsibilities, absent from Skill body | Still delete; separately identify Skill gap on Change Request with original quote and missing meaning, not merely same-dimension coverage |
+| J20 | A candidate section links to another candidate section being removed | Delete the link, contents entry, or reading instruction with the removed section; the referrer is itself a candidate, not an external reference |
 
 ## 0.2.14 read-only repository setting checks
 
