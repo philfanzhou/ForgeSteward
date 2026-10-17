@@ -23,11 +23,12 @@ Merge only when all apply:
 
 - Every original in-scope acceptance criterion is met.
 - All applicable required checks pass, or an exception expressly permitted by repository rules is recorded and authorized.
-- No unresolved in-scope blocking feedback remains.
+- No unresolved in-scope blocking feedback remains; resolved blockers need a fix commit or maintainer acceptance.
+- The base is the default mainline unless the user explicitly named another target.
 - Required approvals, conflict state, and branch protection satisfy repository policy.
-- The head fetched immediately before merging equals the reviewed head; otherwise review the new diff and affected verification first.
+- The head fetched immediately before merging equals the reviewed head; pin it where supported, or verify the merged commit and record an incident if it differs.
 
-When these hold, merge immediately without another user confirmation. Otherwise record the unmet conditions and do not merge. Use the repository's required merge method, or its/platform default if unspecified. Do not proactively use admin bypass or force-push, or enable auto-merge or a merge queue. If a merge queue is already enabled, or policy requires an up-to-date branch and being behind is an approved item's only merge blocker, follow [Merge lane](references/merge-lane.md). Otherwise merge directly after approval. Record permission, protection, or platform failures accurately; never report them as successful merges.
+When these hold, merge immediately without another user confirmation. Otherwise record the unmet conditions and do not merge. Use the repository's required merge method, or its/platform default if unspecified. Do not use admin bypass or force-push, or enable auto-merge or a merge queue. If a merge queue is already enabled, or policy requires an up-to-date branch and being behind is an approved item's only merge blocker, follow [Merge lane](references/merge-lane.md). Otherwise merge directly after approval. Record permission, protection, or platform failures accurately; never report them as successful merges.
 
 ## Handoff
 
