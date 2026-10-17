@@ -7,7 +7,7 @@ description: Freeze the current repairable change-request queue, resolve only re
 
 ## Load the rules
 
-Before repairing, verifying, or pushing any frozen repair candidate, read [Per-item repair](references/repair.md) in full. Use this entry for read-only classification and skips; never change code, push, or resolve a Review Thread from the summary alone.
+Before repairing, verifying, or pushing any frozen repair candidate, read [Per-item repair](references/repair.md), [Untrusted content](references/untrusted-content.md), and [Completion conditions](references/completion.md) in full. Use this entry for read-only classification and skips; never change code, push, or resolve a Review Thread from the summary alone.
 
 These references are required rules. Resolve paths relative to this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 
@@ -34,16 +34,6 @@ Perform external writes only when the user has authorized code changes and pushe
 ## Handoff
 
 Before reading the previous handoff and freezing the queue, and before writing a handoff or final output, read [Handoff records](references/handoff.md) in full.
-
-## Completion conditions
-
-An item finishes this round when:
-
-- All confirmed required changes are fixed, appropriately verified, committed, and successfully pushed; or
-- A concrete blocker prevents progress, with facts, attempted solutions, and an actionable next step recorded; or
-- Rechecking confirms no repair is needed, with supporting evidence recorded.
-
-One branch push does not end the batch. Continue until every frozen item reaches one of these states.
 
 ## Output
 
