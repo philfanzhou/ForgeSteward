@@ -34,8 +34,18 @@ For a large or ambiguous document, translate only complete sections whose result
 
 After translating, verify every relative link and heading fragment in each changed file. When translation changes a heading used as a link target, update only that link's fragment and verify it resolves. On a link regression, stop translating the affected document, restore its original content, and report the regression. Report each file, its translated sections, every replaced passage, and unchanged content under [Reporting](reporting.md).
 
+## Repository About
+
+Apply this in default delivery mode after the working-environment rule and [Documentation translation](#documentation-translation), when the hosting platform exposes a repository About description and the run can read and write it. Check-only, local-only, review-only, audit-only, and release-audit-only runs make no About write.
+
+Read the current value and record its exact text, the read result, and the observation time. If the value is already English, write nothing and report it as unchanged with that reason. If the description is empty or absent, report that and write nothing; there is no existing text to translate. Otherwise, write a faithful English translation of the current value, preserving product names, identifiers, and links, then read the value back. Record the exact before and after values, the query and write results, the read-back result, and the observation time. Claim success only when the read-back equals the intended English description.
+
+If the platform does not expose a writable About description, the value cannot be read, or permission is missing, retain the old value and report the exact blocker and the input needed to recover; do not write blindly. If the write result is ambiguous, read the value back before claiming anything. A read-back matching the intended description is verified success; one matching the old value means the write did not apply; any other or unreadable result leaves the outcome unverified. Restore the recorded old value when possible, and report the ambiguity, retained value, and recovery input without claiming success.
+
+About is external metadata, not a tracked file: it never creates a branch, commit, or Change Request by itself, and it is applied even when no repository file needs a change. Report an unchanged About with the reason. Change no other repository setting, including visibility, topics, merge settings, or branch protection. Never claim a successful About write without an exact read-back.
+
 ## Limits and reporting
 
-About is the only repository setting this flow may change; do not change other settings. Do not rewrite historical Issues, Change Requests, comments, releases, release notes, or other people's content. Translating existing documentation and changing About are separate operations with their own procedures and reporting; [Documentation translation](#documentation-translation) defines the translation flow, and this rule update records the requirement and the root-entry rule.
+About is the only repository setting this flow may change; do not change other settings. Do not rewrite historical Issues, Change Requests, comments, releases, release notes, or other people's content. Translating existing documentation and changing About are separate operations with their own procedures and reporting; [Documentation translation](#documentation-translation) defines the translation flow, and [Repository About](#repository-about) defines the About flow.
 
 Check-only, review-only and audit-only write no project files; local-only stops at the local diff and publishes nothing. A completed rerun writes nothing and adds no duplicate section. Report the section added or replaced, exact replaced originals and source lines, preserved conventions, and unresolved conflicts. Do not claim complete English coverage while conflicts remain.

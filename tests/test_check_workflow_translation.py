@@ -77,9 +77,9 @@ class DocumentationTranslationRuleTests(unittest.TestCase):
     def test_procedure_plans_applies_and_admits_translation(self):
         text = normalized(PROCEDURE)
         for phrase in (
-            "plan its rule and translation against the post-language result",
-            "no safe migration, language or English work remains",
-            "rule and translation.",
+            "plan its rule, translation and About work against the post-language result",
+            "no safe migration, language or English file work remains",
+            "rule, translation and About operation.",
             "section, its translation, and separable documentation or collaboration rule replacements",
         ):
             with self.subTest(phrase=phrase):
