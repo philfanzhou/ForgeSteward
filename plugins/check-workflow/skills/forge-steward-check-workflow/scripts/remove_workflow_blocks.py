@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 
@@ -120,11 +121,38 @@ class Document:
         self.path.write_bytes((b"\xef\xbb\xbf" if self.bom else b"") + text.encode("utf-8"))
 
 
+def git(root, *arguments):
+    """Run Git for this repository; failing to invoke it is unsafe."""
+    try:
+        return subprocess.run(["git", "-C", str(root), *arguments], capture_output=True)
+    except OSError:
+        raise BlockError("Cannot run Git; refusing to write")
+
+
+def require_safe(repo, paths):
+    """Write only in a Git worktree whose target files are tracked and clean."""
+    result = git(repo, "rev-parse", "--is-inside-work-tree")
+    if result.returncode != 0 or result.stdout.strip() != b"true":
+        raise BlockError("Not inside a Git worktree; refusing to write")
+    for path in paths:
+        tracked = git(repo, "ls-files", "--error-unmatch", "--", path.name)
+        if tracked.returncode != 0:
+            raise BlockError(path.name + " is not tracked by Git; refusing to write")
+        status = git(repo, "status", "--porcelain", "--", path.name)
+        if status.returncode != 0:
+            raise BlockError("Cannot read Git status for " + path.name + "; refusing to write")
+        if status.stdout.strip():
+            raise BlockError(path.name + " has uncommitted changes; refusing to write")
+
+
 def plan(repo):
     if not repo.is_dir():
         raise BlockError("Repository directory not found: " + str(repo))
     agents_path, claude_path = repo / "AGENTS.md", repo / "CLAUDE.md"
-    if agents_path.is_symlink() or not agents_path.exists():
+    for path in (agents_path, claude_path):
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise BlockError(path.name + " is not a regular file; it is not managed")
+    if not agents_path.exists():
         return []
     agents = Document(agents_path)
     expected = agents.lines
@@ -134,24 +162,32 @@ def plan(repo):
         return []
     changes = [(agents, expected, "remove forge-steward workflow blocks")]
     # Delete AGENTS.md when only blocks remain; also remove the now-dangling CLAUDE.md import.
-    if not any(line.strip() for line in expected) and claude_path.exists() and not claude_path.is_symlink():
+    if not any(line.strip() for line in expected) and claude_path.exists():
         claude = Document(claude_path)
         effective = set(outside_fences(claude.lines))
-        kept = [line for index, line in enumerate(claude.lines)
-                if not (index in effective and line.strip() in IMPORTS)]
+        kept = remove_imports(claude.lines, effective)
         if kept != claude.lines:
             reason = "delete dangling @AGENTS.md import"
-            changes.append((claude, remove_extra_blank(kept), reason))
+            changes.append((claude, kept, reason))
+    require_safe(repo, [document.path for document, _, _ in changes])
     return changes
 
 
-def remove_extra_blank(lines):
-    result = []
-    for line in lines:
-        if not line.strip() and (not result or not result[-1].strip()):
+def remove_imports(lines, effective):
+    """Remove effective imports and one adjacent blank only between single-blank runs."""
+    result, index = [], 0
+    while index < len(lines):
+        line = lines[index]
+        if index in effective and line.strip() in IMPORTS:
+            before_single = (result and not result[-1].strip()
+                             and (len(result) < 2 or result[-2].strip()))
+            after_single = (index + 1 < len(lines) and not lines[index + 1].strip()
+                            and (index + 2 >= len(lines) or lines[index + 2].strip()))
+            index += 2 if before_single and after_single else 1
             continue
         result.append(line)
-    return trim(result)
+        index += 1
+    return result
 
 
 def main(argv=None):

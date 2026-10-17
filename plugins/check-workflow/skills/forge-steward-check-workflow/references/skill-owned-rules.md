@@ -58,7 +58,7 @@ Retain these for maintainer decision, explaining why in the Change Request:
 - **Clause:** when conventions and policy are coordinated by commas, semicolons, or “and,” delete only the policy clause, preserving all other characters. For a final clause, change its preceding comma/semicolon to a period; this is the sole allowed character replacement. If the result is ungrammatical or needs connective changes, mark it undecided.
 - **Template:** preserve section headings and completion guidance; delete policy sentences, comments, and checkboxes. If all checks under a section are policy, delete that entire section.
 - **Whole document:** delete an entirely policy document, along with reading instructions, links, and contents entries pointing only to it.
-- **Legacy blocks:** use `scripts/remove_workflow_blocks.py`. If root `AGENTS.md` has no other content after deletion, delete it and its import in `CLAUDE.md`; if `CLAUDE.md` is then empty, delete it too.
+- **Legacy blocks:** use `scripts/remove_workflow_blocks.py`. If root `AGENTS.md` has no other content after deletion, delete it and its import in `CLAUDE.md`; if `CLAUDE.md` is then empty, delete it too. The script requires affected files in a Git worktree to be tracked and clean.
 - Never rewrite retained text, relocate deleted rules, or write replacement clauses except the separate [language operation](collaboration-language.md). Migration follows [its own rules](agent-entrypoints.md).
 
 ## Records and repeated runs
