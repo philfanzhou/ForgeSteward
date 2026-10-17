@@ -411,3 +411,23 @@ The new reference is explicitly included in installer resource expectations and 
 | N04 | All five stage packages carry markers equal to the orchestrator's bundled version | Preflight exits 0; the stage proceeds and the check writes no project file | Startup preflight |
 
 The comparison still has one authoritative source: the bundled catalog. A missing owning skill produces an explicit skill gap, not a clean result, and no bundled snapshot of other skills' clauses is added. The preflight reads only packaged markers, is read-only and idempotent, and adds no client configuration or version change.
+
+## English working environment rule and no-write modes (#183)
+
+[Issue #183](https://github.com/philfanzhou/ForgeSteward/issues/183) is the first slice of tracker [#182](https://github.com/philfanzhou/ForgeSteward/issues/182) for original [Issue #151](https://github.com/philfanzhou/ForgeSteward/issues/151). It changes check-workflow's purpose and authorization and adds the [English working environment rule](../plugins/check-workflow/skills/forge-steward-check-workflow/references/english-conversion.md). It does not translate existing documents or change About; the tracker's later tasks own those operations. Historical C01-N04 records remain.
+
+The entry requires that rule before acting and names check-only, local-only, review-only, and audit-only as no-write limits. The fixed section is one rule covering project-maintained documentation, Issue and Change Request titles and bodies, Comments, Discussions, Review Threads, and future commit messages. It replaces the fixed collaboration section rather than adding a duplicate, preserves historical records, and leaves code, commands, paths, identifiers, logs, technical data, quoted external text, code-comment languages, and other conventions unchanged.
+
+| ID | Finite input/state | Expected action and completion condition | Rule basis |
+| --- | --- | --- | --- |
+| W01 | Safe root AGENTS.md has the fixed English collaboration section but no documentation or future-commit-message rule | Replace that section with the fixed English working environment section; record the exact original heading/text and source lines; leave no duplicate section or empty heading; change no other content | English working environment fixed section; procedure step 6 diff gate |
+| W02 | Root rule says “Docs and Issues are written in Chinese” and can be separated; unrelated build and branch conventions exist | Replace only the conflicting documentation/collaboration portion; use the fixed section once; preserve the build and branch conventions byte-for-byte; record exact before/after | Separable replacement and preserved conventions |
+| W03 | Documentation and Issue languages must be chosen together for each release; no clean separation is possible | Retain the mixed rule unchanged; report the exact conflict, unresolved coverage, and the maintainer decision needed; do not add a competing or duplicate section | Inseparable conflict retained and reported |
+| W04 | Complete equivalent English rule already covers every listed surface | Write nothing; no duplicate section, timestamp, branch, commit, or Change Request | Complete coverage; no-write rerun |
+| W05 | Check-only request with a replaceable root rule | Report the planned replacement and exact original; project bytes and modification times stay unchanged; no branch, commit, or Change Request | Check-only no-write boundary |
+| W06 | Local-only request with a replaceable root rule | Apply and verify the local rule edit; no commit, push, or Change Request; report the exact stopping point | Local-only publication boundary |
+| W07 | Review-only request | Review and report only; no project bytes, branch, commit, or Change Request change | Review-only no-write boundary |
+| W08 | Audit-only or release-audit-only request | Finish read-only at Reporting with release conclusions; no rule edit, project write, branch, commit, or Change Request; say “No project files were changed.” | Audit-only no-write boundary; release audit rules |
+| W09 | Conflicting non-English documentation rule exists only in CONTRIBUTING.md, outside the chosen root entry | Retain and report the external conflict; do not add a root rule solely to override it or change the external file | External conflict retained |
+
+The fixed section is the only added rule; this slice does not become a general documentation editor. It records no translation of existing files and no About value. No version, release, or installation change is included. Budgets, Markdown links, wording checks, marketplace consistency, and the full suite are required implementation checks; these are finite rule walkthroughs, not independent Agent/model or consumer repository runs.

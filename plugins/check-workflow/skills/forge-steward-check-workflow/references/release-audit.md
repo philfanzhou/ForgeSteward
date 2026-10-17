@@ -6,6 +6,8 @@
 2. Take scope from the contract. If undefined, enumerate the release scope actually available and explain coverage and omissions; arbitrary “latest N” results are not all history. Identify release tags from the repository contract and exclude development tags. An unpublished source target version is not a missing release. Assess historical releases against their contemporary contract, not today's rules.
 3. Match versions, channels, and package identities only through explicit contract mappings. Do not guess prefixes, case, suffixes, or normalization equivalence. Without a mapping, retain original identities and mark affected comparisons “unknown.”
 
+Retain the existing invocation and infrequent work-cycle schedule.
+
 ## Read-only enumeration and comparison
 
 Use already authorized connectors, CLIs, or APIs for the actual host and feed. These rules mandate no product, query address, or new client. For each category record query source, observation time, version/package identity, and coverage. Confirm absence only after all pages and required categories are queried. Truncated output is not a full inventory; read the remaining raw results or mark partial coverage.

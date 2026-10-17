@@ -99,6 +99,7 @@ class InstallerTests(unittest.TestCase):
         for resource in ("references/skill-owned-rules.md", "references/procedure.md",
                          "references/release-audit.md", "references/reporting.md",
                          "references/agent-entrypoints.md", "references/collaboration-language.md",
+                         "references/english-conversion.md",
                          "scripts/remove_workflow_blocks.py"):
             self.assertTrue((self.installed("check-workflow") / resource).is_file())
         for resource in ("references/startup.md", "references/cycles.md", "references/subagent-lifecycle.md",
