@@ -14,6 +14,7 @@ import tempfile
 
 
 COOLDOWN = timedelta(days=7)
+LOCK_PURPOSE = "check-workflow state decision"
 RESULTS = {"clean", "pr-open", "incomplete"}
 VERSION_FILE = Path(__file__).with_name("VERSION")
 
@@ -102,19 +103,147 @@ def write_state(path, branch, version, result, change_request, now):
     return data
 
 
+def error_text(error):
+    return getattr(error, "strerror", None) or str(error)
+
+
+def stamp(moment):
+    return moment.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def process_start(pid):
+    """Best-effort comparable identity of a running process; the reason is returned when unreadable."""
+    if sys.platform.startswith("linux"):
+        try:
+            stat = Path("/proc/%d/stat" % pid).read_text(encoding="utf-8")
+            fields = stat.rsplit(")", 1)[1].split()
+            if len(fields) < 20:
+                return None, "process start time is missing from /proc"
+            return "linux:" + fields[19], None
+        except (OSError, UnicodeError) as error:
+            return None, "cannot read process start time: " + error_text(error)
+    if os.name == "posix":
+        try:
+            result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True,
+                                    text=True, timeout=2, env=dict(os.environ, LC_ALL="C"),
+                                    check=False)
+        except (OSError, subprocess.SubprocessError) as error:
+            return None, "cannot read process start time: " + error_text(error)
+        value = result.stdout.strip()
+        if result.returncode or not value:
+            return None, "process start time is unavailable: ps did not report it"
+        return "ps:" + value, None
+    if os.name == "nt":
+        return windows_process_start(pid)
+    return None, "process start time is unavailable on this platform"
+
+
+def windows_open_process(pid):
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    return ctypes, wintypes, kernel, handle, ctypes.get_last_error()
+
+
+def windows_process_start(pid):
+    ctypes, wintypes, kernel, handle, error = windows_open_process(pid)
+    if not handle:
+        return None, "cannot open process %d to read its start time (error %d)" % (pid, error)
+    try:
+        creation = wintypes.FILETIME()
+        kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME)]
+        kernel.GetProcessTimes.restype = wintypes.BOOL
+        empty = [wintypes.FILETIME() for _ in range(3)]
+        if not kernel.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(empty[0]),
+                                      ctypes.byref(empty[1]), ctypes.byref(empty[2])):
+            return None, "cannot read process start time (error %d)" % ctypes.get_last_error()
+        return "windows:%d" % ((creation.dwHighDateTime << 32) | creation.dwLowDateTime), None
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def lock_path(path):
+    return path.with_suffix(".lock")
+
+
+def lock_owner():
+    start, start_error = process_start(os.getpid())
+    owner = {"schema": 1, "purpose": LOCK_PURPOSE, "pid": os.getpid(),
+             "acquired_at": stamp(datetime.now(timezone.utc))}
+    if start:
+        owner["process_start"] = start
+    else:
+        owner["process_start_error"] = start_error
+    return owner
+
+
+def read_lock(lock):
+    """Return the recorded owner and why it cannot be used; never guess an owner."""
+    try:
+        data = json.loads(lock.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, "the lock file disappeared"
+    except (OSError, UnicodeError, ValueError) as error:
+        return None, "its owner metadata is unreadable: " + error_text(error)
+    if (not isinstance(data, dict)
+            or not isinstance(data.get("pid"), int) or isinstance(data.get("pid"), bool)
+            or data["pid"] <= 0
+            or not isinstance(data.get("acquired_at"), str) or not data["acquired_at"]):
+        return None, "its owner metadata is incomplete"
+    return data, None
+
+
+def lock_refusal(lock):
+    owner, problem = read_lock(lock)
+    if owner is None:
+        return ("Check-workflow state is locked without readable owner metadata (%s): %s. "
+                "Confirm no orchestration is still running, then remove it to recover."
+                % (problem, lock))
+    started = (owner.get("process_start")
+               or "unavailable: " + str(owner.get("process_start_error") or "not recorded"))
+    return ("Check-workflow state is locked by owner process %d (start time %s) since %s: %s. "
+            "Confirm that orchestration stopped, then remove the file to recover."
+            % (owner["pid"], started, owner["acquired_at"], lock))
+
+
 @contextmanager
 def state_lock(path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    lock = path.with_suffix(".lock")
+    lock = lock_path(path)
+    payload = json.dumps(lock_owner(), ensure_ascii=False) + "\n"
     try:
         fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
-        raise ValueError("Check-workflow state is locked; inspect the running orchestration before retrying")
+        raise ValueError(lock_refusal(lock))
+    identity = None
     try:
-        os.close(fd)
+        stat = os.fstat(fd)
+        identity = (stat.st_dev, stat.st_ino)
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            fd = None
+            output.write(payload)
         yield
     finally:
-        lock.unlink()
+        if fd is not None:
+            os.close(fd)
+        if identity is not None:
+            try:
+                current = os.stat(str(lock))
+            except OSError:
+                current = None
+            if current is not None and (current.st_dev, current.st_ino) == identity:
+                try:
+                    lock.unlink()
+                except FileNotFoundError:
+                    pass
 
 
 def claim(path, branch, version, now):

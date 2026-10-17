@@ -5,6 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -146,6 +147,24 @@ class RunRecordTests(unittest.TestCase):
         result = self.run_cli(*arguments)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def write_guard(self, path, **overrides):
+        guard = path / ".events.lock"
+        guard.mkdir()
+        owner = {"schema": 1, "purpose": "run-record event append", "pid": 4242,
+                 "process_start": "ps:test writer", "acquired_at": "2026-10-17T11:00:00Z"}
+        owner.update(overrides)
+        (guard / record.GUARD_OWNER).write_text(json.dumps(owner) + "\n", encoding="utf-8")
+        return guard, owner
+
+    def timeout_event(self, path, task="blocked"):
+        with mock.patch.object(record.time, "monotonic", side_effect=[100, 111]):
+            with mock.patch.object(record.time, "sleep") as sleep:
+                with self.assertRaisesRegex(ValueError, "Timed out waiting for") as raised:
+                    record.add_event(path, task, "implement", "started", None, None,
+                                     datetime.now(timezone.utc))
+        sleep.assert_not_called()
+        return raised.exception
+
     def test_start_uses_git_metadata_and_leaves_project_files_untouched(self):
         started = self.start()
         path = Path(started["path"])
@@ -192,6 +211,63 @@ class RunRecordTests(unittest.TestCase):
                 path = record.run_dir(record.runs_root(self.repo), run_id)
                 self.assertEqual(sorted(e["task"] for e in record.read_events(path)),
                                  ["implement-%d" % index for index in range(8)])
+
+    def test_event_guard_records_owner_metadata_and_is_removed(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        observed = {}
+        real_write = record.os.write
+
+        def write(fd, data):
+            observed["owner"] = json.loads((path / ".events.lock" / record.GUARD_OWNER)
+                                           .read_text(encoding="utf-8"))
+            return real_write(fd, data)
+
+        with mock.patch.object(record, "process_start", return_value=("ps:writer", None)):
+            with mock.patch.object(record.os, "write", side_effect=write):
+                record.add_event(path, "writer", "implement", "started", None, None,
+                                 datetime.now(timezone.utc))
+        self.assertEqual(observed["owner"]["pid"], os.getpid())
+        self.assertEqual(observed["owner"]["purpose"], "run-record event append")
+        self.assertEqual(observed["owner"]["process_start"], "ps:writer")
+        self.assertIn("acquired_at", observed["owner"])
+        self.assertFalse((path / ".events.lock").exists())
+        self.assertEqual([event["task"] for event in record.read_events(path)], ["writer"])
+
+    def test_leftover_guard_reports_owner_and_time_without_removing_it(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        record.add_event(path, "prior", "implement", "started", None, None, datetime.now(timezone.utc))
+        before = (path / "events.jsonl").read_bytes()
+        guard, owner = self.write_guard(path)
+        owner_before = (guard / record.GUARD_OWNER).read_bytes()
+        message = str(self.timeout_event(path))
+        for text in ("owner process 4242", owner["process_start"], owner["acquired_at"],
+                     str(guard), "remove"):
+            self.assertIn(text, message)
+        self.assertEqual((path / "events.jsonl").read_bytes(), before)
+        self.assertEqual((guard / record.GUARD_OWNER).read_bytes(), owner_before)
+        self.assertTrue(guard.is_dir())
+
+    def test_active_guard_is_never_removed(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        guard, owner = self.write_guard(path, pid=os.getpid())
+        self.timeout_event(path)
+        self.assertTrue(guard.is_dir())
+        self.assertEqual(json.loads((guard / record.GUARD_OWNER).read_text(encoding="utf-8")), owner)
+
+    def test_manual_guard_recovery_allows_later_events(self):
+        run_id = self.start()["run_id"]
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        guard, _ = self.write_guard(path)
+        self.timeout_event(path)
+        (guard / record.GUARD_OWNER).unlink()
+        guard.rmdir()
+        record.add_event(path, "recovered", "implement", "started", None, None,
+                         datetime.now(timezone.utc))
+        self.assertEqual([event["task"] for event in record.read_events(path)], ["recovered"])
+        self.assertFalse(guard.exists())
 
     @unittest.skipUnless(sys.platform == "win32", "Requires native Windows directory deletion semantics")
     def test_event_waits_for_windows_pending_directory_deletion(self):
@@ -295,6 +371,8 @@ class RunRecordTests(unittest.TestCase):
                                              datetime.now(timezone.utc))
                 self.assertIs(raised.exception.__cause__, error)
                 self.assertIn(str(error), str(raised.exception))
+                self.assertIn(record.GUARD_OWNER, str(raised.exception))
+                self.assertIn("remove", str(raised.exception))
                 self.assertEqual((path / "events.jsonl").read_bytes(), before)
                 self.assertTrue(guard.is_dir())
 

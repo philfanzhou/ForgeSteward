@@ -73,6 +73,110 @@ def stamp(moment):
     return moment.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def error_text(error):
+    return getattr(error, "strerror", None) or str(error)
+
+
+def process_start(pid):
+    """Best-effort comparable identity of a running process; the reason is returned when unreadable."""
+    if sys.platform.startswith("linux"):
+        try:
+            stat = Path("/proc/%d/stat" % pid).read_text(encoding="utf-8")
+            fields = stat.rsplit(")", 1)[1].split()
+            if len(fields) < 20:
+                return None, "process start time is missing from /proc"
+            return "linux:" + fields[19], None
+        except (OSError, UnicodeError) as error:
+            return None, "cannot read process start time: " + error_text(error)
+    if os.name == "posix":
+        try:
+            result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True,
+                                    text=True, timeout=2, env=dict(os.environ, LC_ALL="C"),
+                                    check=False)
+        except (OSError, subprocess.SubprocessError) as error:
+            return None, "cannot read process start time: " + error_text(error)
+        value = result.stdout.strip()
+        if result.returncode or not value:
+            return None, "process start time is unavailable: ps did not report it"
+        return "ps:" + value, None
+    if os.name == "nt":
+        return windows_process_start(pid)
+    return None, "process start time is unavailable on this platform"
+
+
+def windows_open_process(pid):
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    return ctypes, wintypes, kernel, handle, ctypes.get_last_error()
+
+
+def windows_process_start(pid):
+    ctypes, wintypes, kernel, handle, error = windows_open_process(pid)
+    if not handle:
+        return None, "cannot open process %d to read its start time (error %d)" % (pid, error)
+    try:
+        creation = wintypes.FILETIME()
+        kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME),
+                                           ctypes.POINTER(wintypes.FILETIME)]
+        kernel.GetProcessTimes.restype = wintypes.BOOL
+        empty = [wintypes.FILETIME() for _ in range(3)]
+        if not kernel.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(empty[0]),
+                                      ctypes.byref(empty[1]), ctypes.byref(empty[2])):
+            return None, "cannot read process start time (error %d)" % ctypes.get_last_error()
+        return "windows:%d" % ((creation.dwHighDateTime << 32) | creation.dwLowDateTime), None
+    finally:
+        kernel.CloseHandle(handle)
+
+
+GUARD_OWNER = "owner.json"
+
+
+def owner_metadata(purpose):
+    start, start_error = process_start(os.getpid())
+    owner = {"schema": 1, "purpose": purpose, "pid": os.getpid(),
+             "acquired_at": stamp(datetime.now(timezone.utc))}
+    if start:
+        owner["process_start"] = start
+    else:
+        owner["process_start_error"] = start_error
+    return owner
+
+
+def read_guard_owner(guard):
+    """Return the recorded owner and why it cannot be used; never guess an owner."""
+    try:
+        data = json.loads((guard / GUARD_OWNER).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, "the guard has no " + GUARD_OWNER
+    except (OSError, UnicodeError, ValueError) as error:
+        return None, "the guard's owner metadata is unreadable: " + error_text(error)
+    if (not isinstance(data, dict)
+            or not isinstance(data.get("pid"), int) or isinstance(data.get("pid"), bool)
+            or data["pid"] <= 0
+            or not isinstance(data.get("acquired_at"), str) or not data["acquired_at"]):
+        return None, "the guard's owner metadata is incomplete"
+    return data, None
+
+
+def guard_recovery(guard):
+    owner, problem = read_guard_owner(guard)
+    if owner is None:
+        return ("owner metadata is unreadable (%s); confirm that no event writer is running, "
+                "then remove %s to recover" % (problem, guard))
+    started = (owner.get("process_start")
+               or "unavailable: " + str(owner.get("process_start_error") or "not recorded"))
+    return ("owner process %d (start time %s) acquired it at %s; confirm that writer stopped, "
+            "then remove %s to recover" % (owner["pid"], started, owner["acquired_at"], guard))
+
+
 def parse(text):
     moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
     if moment.tzinfo is None:
@@ -139,16 +243,26 @@ def add_event(path, task, stage, status, wait, detail, moment):
             if not isinstance(error, FileExistsError) and getattr(error, "winerror", None) != 5:
                 raise
             if time.monotonic() > deadline:
-                raise ValueError("Timed out waiting for %s: %s" % (guard, error)) from error
+                raise ValueError("Timed out waiting for %s: %s; %s"
+                                 % (guard, error, guard_recovery(guard))) from error
             time.sleep(0.01)
     try:
+        owner = owner_metadata("run-record event append")
+        (guard / GUARD_OWNER).write_text(json.dumps(owner, ensure_ascii=False) + "\n", encoding="utf-8")
         fd = os.open(str(path / "events.jsonl"), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
         try:
             os.write(fd, line)
         finally:
             os.close(fd)
     finally:
-        os.rmdir(str(guard))
+        try:
+            (guard / GUARD_OWNER).unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            os.rmdir(str(guard))
+        except FileNotFoundError:
+            pass
     return record
 
 
