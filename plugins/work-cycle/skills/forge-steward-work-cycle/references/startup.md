@@ -4,14 +4,26 @@ Identify the user's current repository, remotes, default mainline, and workspace
 
 `check-workflow` is an infrequent startup check, not part of every cycle. Run this package's `scripts/check_workflow_gate.py --repo <target-repository> --branch <default-mainline> --claim`. It reads the unified version from `scripts/VERSION` and maintains `forge-steward/check-workflow.json` in the target's Git common dir without changing tracked files. `--claim` decides atomically and writes an `incomplete` placeholder before a required run; it serializes that state decision only, so two concurrent orchestrations still require the run-level `run` lock in [Run-level ownership](concurrency.md#run-level-ownership). The state lock `forge-steward/check-workflow.lock` records the owner process, its start time when readable, the acquisition time, and the purpose; never remove a leftover lock automatically, and remove that file only after confirming no orchestration is still running. Exit `0` means skip, `1` run, `2` unreliable state. For read-only inspection use `--check`, which does not claim. On `2`, report the error, skip this automatic check, and continue independent cycles without repeated probing.
 
-Decide using only the repository/mainline's prior run record, unified version, and UTC time:
+Decide using only the repository/mainline's prior run record, unified version, and UTC time. A `pr-open` record is reconciled first, as described under [Recorded cleanup request](#recorded-cleanup-request):
 
 - No record, or recorded mainline differs: run once.
 - Previous run incomplete: skip within 168 hours of its attempt; rerun after 168 hours.
 - Previous run complete (no changes or cleanup Change Request submitted): skip the same version; skip a different version within 168 hours; run only when the version differs and 168 hours have elapsed.
+- Previous run recorded `pr-open`: reconcile the Change Request first; merged records completion, closed unmerged records incomplete, and still-open or unreadable keeps the complete-run skip. A record for a different branch is not reconciled.
 
-Ordinary code/document commits, candidate-file changes, and PR/MR creation, status changes, or merges do not trigger this check. Skips do not refresh timestamps. This intentionally lets newly duplicated rules remain temporarily in the same version; sustained Issue delivery must not be slowed by frequent cleanup scans.
+Ordinary code/document commits, candidate-file changes, and PR/MR creation, status changes, or merges do not trigger this check; only the next startup's read of a recorded `pr-open` cleanup request reconciles it. Skips do not refresh timestamps. This intentionally lets newly duplicated rules remain temporarily in the same version; sustained Issue delivery must not be slowed by frequent cleanup scans.
 
 When a run is needed, `--claim` has recorded the attempt. Create a separate subagent explicitly invoking `forge-steward-check-workflow` for its default delivery flow; the orchestrator must not clean directly. After it finishes, read the release-audit part of its `result.md` and record `release_audit` in `handoff.json` before the cleanup decision: the summary, the `clean`/`findings`/`incomplete`/`not-run` result, every finding and unknown, and the evidence path. If that part is missing or unreadable, record `incomplete` with the reason; never infer a clean audit. A check skipped by the gate without dispatch uses `not-run` with the skip reason. After completion, use `--record --result clean` for no changes or `--record --result pr-open --change-request <URL>` for a submitted cleanup request. On failed calls/uncertain results, retain `incomplete`. Read back uncertain writes before redispatching. The record represents one version's run; `pr-open` does not mean merged. Normal review handles that request later; its status changes do not trigger another check. Report record-write failure without rerunning the stage in this orchestration. A clean, findings, incomplete, or skipped audit never blocks an independent cleanup Change Request or its delivery.
+
+### Recorded cleanup request
+
+At each startup, before `--claim`, read `forge-steward/check-workflow.json` in the target repository's Git common directory. If its `result` is `pr-open` and its recorded `branch` matches the target's default mainline, read the recorded `change_request` URL and that Change Request's actual state through an available hosting capability, using read-only calls. Reconcile the record:
+
+- Merged: record completion with `--record --result clean` and do not re-run the same version.
+- Closed without merging: record the incomplete state with `--record --result incomplete`; the same version is eligible after the 168-hour cooldown, and report that outcome.
+- Still open: keep the record and the current skip, and report that it is still open.
+- If the Change Request's state cannot be read: keep the record and report the unverified state and the input needed to retry; never claim completion.
+
+Reconcile only when a startup reads the record. A Change Request status change does not trigger a check by itself, and ordinary commits, merges, or unrelated Change Request changes never trigger one. If a reconciliation record write fails, keep the existing record, report the failure, and do not redispatch check-workflow in this orchestration. If the record itself is invalid or unreadable, leave it unchanged and use the gate's existing exit `2` path.
 
 This cache belongs to local checkout Git metadata, shared by worktrees through the common dir. New clones/machines lack it and each perform a first check. Never commit cache markers, create empty PRs, or change check-workflow's delete-only contract to share it.

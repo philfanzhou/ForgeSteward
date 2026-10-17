@@ -59,7 +59,11 @@ This document covers `work-cycle` in `0.2.16`, with later revisions identified b
 | Merge lock occupied | A merging when B requests lock | B waits until A finishes merge/cleanup and releases |
 | Reviewer exits abnormally | Stopped reviewer holds `merge` | Confirm stopped, release, and redispatch that PR review from recorded state |
 | First automatic cleanup | No target-repository Git-metadata record | Dispatch check-workflow once at startup, record in local Git metadata, outside cycle count |
-| Same version, ordinary changes | Previous run completed at same version; ordinary commits/merges since | Skip automatic cleanup even after 7 days; PR state/file diffs do not trigger it |
+| Same version, ordinary changes | Previous run completed at the same version; ordinary commits or merges and unrelated Change Request state changes since | Skip automatic cleanup even after 7 days; these changes do not trigger a check, and only a recorded cleanup request is reconciled at the next startup |
+| Cleanup request merged | Previous run recorded `pr-open`; that Change Request merged | At the next startup, record completion with `--record --result clean`; keep skipping the same version and do not dispatch another check for it |
+| Cleanup request closed unmerged | Previous run recorded `pr-open`; that Change Request closed without merging | At the next startup, record `incomplete` with `--record --result incomplete`; skip within 168 hours, run after the cooldown, and report the outcome |
+| Cleanup request still open | Previous run recorded `pr-open`; that Change Request is still open | Keep the record and the skip; report that it is still open, without dispatching a check |
+| Cleanup request unreadable | Previous run recorded `pr-open`; no hosting capability can read that Change Request | Keep the record and the skip; report the unverified state and the input needed to retry, and never claim completion |
 | New-version cooldown | Version changed, last run 6 days ago or exactly 7 | Skip at 6 days; run at 168 hours; skips do not extend cooldown |
 | Incomplete prior run | Previous automatic cleanup failed/uncertain | No automatic retry within 168 hours; afterward retry allowed even at same version; independent cycles continue |
 

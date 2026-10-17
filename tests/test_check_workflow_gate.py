@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,7 @@ from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/scripts/check_workflow_gate.py"
+STARTUP = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle/references/startup.md"
 spec = importlib.util.spec_from_file_location("check_workflow_gate", SCRIPT)
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
@@ -52,6 +54,31 @@ class CheckWorkflowGateTests(unittest.TestCase):
     def test_incomplete_run_has_cooldown_even_without_version_change(self):
         self.assertFalse(gate.decide(self.saved(6, result="incomplete"), "main", "0.2.13", self.now)[0])
         self.assertTrue(gate.decide(self.saved(7, result="incomplete"), "main", "0.2.13", self.now)[0])
+
+    def test_closed_unmerged_pr_open_is_reconciled_to_incomplete_with_cooldown(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "check-workflow.json"
+            gate.write_state(path, "main", "0.2.13", "pr-open",
+                             "https://example.test/pr/1", self.now - timedelta(days=30))
+            # Startup reconciliation for a request closed without merging records incomplete.
+            gate.write_state(path, "main", "0.2.13", "incomplete", None, self.now)
+            saved = gate.read_state(path)
+            self.assertEqual(saved[0]["schema"], 1)
+            self.assertFalse(gate.decide(saved, "main", "0.2.13", self.now + timedelta(days=6))[0])
+            self.assertTrue(gate.decide(saved, "main", "0.2.13", self.now + timedelta(days=7))[0])
+
+    def test_merged_pr_open_is_reconciled_to_clean_and_stays_complete(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "check-workflow.json"
+            gate.write_state(path, "main", "0.2.13", "pr-open",
+                             "https://example.test/pr/1", self.now - timedelta(days=30))
+            # Startup reconciliation for a merged request records completion.
+            gate.write_state(path, "main", "0.2.13", "clean", None, self.now)
+            saved = gate.read_state(path)
+            self.assertEqual(saved[0]["schema"], 1)
+            self.assertFalse(gate.decide(saved, "main", "0.2.13", self.now + timedelta(days=400))[0])
+            self.assertFalse(gate.decide(saved, "main", "0.2.14", self.now + timedelta(days=6))[0])
+            self.assertTrue(gate.decide(saved, "main", "0.2.14", self.now + timedelta(days=7))[0])
 
     def test_claim_reserves_run_before_another_coordinator_can_start(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -176,6 +203,42 @@ class CheckWorkflowGateTests(unittest.TestCase):
             self.assertEqual((first.returncode, second.returncode, recorded.returncode), (1, 0, 0))
             self.assertIn("RUN:", first.stdout)
             self.assertIn("SKIP:", second.stdout)
+
+
+class StartupCleanupReconciliationRuleTests(unittest.TestCase):
+    """The startup rule reads a pr-open record, reconciles it, then records the outcome."""
+
+    def setUp(self):
+        self.text = re.sub(r"\s+", " ", STARTUP.read_text(encoding="utf-8"))
+
+    def test_startup_reads_reconciles_and_records_a_pr_open_request(self):
+        for phrase in (
+            "before `--claim`",
+            "`forge-steward/check-workflow.json`",
+            "recorded `branch` matches the target's default mainline",
+            "recorded `change_request` URL",
+            "through an available hosting capability",
+            "`--record --result clean`",
+            "do not re-run the same version",
+            "`--record --result incomplete`",
+            "168-hour cooldown",
+            "Still open: keep the record and the current skip",
+            "If the Change Request's state cannot be read",
+            "never claim completion",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
+    def test_ordinary_changes_do_not_trigger_a_check(self):
+        self.assertIn(
+            "A Change Request status change does not trigger a check by itself, "
+            "and ordinary commits, merges, or unrelated Change Request changes never trigger one.",
+            self.text,
+        )
+        self.assertIn(
+            "only the next startup's read of a recorded `pr-open` cleanup request reconciles it",
+            self.text,
+        )
 
 
 if __name__ == "__main__":
