@@ -89,10 +89,10 @@ Final output remains one line of identifiers; all this information belongs in ea
 
 ## Tracker fallback for a fresh repository (#141)
 
-Manual walkthrough of [handoff and recovery](../plugins/prepare-work/skills/forge-steward-prepare-work/references/handoff.md) and [queue and screening](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-screening.md). The repository has open Issues, C is the current candidate, and no tracker or repository-designated scheduling location exists.
+Manual walkthrough of [handoff and recovery](../plugins/prepare-work/skills/forge-steward-prepare-work/references/handoff.md) and [queue and screening](../plugins/prepare-work/skills/forge-steward-prepare-work/references/queue-and-screening.md). The repository has open Issues, C is the current candidate, and no tracker exists.
 
 | ID | Input and events | Result |
 | --- | --- | --- |
-| P53 | First preparation run in this repository; no writable tracker and no repository-designated location; C's original Issue is writable; compare a second run where no repository location is writable | Establish the freeze time and baseline, persist the baseline and counts in C's original Issue handoff (or the designated location when one exists), and invent no tracker; update one current scheduling section without contradictory “latest” states. When no writable location exists, state during progress that persistence is unavailable and do not claim a saved record. Passed |
+| P53 | First preparation run in this repository; no tracker exists; C's original Issue is writable; compare a run where no repository location is writable | Establish the freeze time and baseline; persist the baseline and counts in a repository-designated location when one exists, otherwise in C's original Issue handoff; invent no tracker; update one current scheduling section without contradictory “latest” states. When no writable location exists, state during progress that persistence is unavailable and do not claim a saved record. Passed |
 
 The fallback keeps the baseline readable across runs without creating an invented tracker. It does not change freeze time, baseline identity, counts, selection order, or the one-line output.
