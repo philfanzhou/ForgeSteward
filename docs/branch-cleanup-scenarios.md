@@ -1,10 +1,12 @@
 # Leftover branch cleanup scenarios
 
-This document covers review-and-merge's [leftover branch cleanup](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) rules (Issue #81). These are limited walkthroughs of the written rules, not runs against real repositories or evaluations of actual Agent behavior.
+This document covers review-and-merge's [leftover branch cleanup](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) rules (Issues #81 and #165). These are limited walkthroughs of the written rules, not runs against real repositories or evaluations of actual Agent behavior.
 
 ## Background
 
 Previously, review-and-merge deleted only the source branch of a Change Request merged during that invocation. It left branches from interrupted Agents or earlier merges untouched: remote branches whose PRs were all merged, local branches whose remotes had already gone, and local branches left by previous sessions. The new rules add a cleanup pass after the frozen queue is processed. Since work-cycle calls review-and-merge each cycle, this takes effect without another stage.
+
+Since Issue #165, the work-cycle orchestrator records every workspace it dispatches in `workspaces.json` in the run directory. Cleanup can therefore remove a worktree outside the conventional directory when this run's record identifies it, but only when every other safety condition also holds. An unrecorded path is never treated as owned, even when its branch looks deletable.
 
 ## Scenarios
 
@@ -21,7 +23,7 @@ Unless specified otherwise, the user explicitly invokes review-and-merge and all
 | B07 | Local `fix/f` has a missing upstream, no matching PR can be found, and its head is not in main | Keep it and report that the remote is gone and absence of unpushed commits cannot be confirmed | Classification table, row 6 |
 | B08 | Remote `wip/g` has 3 commits outside main and never had a PR | List remote and local branches without deleting; explain that they may be leftovers from interrupted work and deletion would prevent recovery | Last classification-table row |
 | B09 | `feat/h` has an open PR and an older merged PR for the same branch name | Keep it; the open-PR exclusion takes precedence over the merged PR | Never-delete rule 2; multiple-Change-Request guidance |
-| B10 | Two detached-HEAD worktrees are under `~/.codex/worktrees/`; under `.claude/worktrees/`, one checks out merged-PR branch `feat/i` and another is locked | Leave every worktree untouched and report why; retain both remote and local `feat/i` because a worktree ineligible for removal still checks it out; `git worktree prune` also skips locked records | Worktree rule 3; never-delete rule 3 |
+| B10 | Two detached-HEAD worktrees are under `~/.codex/worktrees/`; under `.claude/worktrees/`, one checks out merged-PR branch `feat/i` and another is locked | Leave every worktree untouched and report why; retain both remote and local `feat/i` because a worktree ineligible for removal still checks it out; `git worktree prune` also skips locked records | Worktree rule 5; never-delete rule 3 |
 | B11 | A clean, unlocked worktree at ForgeSteward's conventional `<repository-parent>/<repository-name>-forge-steward/42` checks out merged-PR branch `forge-steward/issue-42`; another worktree under the same parent has untracked files | Remove the first with `git worktree remove`, then delete its branch; retain the second and its branch and report uncommitted changes | Worktree rule 2 |
 | B12 | 40 remote and 25 local branches qualify for deletion | Delete the first 50 in oldest-last-commit order; report the remaining 15 as left for next time; associated worktree removals do not count | Deletion and limit rule 3 |
 | B13 | User requests review only, with no merge or modifications; branches like B01, B03, and B05 exist | Delete none and do not run `git worktree prune`; report branches, classifications, and reasons | Timing and mode rule 2 |
@@ -34,11 +36,22 @@ Unless specified otherwise, the user explicitly invokes review-and-merge and all
 | B20 | User requests a stop after the 12th deletion | Stop deleting; report the 12 deleted branches and all unprocessed branches | Timing and mode rule 4 |
 | B21 | Repository CI explicitly names remote `release/1.x`; it has no open PR and all commits are in main | List it without deleting | Long-lived branch guidance |
 | B22 | Remote `upstream` points to the fork's source repository and contains merged-PR branches | Leave it untouched; it is outside cleanup scope | Scope and reading rule 1 |
-| B23 | Post-merge finds a merged PR branch checked out in a worktree under `~/.codex/worktrees/` | Leave the worktree untouched, retain its branch, and report the external path; post-merge worktree removal is limited to the conventional workspace directory | post-merge step 4 |
+| B23 | Post-merge finds a merged PR branch checked out in an unrecorded worktree under `~/.codex/worktrees/` | Leave the worktree untouched, retain its branch, and report the external path; post-merge removal outside the conventional workspace directory requires this run's ownership record | post-merge step 4; worktree rule 5 |
 | B24 | Post-merge finds a clean, unlocked conventional worktree for the merged branch with one untracked file | Retain the worktree and its branch; report the untracked file | post-merge step 4 |
 | B25 | Post-merge finds a locked conventional worktree for the merged branch | Retain the worktree and its branch; report the lock | post-merge step 4 |
 | B26 | Post-merge runs from the conventional worktree that checks out the merged branch, and every other removal condition holds | Switch to the mainline workspace first, then remove the worktree only if every condition still holds; otherwise retain it and its branch and report why | post-merge step 4 |
 | B27 | Another active flow or a caller-listed workspace checks out the merged branch in an otherwise eligible conventional worktree | Retain the worktree and its branch; report the owner | post-merge step 4 |
+| B28 | A clean, unlocked, attached worktree outside `<repository-parent>/<repository-name>-forge-steward/`; this run's `workspaces.json` names it as a finished task, its branch is a merged PR with matching head, it is not current or caller-listed active, and no open PR uses it | Remove it with `git worktree remove` (never force), delete its branch, and record the outside path, deletion-time commit, and recovery in `cleanup.md` | Worktree rule 2; ownership-record exception |
+| B29 | B28's worktree has one modified tracked file | Retain the worktree and its branch and report the uncommitted change | Worktree rule 2 |
+| B30 | B28's worktree has one untracked file | Retain the worktree and its branch and report the untracked file | Worktree rule 2 |
+| B31 | B28's worktree is locked | Retain it and report the lock; `git worktree prune` also skips it | Worktree rules 1–2 |
+| B32 | B28's worktree is the one running cleanup | Do not remove it; if its branch is the merged request's, switch to mainline first, then remove only if every condition still holds | Worktree rule 2; post-merge step 4 |
+| B33 | B28's worktree has a detached HEAD | Retain it and report the detached HEAD | Worktree rule 2 |
+| B34 | A clean outside worktree checks out a merged-PR branch, but this run's `workspaces.json` does not name it (another run or a user created it) | Retain it and report that this run does not own it; never infer ownership from a path | Worktree rule 5 |
+| B35 | B28's worktree is named by the record, but another active stage or a caller list marks it active | Retain it and report the active owner | Worktree rule 2 |
+| B36 | B28's worktree's branch has unique commits, is unmerged, or is used by an open PR | Retain the worktree and its branch; report the failed branch condition | Worktree rule 2; classification table |
+| B37 | `workspaces.json` is missing, unreadable, or malformed when cleanup runs | Treat every outside-directory worktree as unowned, retain it, and report the unusable record | Worktree rule 2 |
+| B38 | The record names a worktree whose directory no longer exists | Prune the stale record with `git worktree prune`; report it as absent, not deleted | Worktree rule 1 |
 
 ## Recovery and rollback
 
@@ -48,4 +61,5 @@ Unless specified otherwise, the user explicitly invokes review-and-merge and all
 ## Limitations
 
 - Cleanup does not guarantee removal of every leftover branch; uncertain cases are retained.
+- Ownership comes only from this run's record and the caller's active list; cleanup does not scan other runs' records or infer ownership from a path.
 - It does not inspect same-named branches in other people's local clones, handle fork branches, or change repository settings.
