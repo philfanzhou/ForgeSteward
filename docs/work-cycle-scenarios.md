@@ -233,6 +233,7 @@ Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's
 | Platform has no blocking watcher | Status query only | Query summary counts at least one minute apart, read full result once finished |
 | Local failures | Two unit tests fail | Read failures first, using failure-only framework output if available |
 | Normal subagent completion | Implementation #12 hands off PR | Return Handed off, PR link, one reason sentence, one next-step sentence, and task evidence result.md; orchestrator records schedule without reading full result.md |
+| Prepare-work batch details | Nonempty list whose selections have a dependency and a queued local resource; both are in the stage result.md | Return only the one-line list; orchestrator reads result.md for batch relationships and queued resources and records them in the scheduling table |
 | Missing/conflicting return | Return says PR submitted but remote cannot find it | Read result.md and verify remote; remote state wins |
 | Excessive process return | Hundreds of narrative lines returned | Save only fixed fields, not process in handoff |
 | No return after failure | Create/wait errors | Use existing subagent-lifecycle.md recovery rules |
@@ -243,7 +244,7 @@ Log/wait instructions live in execute-work, fix-feedback, and review-and-merge's
 | Stage | Result | Link | Reason / next step | Orchestrator records |
 | --- | --- | --- | --- | --- |
 | check-workflow | `clean` or `pr-open` | Cleanup PR if any | One sentence each | check_workflow record and startup_check |
-| prepare-work | One-line Issue list or `[]` | None | Per selected item one sentence for relationships/queued resources; one reason for `[]` | Schedule; stop_reason for `[]` |
+| prepare-work | One-line Issue list or `[]` | None | None; batch relationships and queued resources are in `result.md` | Schedule; read `result.md` for relationships/queued resources; `stop_reason` for `[]` |
 | execute-work per Issue | Handed off, Not started, or Paused | PR or Issue | One sentence each | Schedule; final change_requests or issues_without_change_request |
 | review-and-merge per PR | One of seven report results, or Awaiting repair for edits/main sync | PR | One sentence each | Schedule and change_requests |
 | fix-feedback per PR | Handed off after push, Waiting for CI, or Paused | PR | One sentence each | Schedule |
