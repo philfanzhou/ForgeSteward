@@ -91,14 +91,20 @@ The original #83 revision used everyday Chinese as the default while prioritizin
 | English Issue/PR bodies required | Contribution rules require English Issue/PR bodies | Write bodies/comments in the required English; user reports, progress, and questions default to everyday English unless explicitly requested otherwise |
 | No language policy | No applicable convention | Use everyday English for Issue/PR bodies/comments and platform defaults for merge commits |
 
-## Leftover branch cleanup once per run (#84)
+## Leftover branch cleanup once per run (#84, #164)
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
 | Concurrent merges | Three PRs each merged by a reviewer | Each cleans only its PR branch/workspace under merge lock; no repository-wide scan or leftover cleanup in the lock |
 | Repeated serial reviews | Review dispatched 6 times in a run | None performs leftover cleanup |
-| Run completion | All stages finished, one PR paused | Dispatch one cleanup-only subagent, explicitly retaining paused PR branches/workspaces; one leftover pass for the whole run |
-| Standalone review-and-merge | User directly invokes review Skill | Unchanged: one leftover pass after processing its list |
+| Run completion | All stages finished, one PR paused | Dispatch one cleanup-only `review-and-merge` subagent, explicitly retaining paused PR branches/workspaces; it records the `cleanup` stage and writes `cleanup.md` in the run directory; one leftover pass for the whole run |
+| Complete audit | One branch deleted, one worktree retained, one query failed, three branches deferred | `cleanup.md` lists the remote branches, local branches, and worktrees checked, with deleted, retained, failed, unqueried, and deferred outcomes and reasons; `branch_cleanup` summarizes the same result and the two agree |
+| Explicit stop | User stops before cleanup is dispatched | No cleanup deletion; the report says cleanup was skipped; paused branches and workspaces remain listed |
+| 50-branch limit | 60 safely deletable branches, counting remote and local separately | Delete at most 50 in oldest-last-commit order; list the remainder as deferred in `cleanup.md` and `branch_cleanup` |
+| Failed audit write or query | Run directory not writable, or a branch/worktree query fails | Report the failure and unqueried scope honestly, retain unconfirmed resources, and never claim an unperformed check |
+| Standalone review-and-merge | User directly invokes review Skill | Unchanged: one leftover pass after processing its list; without a work-cycle run directory it reports the audit in its result |
+
+The cleanup stage runs only after no other stage remains active and before report generation; `cleanup.md` is the run's per-resource record, with one outcome for every branch and worktree checked, and the stage changes no tracked files. These are rule walkthroughs; the static tests check wording and report-data handling, not Agent behavior.
 
 ## Run records and timing (#85)
 

@@ -10,7 +10,7 @@ During the run, save results in `handoff.json` in the run directory (the short h
 | `release_audit` | Optional release-audit result: `result` (`clean`, `findings`, `incomplete`, `not-run`); one-sentence `summary`; `evidence` (the check-workflow `result.md` path); optional `findings` and `unknowns` lists. Use redacted text only, and record it from the stage's `result.md` under [Startup](startup.md). Older handoffs without it stay valid |
 | `startup_queue` | Existing PRs: `count` and handling `note` (may be empty) |
 | `concurrency` | `enabled`; when enabled, `agent_limit`; otherwise or after falling back to serial, `serial_reason`; optional `note` for CI queueing with several PRs, whose added delay is not time saved |
-| `branch_cleanup` | Cleanup results, including retained branches and workspaces |
+| `branch_cleanup` | Concise summary of the cleanup audit in the run directory's `cleanup.md`; it must agree with that file and cover every checked branch and worktree with its deleted, retained, failed, or unqueried outcome, plus branches deferred by the 50-branch limit |
 | `change_requests` | Each PR: `url`, `number`, `issues` (Issue list), `result`, `reason`, `next` |
 | `issues_without_change_request` | Each Issue without a PR: `issue`, `result` (only `Paused` or `Not started`), `reason`, `next` |
 | `exceptions` | Each actual error in `what`; state checks, recovery actions and results, last confirmed remote state, unfinished stages, and recovery conditions in `recovery` |
