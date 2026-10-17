@@ -1,6 +1,15 @@
 ## Read logs and wait for checks
 
-This file governs only reading results and waiting for checks. Existing rules still determine wait limits, one retry for unrelated failures, and external-wait status after timeout.
+This file governs only reading results and waiting for checks, and it defines the single CI wait limit. The stage rules still determine the one retry for unrelated failures and the external-wait status after a timeout.
+
+### Wait limit
+
+Use one limit for all required checks of the current Change Request:
+
+- Recent runs are the last 10 successful completed runs of that required check on the default mainline that finished within 90 days.
+- Use twice the median completed duration of the recent runs. If no run qualifies, use 30 minutes.
+- Cap the limit for each required check at 60 minutes, then use the largest capped limit across all required checks.
+- A rerun shares the original limit and does not start a new one. One long historical run cannot raise the limit past the cap.
 
 ### Find the failure
 
