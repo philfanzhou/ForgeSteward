@@ -6,6 +6,10 @@ Avoid making completed items wait for the whole batch. Workload, stage standards
 
 Enable when the runtime can run subagents in the background and read their progress (handoffs, messages, or status) while active, and [Resource locks](verification.md) work. Otherwise run serially under [Cycles, handoffs, and stopping](cycles.md), without treating it as failure or reducing work. After background-dispatch/progress-read failure, apply [Lifecycle and recovery](subagent-lifecycle.md). If progress remains unknown, make that portion serial and await its stage before dependent dispatch.
 
+### Run-level ownership
+
+A checkout runs one work-cycle at a time. Before the first stage dispatch, acquire the reserved `run` resource with this run's ID (`--run <run-id> --task run`) and hold it until the run ends. A second run gets `BUSY`: wait or report busy without dispatching, and never release another run's slot. Recovery follows [Resource locks](verification.md) after confirming the owner stopped. This prevents two runs from silently sharing `stage-Issue-or-PR-number` task identifiers.
+
 ### Concurrency limits and order
 
 - Default to at most 3 implementation/review/repair/preparation subagents combined; use 2 with fewer than 8 logical cores, or 1 with fewer than 4. Compilation/full suites and other heavy work also queue under [Local verification](verification.md)'s `heavy` limit.

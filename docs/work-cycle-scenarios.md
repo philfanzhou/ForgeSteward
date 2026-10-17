@@ -40,7 +40,7 @@ This document covers `work-cycle` in `0.2.16`, with later revisions identified b
 | Isolatable resources | Existing config permits test database/container project names | Name them per task instead of queueing; do not change repository config for isolation |
 | Unknown resources | External PR lacks resource records | Reviewer acquires all resources known to this run plus `local-suite` before local tests |
 | Failure under concurrency | Test fails concurrently but passes alone while holding all relevant locks | Report resource collision, not code defect/repair round; orchestrator marks resource as queued thereafter |
-| Subagent exits abnormally | Stopped Agent retains locks | Orchestrator confirms stop, then releases under same task ID; never release a running Agent's locks |
+| Subagent exits abnormally | Stopped Agent retains locks | Orchestrator confirms stop, then releases under the recorded owner key; never release a running Agent's locks |
 | Excessive lock wait | Cumulative wait exceeds 30 minutes | Return waiting-for-resource result instead of idle waiting |
 | Lock script unavailable | Script cannot run or errors | Disable concurrency for this run and use serial stages |
 | Three unrelated items | Preparation returns `#1, #2, #3`, no relationships, limit 3 | Three execution Agents each take one Issue in an independent external worktree; first handed-off PR enters review first |
