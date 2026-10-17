@@ -2,8 +2,8 @@
 """Keep work-cycle run records with per-stage timings in a repository's Git metadata.
 
 Each run gets runs/<run id>/ under <git common dir>/forge-steward/: run.json,
-an append-only events.jsonl and one evidence directory per task. Records
-never touch version-controlled files; prune only removes run directories
+an append-only events.jsonl and one attempt-scoped evidence directory per task.
+Records never touch version-controlled files; prune only removes run directories
 this script created. The report command renders the final summary from
 handoff.json, the events and, when recorded, the agent_install.py check
 result; its sections and wording come only from references/report.md.
@@ -210,20 +210,32 @@ def start(root, cycles, now):
     return run_id, path
 
 
-def task_dir(path, task):
+def attempt_number(text):
+    try:
+        value = int(text)
+    except ValueError:
+        value = 0
+    if value < 1 or value > 9999:
+        raise argparse.ArgumentTypeError("attempt must be a whole number from 1 to 9999")
+    return value
+
+
+def task_dir(path, task, attempt=1):
     if not TASK.fullmatch(task):
         raise ValueError("Invalid task id: " + repr(task))
-    target = path / task
+    if not isinstance(attempt, int) or isinstance(attempt, bool) or not 1 <= attempt <= 9999:
+        raise ValueError("attempt must be a whole number from 1 to 9999")
+    target = path / (task if attempt == 1 else "%s-r%d" % (task, attempt))
     target.mkdir(exist_ok=True)
     return target
 
 
-def add_event(path, task, stage, status, wait, detail, moment):
+def add_event(path, task, stage, status, wait, detail, moment, attempt=1):
     if status not in STATUSES:
         raise ValueError("Invalid status: " + status)
     if status.startswith("wait-") and wait not in WAITS:
         raise ValueError("wait-start and wait-end need --wait " + "/".join(WAITS))
-    task_dir(path, task)
+    task_dir(path, task, attempt)
     record = {"at": stamp(moment), "task": task, "stage": stage, "status": status}
     if wait:
         record["wait"] = wait
@@ -769,9 +781,11 @@ def main(argv=None):
     note.add_argument("--wait", choices=WAITS)
     note.add_argument("--detail")
     note.add_argument("--at", help="ISO timestamp with timezone; defaults to now")
+    note.add_argument("--attempt", type=attempt_number, default=1)
     where = commands.add_parser("task-dir")
     where.add_argument("--run", required=True)
     where.add_argument("--task", required=True)
+    where.add_argument("--attempt", type=attempt_number, default=1)
     show = commands.add_parser("summary")
     show.add_argument("--run", required=True)
     render = commands.add_parser("report")
@@ -791,10 +805,10 @@ def main(argv=None):
         elif args.command == "event":
             moment = parse(args.at) if args.at else now
             record = add_event(run_dir(root, args.run), args.task, args.stage, args.status,
-                               args.wait, args.detail, moment)
+                               args.wait, args.detail, moment, args.attempt)
             print(json.dumps(record, ensure_ascii=False))
         elif args.command == "task-dir":
-            print(task_dir(run_dir(root, args.run), args.task))
+            print(task_dir(run_dir(root, args.run), args.task, args.attempt))
         elif args.command == "summary":
             print(json.dumps(summarize(run_dir(root, args.run)), ensure_ascii=False, indent=2))
         elif args.command == "report":
