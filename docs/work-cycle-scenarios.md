@@ -91,20 +91,25 @@ The original #83 revision used everyday Chinese as the default while prioritizin
 | English Issue/PR bodies required | Contribution rules require English Issue/PR bodies | Write bodies/comments in the required English; user reports, progress, and questions default to everyday English unless explicitly requested otherwise |
 | No language policy | No applicable convention | Use everyday English for Issue/PR bodies/comments and platform defaults for merge commits |
 
-## Leftover branch cleanup once per run (#84, #164)
+## Leftover branch cleanup once per run (#84, #164, #165)
 
 | Scenario | Input and state | Expected behavior |
 | --- | --- | --- |
 | Concurrent merges | Three PRs each merged by a reviewer | Each cleans only its PR branch/workspace under merge lock; no repository-wide scan or leftover cleanup in the lock |
 | Repeated serial reviews | Review dispatched 6 times in a run | None performs leftover cleanup |
-| Run completion | All stages finished, one PR paused | Dispatch one cleanup-only `review-and-merge` subagent, explicitly retaining paused PR branches/workspaces; it records the `cleanup` stage and writes `cleanup.md` in the run directory; one leftover pass for the whole run |
+| Run completion | All stages finished, one PR paused | Dispatch one cleanup-only `review-and-merge` subagent with the run directory, explicitly retaining paused PR branches/workspaces; it records the `cleanup` stage and writes `cleanup.md` in the run directory; one leftover pass for the whole run |
 | Complete audit | One branch deleted, one worktree retained, one query failed, three branches deferred | `cleanup.md` lists the remote branches, local branches, and worktrees checked, with deleted, retained, failed, unqueried, and deferred outcomes and reasons; `branch_cleanup` summarizes the same result and the two agree |
 | Explicit stop | User stops before cleanup is dispatched | No cleanup deletion; the report says cleanup was skipped; paused branches and workspaces remain listed |
 | 50-branch limit | 60 safely deletable branches, counting remote and local separately | Delete at most 50 in oldest-last-commit order; list the remainder as deferred in `cleanup.md` and `branch_cleanup` |
 | Failed audit write or query | Run directory not writable, or a branch/worktree query fails | Report the failure and unqueried scope honestly, retain unconfirmed resources, and never claim an unperformed check |
+| Recorded outside-directory worktree | A clean, unlocked, non-current, attached worktree outside `<repository-parent>/<repository-name>-forge-steward/`; this run's `workspaces.json` names it as a finished task, and its branch is a merged Change Request with matching head and no open request | Remove the worktree with `git worktree remove` (never force), delete the branch, and record the outside path, deleted commit, and recovery in `cleanup.md` |
+| Unrecorded outside-directory worktree | The same clean worktree and merged branch, but this run's `workspaces.json` does not name it | Retain it and report that this run does not own it; never infer ownership from a path |
+| Worktree safety exclusions | A recorded outside worktree is dirty, has untracked files, is locked, is current, is detached, or another active stage or run lists it as active | Retain it and report the exact failed condition; remove only when every condition holds |
+| Branch safety exclusions | A recorded outside worktree's branch has unique commits, is unmerged, or is used by an open Change Request | Retain the worktree and its branch; report which branch condition failed |
+| Ownership record updates | The orchestrator dispatches and completes implementation, review, and repair stages | `workspaces.json` in the run directory lists task, branch, absolute workspace path, owning stage, status, and update time; dispatch sets `active` and completion sets `finished`, `failed`, or `paused`; no tracked files change and `handoff.json` keeps its schema |
 | Standalone review-and-merge | User directly invokes review Skill | Unchanged: one leftover pass after processing its list; without a work-cycle run directory it reports the audit in its result |
 
-The cleanup stage runs only after no other stage remains active and before report generation; `cleanup.md` is the run's per-resource record, with one outcome for every branch and worktree checked, and the stage changes no tracked files. These are rule walkthroughs; the static tests check wording and report-data handling, not Agent behavior.
+The cleanup stage runs only after no other stage remains active and before report generation; `cleanup.md` is the run's per-resource record, with one outcome for every branch and worktree checked, and the stage changes no tracked files. A worktree outside the conventional workspace directory is removable only when this run's ownership record names it and every safety condition holds; each unsafe case is retained with the failed condition, and ownership is never inferred from a path. These are rule walkthroughs; the wording tests and the read-only inventory fixtures check rule text and inventory decisions, not whether an Agent follows them.
 
 ## Run records and timing (#85)
 
@@ -112,6 +117,7 @@ The cleanup stage runs only after no other stage remains active and before repor
 | --- | --- | --- |
 | Start | Startup checks finished | `start` creates `runs/<run-id>/` in common Git metadata and retains only the latest 20 script-created runs, leaving other old-version files untouched |
 | Dispatch/completion | Execution Agent starts then returns | Record `started` before dispatch and `finished` after confirmed completion; place evidence in `task-dir` directory, not `/tmp` |
+| Workspace ownership | Orchestrator dispatches and then completes a stage in a workspace | `workspaces.json` in the run directory gets or replaces one entry with task, branch, absolute workspace path, owning stage, status, and update time; dispatch sets `active` and completion sets `finished`, `failed`, or `paused`; the file stays in Git metadata and `handoff.json` keeps its schema |
 | CI wait | Subagent waits 8 minutes after push | Record `wait-start`/`wait-end` with type `ci`; include time in summary |
 | Recovery | Orchestrator context compacted | Read run-directory `handoff.json` first to restore progress |
 | Final report | Run ends | Include wall time, aggregate stage durations, and total CI/lock waits |

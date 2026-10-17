@@ -12,6 +12,12 @@ python3 <skill-directory>/scripts/run_record.py --repo <target-repository> repor
 
 Statuses: `started`, `finished`, `failed`, `wait-start`, `wait-end`. Wait types: `ci`, `lock`, `review`, `external`, `other`. `report` exit `1` means invalid `handoff.json` data; any command's exit `2` means argument/environment error.
 
+### Files in a run directory
+
+`run.json` holds the run identifier and cycle limit, `events.jsonl` the append-only stage events, and one `<task-id>/` directory for each dispatched task's evidence. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
+
+`workspaces.json` is a JSON list of entries with `task`, `branch`, absolute `workspace` path, owning `stage`, `status`, and `updated_at` (UTC). Before dispatch the orchestrator records an entry, replacing any match for the same workspace, with status `active`; after confirmed completion it sets `finished`, `failed`, or `paused`. The file stays in Git metadata, changes no tracked files, and does not change the `handoff.json` schema. Cleanup reads it as ownership evidence and never infers ownership from a path.
+
 ### Find usable Python
 
 Try `python3 --version`, `py -3 --version`, then `python --version`; use the first working Python 3.9+ command, avoiding Windows stubs that only open the store. Substitute it for `python3` throughout these rules. Check before `start`. If none works, record it in the handoff, continue delivery, and use [Final report](report.md)'s manual fallback.
