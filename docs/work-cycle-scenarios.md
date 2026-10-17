@@ -285,3 +285,16 @@ Current source rules, newly generated statuses, reports, errors, prompts, and ma
 The single report specification in `references/report.md` defines current vocabularies and exact aliases for known legacy Chinese result and Agent-state values. On reading structured `handoff.json` or `agent-check.json`, readers map only those known fields in an in-memory copy before validation, counting, and upgrade filtering. Equivalent old, new, or mixed values produce the same merged/actionable counts and upgrade candidates. Unknown values remain invalid. Invalid Agent-check data retains the existing behavior of omitting the optional upgrade section, while invalid handoff data still fails validation. Old free-form records missing required fields still use the existing manual fallback.
 
 Reading does not rewrite original input files or translate user-provided free text such as reasons, next actions, Agent names, or external command errors. New handoff prose must use the required language. Keep original records for recovery. Old readers may reject new English enum values; when rolling source back, use saved old records or continue generating reports with the new reader. Do not automatically reverse-translate or overwrite user records. The migration neither upgrades installed plugins nor grants installation or release authorization.
+
+## Stage-skill version preflight (#174)
+
+[Issue #174](https://github.com/philfanzhou/ForgeSteward/issues/174) adds one packaged `VERSION` marker beside each of the five stage skills and a read-only `preflight_versions.py` to work-cycle. The orchestrator passes the expected value from its bundled `scripts/VERSION` and the command with every stage dispatch. These are rule walkthroughs; `tests/test_version_preflight.py` checks the exit codes and messages, not model compliance.
+
+| Scenario | Input and state | Expected behavior |
+| --- | --- | --- |
+| Consistent stage installation | Orchestrator 0.2.25; every dispatched stage package marker is 0.2.25 | Preflight exits 0; the stage proceeds normally and the check writes no project file |
+| Mixed stage version | Orchestrator 0.2.25; one stage package marker is 0.2.24 | The stage preflight exits 1, reports the exact path plus expected 0.2.25 and actual 0.2.24, and the stage stops before its first write; no tracked file changes |
+| Missing version marker | Orchestrator 0.2.25; one stage package has no `VERSION` marker | Preflight exits 1, reports the exact missing path and expected 0.2.25, and the stage stops before its first write; no fallback guesses the version |
+| Preflight usage error | Expected version is missing or malformed, or no stage directory is supplied | Preflight exits 2 and no stage write occurs |
+
+The preflight checks only packaged markers. It does not discover install paths, change client configuration, weaken unified versioning, or write project files.

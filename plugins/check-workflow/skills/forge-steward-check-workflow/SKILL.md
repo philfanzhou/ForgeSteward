@@ -7,7 +7,7 @@ description: Check branch cleanup settings and releases read-only, remove duplic
 
 ## Load the rules
 
-Before checking, read [Skill-owned rules and deletion](references/skill-owned-rules.md), [Check, migrate, and submit](references/procedure.md), [Claude entry migration](references/agent-entrypoints.md), [Collaboration language](references/collaboration-language.md), and [Release pipeline audit](references/release-audit.md) in full, then follow the authorized mode. Read-only checks need these rules too; never act from this summary alone. When comparing another skill's equivalent rules, also inspect the rule files linked from its entry.
+Before checking, read [Skill-owned rules and deletion](references/skill-owned-rules.md), [Check, migrate, and submit](references/procedure.md), [Claude entry migration](references/agent-entrypoints.md), [Collaboration language](references/collaboration-language.md), and [Release pipeline audit](references/release-audit.md) in full, then follow the authorized mode. Read-only checks need these rules too; never act from this summary alone.
 
 These rules are required. Resolve paths from this `SKILL.md`, not the target repository or working directory. If a rule-file read is truncated, continue by line or section through the end (this does not apply to CI logs, test output, or other tool results). If a file is missing or unreadable, identify its path and impact; do not continue affected actions with incomplete rules. After context compaction, reload any missing rules for the current stage.
 

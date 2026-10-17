@@ -103,6 +103,16 @@ class PluginMetadataTests(unittest.TestCase):
         self.assertEqual(bundled.read_text(encoding="utf-8").strip(),
                          (REPO / "VERSION").read_text(encoding="utf-8").strip())
 
+    def test_stage_skill_version_markers_match_unified_version(self):
+        version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertTrue(version)
+        for name in ("check-workflow", "prepare-work", "execute-work",
+                     "review-and-merge", "fix-feedback"):
+            marker = REPO / "plugins" / name / "skills" / ("forge-steward-" + name) / "VERSION"
+            with self.subTest(skill=name):
+                self.assertTrue(marker.is_file(), str(marker) + " is missing")
+                self.assertEqual(marker.read_text(encoding="utf-8").strip(), version)
+
 
 if __name__ == "__main__":
     unittest.main()
