@@ -18,6 +18,8 @@ Statuses: `started`, `finished`, `failed`, `wait-start`, `wait-end`. Wait types:
 
 `workspaces.json` is a JSON list of entries with `task`, `branch`, absolute `workspace` path, owning `stage`, `status`, and `updated_at` (UTC). Before dispatch the orchestrator records an entry, replacing any match for the same workspace, with status `active`; after confirmed completion it sets `finished`, `failed`, or `paused`. The file stays in Git metadata, changes no tracked files, and does not change the `handoff.json` schema. Cleanup reads it as ownership evidence and never infers ownership from a path.
 
+Event appends take a short-lived `.events.lock` directory in the run directory. Before appending, the writer stores `owner.json` in it with its process ID, start time when readable, acquisition time, and purpose. Writers wait at most ten seconds; on timeout the error names the recorded owner and the recovery step. A killed writer leaves the guard behind, and later appends keep failing until recovery: confirm that no event writer is running, then remove only that `.events.lock` directory. Never remove it while a writer may run, and never expect automatic removal.
+
 ### Find usable Python
 
 Try `python3 --version`, `py -3 --version`, then `python --version`; use the first working Python 3.9+ command, avoiding Windows stubs that only open the store. Substitute it for `python3` throughout these rules. Check before `start`. If none works, record it in the handoff, continue delivery, and use [Final report](report.md)'s manual fallback.
