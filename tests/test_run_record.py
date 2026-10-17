@@ -140,10 +140,12 @@ class RunRecordTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
-    def event(self, run_id, task, stage, status, at, wait=None):
+    def event(self, run_id, task, stage, status, at, wait=None, attempt=None):
         arguments = ["event", "--run", run_id, "--task", task, "--stage", stage, "--status", status, "--at", at]
         if wait:
             arguments += ["--wait", wait]
+        if attempt is not None:
+            arguments += ["--attempt", str(attempt)]
         result = self.run_cli(*arguments)
         self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -425,6 +427,48 @@ class RunRecordTests(unittest.TestCase):
         self.assertEqual(removed, sorted(created[:2]))
         self.assertTrue(foreign.is_dir())
         self.assertEqual(sorted(p.name for p in root.iterdir() if p.name in created), sorted(created[2:]))
+
+    def test_repeated_task_dirs_keep_earlier_evidence(self):
+        run_id = self.start()["run_id"]
+        first = self.run_cli("task-dir", "--run", run_id, "--task", "review-pr-45")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        earlier = Path(first.stdout.strip())
+        self.assertTrue(earlier.is_absolute())
+        self.assertEqual(earlier.name, "review-pr-45")
+        evidence = earlier / "result.md"
+        evidence.write_bytes(b"first review\n")
+        before = evidence.read_bytes()
+
+        second = self.run_cli("task-dir", "--run", run_id, "--task", "review-pr-45", "--attempt", "2")
+        self.assertEqual(second.returncode, 0, second.stderr)
+        later = Path(second.stdout.strip())
+        self.assertTrue(later.is_absolute())
+        self.assertEqual(later.name, "review-pr-45-r2")
+        self.assertTrue(later.is_dir())
+        self.assertNotEqual(later, earlier)
+        self.assertEqual(evidence.read_bytes(), before)
+        self.assertEqual(sorted(path.name for path in later.parent.iterdir() if path.name.startswith("review-pr-45")),
+                         ["review-pr-45", "review-pr-45-r2"])
+
+    def test_event_writes_evidence_into_its_attempt_directory(self):
+        run_id = self.start()["run_id"]
+        self.event(run_id, "review-pr-45", "review", "started", "2026-10-10T01:00:00Z")
+        self.event(run_id, "review-pr-45", "review", "started", "2026-10-10T02:00:00Z", attempt=2)
+        path = record.run_dir(record.runs_root(self.repo), run_id)
+        self.assertTrue((path / "review-pr-45").is_dir())
+        self.assertTrue((path / "review-pr-45-r2").is_dir())
+        events = record.read_events(path)
+        self.assertEqual([event["task"] for event in events], ["review-pr-45", "review-pr-45"])
+        self.assertTrue(all("attempt" not in event for event in events))
+
+    def test_attempt_outside_range_is_rejected(self):
+        run_id = self.start()["run_id"]
+        for attempt in ("0", "10000"):
+            with self.subTest(attempt=attempt):
+                result = self.run_cli("task-dir", "--run", run_id, "--task", "review-pr-45",
+                                      "--attempt", attempt)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("attempt must be a whole number from 1 to 9999", result.stderr)
 
     def test_invalid_inputs_are_rejected(self):
         run_id = self.start()["run_id"]

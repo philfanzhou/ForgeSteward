@@ -4,8 +4,8 @@ Store handoffs, evidence, and stage timings in the target repository's Git commo
 
 ```bash
 python3 <skill-directory>/scripts/run_record.py --repo <target-repository> start --cycles <count>
-python3 <skill-directory>/scripts/run_record.py --repo <target-repository> event --run <run-id> --task <task-id> --stage <stage> --status <status> [--wait <wait-type>] [--detail <description>]
-python3 <skill-directory>/scripts/run_record.py --repo <target-repository> task-dir --run <run-id> --task <task-id>
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> event --run <run-id> --task <task-id> --stage <stage> --status <status> [--wait <wait-type>] [--detail <description>] [--attempt <attempt>]
+python3 <skill-directory>/scripts/run_record.py --repo <target-repository> task-dir --run <run-id> --task <task-id> [--attempt <attempt>]
 python3 <skill-directory>/scripts/run_record.py --repo <target-repository> summary --run <run-id>
 python3 <skill-directory>/scripts/run_record.py --repo <target-repository> report --run <run-id>
 ```
@@ -14,7 +14,7 @@ Statuses: `started`, `finished`, `failed`, `wait-start`, `wait-end`. Wait types:
 
 ### Files in a run directory
 
-`run.json` holds the run identifier and cycle limit, `events.jsonl` the append-only stage events, and one `<task-id>/` directory for each dispatched task's evidence. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
+`run.json` holds the run identifier and cycle limit, `events.jsonl` the append-only stage events, and one attempt-scoped evidence directory for each dispatched task. Attempt 1 uses `<task-id>/` and later attempts use `<task-id>-r<attempt>/`; the attempt is a whole number from 1 to 9999 and defaults to 1. The attempt scopes only the directory: `--task` still uses the stage-and-item identifier such as `review-pr-45`, and events keep grouping by that identifier. Never overwrite an earlier attempt's `result.md`; read the earlier attempt directories before writing the next result. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
 
 `workspaces.json` is a JSON list of entries with `task`, `branch`, absolute `workspace` path, owning `stage`, `status`, and `updated_at` (UTC). Before dispatch the orchestrator records an entry, replacing any match for the same workspace, with status `active`; after confirmed completion it sets `finished`, `failed`, or `paused`. The file stays in Git metadata, changes no tracked files, and does not change the `handoff.json` schema. Cleanup reads it as ownership evidence and never infers ownership from a path.
 
@@ -28,7 +28,7 @@ Try `python3 --version`, `py -3 --version`, then `python --version`; use the fir
 
 1. After the startup check, run `start` for a run identifier/directory. It retains only the latest 20 directories created by this script, leaving other files untouched.
 2. Before each dispatch record `started`; after confirmed completion record `finished` or `failed`. Stages are `check-workflow`, `prepare`, `implement`, `review`, `fix`, `merge`, `cleanup`. Task identifiers match [Resource locks](verification.md).
-3. Give subagents the run identifier and `task-dir` evidence directory. Require `event` records for `wait-start`/`wait-end` during CI, lock, approval, and other external waits. Each subagent's evidence/handoff files belong in its own directory.
+3. Give subagents the run identifier and the attempt's `task-dir` evidence directory. Require `event` records for `wait-start`/`wait-end` during CI, lock, approval, and other external waits. Each subagent's evidence/handoff files belong in its own directory.
 4. Save [Cycles, handoffs, and stopping](cycles.md)'s short orchestration handoff as run-directory `handoff.json`, populating [Final report](report.md)'s required fields. Read it first after compaction/interruption.
 5. At completion run `report` and paste output unchanged. It reads handoff/events, takes timings from `summary`, and saves run-directory `report.md`. See [Final report](report.md) for invalid-data retries and manual fallback.
 
