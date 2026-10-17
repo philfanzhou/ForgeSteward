@@ -34,6 +34,11 @@ Unless specified otherwise, the user explicitly invokes review-and-merge and all
 | B20 | User requests a stop after the 12th deletion | Stop deleting; report the 12 deleted branches and all unprocessed branches | Timing and mode rule 4 |
 | B21 | Repository CI explicitly names remote `release/1.x`; it has no open PR and all commits are in main | List it without deleting | Long-lived branch guidance |
 | B22 | Remote `upstream` points to the fork's source repository and contains merged-PR branches | Leave it untouched; it is outside cleanup scope | Scope and reading rule 1 |
+| B23 | Post-merge finds a merged PR branch checked out in a worktree under `~/.codex/worktrees/` | Leave the worktree untouched, retain its branch, and report the external path; post-merge worktree removal is limited to the conventional workspace directory | post-merge step 4 |
+| B24 | Post-merge finds a clean, unlocked conventional worktree for the merged branch with one untracked file | Retain the worktree and its branch; report the untracked file | post-merge step 4 |
+| B25 | Post-merge finds a locked conventional worktree for the merged branch | Retain the worktree and its branch; report the lock | post-merge step 4 |
+| B26 | Post-merge runs from the conventional worktree that checks out the merged branch, and every other removal condition holds | Switch to the mainline workspace first, then remove the worktree only if every condition still holds; otherwise retain it and its branch and report why | post-merge step 4 |
+| B27 | Another active flow or a caller-listed workspace checks out the merged branch in an otherwise eligible conventional worktree | Retain the worktree and its branch; report the owner | post-merge step 4 |
 
 ## Recovery and rollback
 
