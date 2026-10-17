@@ -26,7 +26,7 @@ Before recording results or generating a report, read [all report input fields](
 
 ## Specification
 
-The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` contain exact legacy input values as Unicode escapes for compatibility data, not output prose. Readers map these fields in memory before validation, never rewrite input files or translate free text, and reject unknown values. Alias targets must belong to the current vocabulary. Schema, fields, and CLI remain unchanged. Old readers may not accept new English values: on rollback, retain original records and use old copies or the new reader; do not reverse-write user data.
+The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` contain exact legacy input values as Unicode escapes for compatibility data, not output prose. Readers map these fields in memory before validation, never rewrite input files or translate free text, and reject unknown values. Alias targets must belong to the current vocabulary. Existing fields and the CLI remain unchanged; `release_audit` is optional. Old readers may not accept new English values: on rollback, retain original records and use old copies or the new reader; do not reverse-write user data.
 
 ```json report-spec
 {
@@ -36,6 +36,7 @@ The script reads sections, outcomes, and display names here. This is the only sh
   "merged": "Merged",
   "needs_you": ["Awaiting your approval", "Paused"],
   "issue_only": ["Paused", "Not started"],
+  "release_audit_results": {"clean": "Clean", "findings": "Findings", "incomplete": "Incomplete", "not-run": "Not run"},
   "result_aliases": {
     "\u5df2\u5408\u5e76": "Merged",
     "\u7b49\u4f60\u5ba1\u6279": "Awaiting your approval",
@@ -98,6 +99,7 @@ Conclusion: <merged PR count> PRs merged; <action count> items need your action.
 
 ### Run overview
 - Startup check: <startup_check>
+- Release audit: <summary>; Result: <release audit result>; Findings: <finding>; <finding>; Unknowns: <unknown>; Evidence: <evidence>
 - Existing PRs: <count>, <note>
 - Cycles: <completed_cycles> / <requested_cycles>; Stop reason: <stop_reason>
 - Concurrency: Enabled, up to <agent_limit>; <note>
@@ -122,6 +124,7 @@ Filling rules:
 - Needs your action: first PRs with results in `needs_you`, then `Paused` Issues, then extra `needs_you` items. Keep data order within each group and number continuously; their total is the conclusion's count.
 - PR results: PRs first, then Issues without PRs (`None` in PR column). An empty Issue list is `None`.
 - Omit empty `reason`/`next` parts, including `Next:`. Flatten line breaks to spaces, strip extra ending punctuation, and escape table `|` as `\|`.
+- Release audit: include this bullet only when `release_audit` is present. Use its summary, display name, every listed finding and unknown, and evidence location; omit `Findings:`/`Unknowns:` parts when empty, and never drop a listed item. Older handoffs stay unchanged.
 - Concurrency disabled or returned to serial: `Concurrency: Disabled; Reason: <serial_reason>`. Omit the separator and suffix for empty notes, likewise for the existing-PR note.
 - Last section: follow section-seven rules in [installation checks](agent-check.md).
 - Time spent: total is the interval between first and last event; below one hour use `Y min`, otherwise `X h Y min`. Show only stages with completed records, in specification order, then unknown stage names alphabetically as-is. With no stages, omit the colon and suffix. Round minutes to the nearest integer. Missing CI/local-resource waits are `0 min`; with no events, the whole section is `- No record`.
