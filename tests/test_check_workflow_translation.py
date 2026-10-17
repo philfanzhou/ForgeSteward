@@ -78,7 +78,7 @@ class DocumentationTranslationRuleTests(unittest.TestCase):
         text = normalized(PROCEDURE)
         for phrase in (
             "plan its rule and translation against the post-language result",
-            "no safe migration, language, rule, or translation work remains",
+            "no safe migration, language or English work remains",
             "rule and translation.",
             "section, its translation, and separable documentation or collaboration rule replacements",
         ):
