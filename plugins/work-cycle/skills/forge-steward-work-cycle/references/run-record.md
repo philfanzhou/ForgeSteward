@@ -1,6 +1,6 @@
 ## Run records and timing
 
-Store handoffs, evidence, and stage timings in the target repository's Git common directory at `forge-steward/runs/<run-id>/`, shared by all worktrees. Do not change tracked files or use `/tmp`. Use this package's `scripts/run_record.py`:
+Store handoffs, evidence, and stage timings in the target repository's Git common directory at `forge-steward/runs/<run-id>/`, shared by all worktrees. Never change tracked files or use `/tmp`. Use this package's `scripts/run_record.py`:
 
 ```bash
 python3 <skill-directory>/scripts/run_record.py --repo <target-repository> start --cycles <count>
@@ -14,11 +14,11 @@ Statuses: `started`, `finished`, `failed`, `suspended`, `resumed`, `wait-start`,
 
 ### Files in a run directory
 
-Read [Capability reuse](capabilities.md) in full before using optional run-scoped `capabilities.json`. Only the orchestrator aggregates adapter-owned observations; pass its path in dispatches.
+Read [Capability reuse](capabilities.md) in full for optional run-scoped `capabilities.json`. Only the orchestrator aggregates adapter observations; pass its path to stages.
 
-`run.json` holds the run identifier and cycle limit, `events.jsonl` the append-only stage events, and one attempt-scoped evidence directory for each dispatched task. Attempt 1 uses `<task-id>/`, later attempts `<task-id>-r<attempt>/`; attempts are whole numbers 1–9999, default 1. `--task` remains the stage-and-item identifier such as `review-pr-45`; schema-2 events and summaries also retain the numbered attempt. Never overwrite an earlier attempt's `result.md`; read the earlier attempt directories before writing the next result. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
+`run.json` holds the run ID and cycle limit, `events.jsonl` the append-only stage events, and one attempt-scoped evidence directory for each dispatched task. Attempt 1 uses `<task-id>/`, later attempts `<task-id>-r<attempt>/`; attempts are whole numbers 1–9999, default 1. `--task` remains the stage-and-item identifier such as `review-pr-45`; schema-2 events and summaries also retain the numbered attempt. Never overwrite an earlier attempt's `result.md`; read the earlier attempt directories before writing the next result. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
 
-Before writing `workspaces.json`, read [Workspace ownership](workspace-ownership.md) in full. This JSON list of entries has `task`, `branch`, absolute `workspace` path, owning `stage`, `status`, and `updated_at`; detached identity uses a null branch plus `detached` and `head`. The orchestrator updates it before dispatch (`active`) and after confirmed completion (`finished`, `failed`, or `paused`). It changes no tracked files or `handoff.json` schema; never infer ownership from paths. The linked format defines optional `disposable: true`. Keep cleanup's `disposal.json`, ownership, handoffs, evidence, and audit in shared Git metadata after reclamation.
+Before writing `workspaces.json`, read [Workspace ownership](workspace-ownership.md) in full. This JSON list of entries has `task`, `branch`, absolute `workspace` path, owning `stage`, `status`, and `updated_at`; detached identity uses a null branch plus `detached` and `head`. The orchestrator updates it before dispatch (`active`) and after confirmed completion (`finished`, `failed`, or `paused`). It changes no tracked files, does not change the `handoff.json` schema, and never infers ownership from a path. The linked format defines optional `disposable: true`. Keep cleanup's `disposal.json`, ownership, handoffs, evidence, and audit in shared Git metadata after reclamation.
 
 Event appends take a short-lived `.events.lock` directory in the run directory. Before appending, the writer stores `owner.json` in it with its process ID, start time when readable, acquisition time, and purpose. Writers wait at most ten seconds; on timeout the error names the recorded owner and the recovery step. A killed writer leaves the guard; appends fail until recovery. Confirm no event writer is running, then remove only that `.events.lock` directory. Never remove it while a writer may run, and never expect automatic removal.
 
