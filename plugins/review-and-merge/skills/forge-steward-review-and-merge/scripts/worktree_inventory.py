@@ -16,11 +16,12 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
 
-OWNERSHIP_FIELDS = ("task", "branch", "workspace", "stage", "status", "updated_at")
+OWNERSHIP_FIELDS = ("task", "workspace", "stage", "status", "updated_at")
 OWNERSHIP_STATUSES = ("active", "finished", "failed", "paused")
 CONVENTIONAL_SUFFIX = "-forge-steward"
 
@@ -103,6 +104,20 @@ def read_ownership(path):
             value = entry.get(field)
             if not isinstance(value, str) or not value.strip():
                 raise InventoryError(where + " needs a non-empty %s string" % field)
+        if "branch" not in entry or (entry["branch"] is not None
+                                     and not isinstance(entry["branch"], str)):
+            raise InventoryError(where + " needs a branch string or null")
+        if "detached" in entry and not isinstance(entry["detached"], bool):
+            raise InventoryError(where + " detached must be a boolean")
+        if "head" in entry and (not isinstance(entry["head"], str)
+                                or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}",
+                                                entry["head"]) is None):
+            raise InventoryError(where + " head must be a full 40- or 64-digit Git object ID")
+        entry = dict(entry)
+        if isinstance(entry["branch"], str):
+            entry["branch"] = entry["branch"].strip() or None
+        if "head" in entry:
+            entry["head"] = entry["head"].lower()
         if entry["status"] not in OWNERSHIP_STATUSES:
             raise InventoryError(where + " has an unknown status %r; use %s"
                                  % (entry["status"], ", ".join(OWNERSHIP_STATUSES)))
@@ -114,6 +129,28 @@ def read_ownership(path):
             raise InventoryError(where + " repeats workspace " + entry["workspace"])
         entries[key] = entry
     return entries
+
+
+def identity_reasons(owner, record):
+    """Ownership identity is evidence only; even a matching detached HEAD is retained."""
+    reasons = []
+    branch = owner["branch"]
+    detached = owner.get("detached")
+    head = owner.get("head")
+    if branch is None:
+        if detached is not True or head is None:
+            reasons.append("unverified ownership: empty/null branch needs detached true and a full head")
+        if detached is False:
+            reasons.append("ownership branch and detached flag disagree")
+    elif detached is True:
+        reasons.append("ownership branch and detached flag disagree")
+    if detached is True and not record["detached"]:
+        reasons.append("recorded detached identity does not match the attached worktree")
+    if branch is not None and branch != record["branch"]:
+        reasons.append("recorded branch does not match the worktree branch")
+    if head is not None and head != record["head"]:
+        reasons.append("recorded head does not match the worktree head")
+    return reasons
 
 
 def current_workspaces(records, requested):
@@ -136,7 +173,7 @@ def inspect(path):
     if not Path(path).is_dir():
         return False, False, None
     try:
-        output = git(path, "status", "--porcelain")
+        output = git(path, "--no-optional-locks", "status", "--porcelain")
     except InventoryError as exc:
         return False, False, str(exc)
     dirty = False
@@ -156,8 +193,9 @@ def evaluate(record, primary, conventional_root, ownership, currents, active, de
     dirty, untracked, status_error = inspect(record["path"])
     inside_conventional = path == conventional_root or path.startswith(conventional_root + os.sep)
     branch = record["branch"]
+    owner_reasons = identity_reasons(owner, record) if owner is not None else []
 
-    reasons = []
+    reasons = list(owner_reasons)
     if path == primary:
         reasons.append("the primary repository worktree")
     if path in currents:
@@ -208,6 +246,8 @@ def evaluate(record, primary, conventional_root, ownership, currents, active, de
         "active": path in active,
         "inside_conventional": inside_conventional,
         "ownership": owner,
+        "ownership_identity_verified": not owner_reasons if owner is not None else False,
+        "ownership_identity_reasons": owner_reasons,
         "removal_allowed": not reasons,
         "retain_reasons": reasons,
     }
