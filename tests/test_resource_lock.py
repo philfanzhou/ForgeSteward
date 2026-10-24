@@ -151,7 +151,8 @@ class ResourceLockTests(unittest.TestCase):
         self.assertEqual(report["slot"], "slot-0")
         root = lock.locks_root(self.repo)
         before = (root / "heavy" / "slot-0" / "holder.json").read_bytes()
-        with mock.patch.object(lock.time, "sleep") as sleep, \
+        # Keep the clock mock local: subprocess timeout polling also uses the time module.
+        with mock.patch.object(lock, "time", wraps=time, sleep=mock.Mock()) as clock, \
                 mock.patch.object(lock, "try_acquire", wraps=lock.try_acquire) as tried:
             code, output, errors = self.call_main("acquire", "heavy", "--run", "run-b", "--task", "worker",
                                                   "--wait", "60", "--json")
@@ -161,7 +162,7 @@ class ResourceLockTests(unittest.TestCase):
         self.assertEqual((mismatch["requested_capacity"], mismatch["existing_capacity"]), (1, 2))
         self.assertIn("retry with --capacity 2", mismatch["reason"])
         self.assertEqual(tried.call_count, 1)
-        sleep.assert_not_called()
+        clock.sleep.assert_not_called()
         self.assertEqual((root / "heavy" / "capacity").read_text().strip(), "2")
         self.assertEqual((root / "heavy" / "slot-0" / "holder.json").read_bytes(), before)
         held = self.acquire("heavy", "run-a", "worker", 1, "--capacity", "2", "--json")
@@ -208,13 +209,13 @@ class ResourceLockTests(unittest.TestCase):
         self.assertEqual(list(root.glob(".tmp-*")), [])
         for code in (errno.EACCES, errno.EIO, errno.ENOENT, errno.ENOSPC):
             with self.subTest(errno=code), mock.patch.object(lock.os, "rename", side_effect=OSError(code, "failure")), \
-                    mock.patch.object(lock.time, "sleep") as sleep:
+                    mock.patch.object(lock, "time", wraps=time, sleep=mock.Mock()) as clock:
                 result, output, errors = self.call_main("acquire", "db", "--run", "run-a", "--task", "worker",
                                                         "--wait", "60", "--json")
                 self.assertEqual((result, errors), (2, ""))
                 self.assertEqual(json.loads(output)["result"], "error")
                 self.assertIn("failure", json.loads(output)["reason"])
-                sleep.assert_not_called()
+                clock.sleep.assert_not_called()
                 self.assertEqual(list(root.glob(".tmp-*")), [])
                 self.assertEqual(lock.holders(root / "db"), [])
 
@@ -228,14 +229,14 @@ class ResourceLockTests(unittest.TestCase):
                                  "rename": (lock.os, "rename")}[target]
             with self.subTest(target=target), mock.patch.object(module, attribute,
                                                                side_effect=PermissionError(errno.EACCES, "denied")), \
-                    mock.patch.object(lock.time, "sleep") as sleep:
+                    mock.patch.object(lock, "time", wraps=time, sleep=mock.Mock()) as clock:
                 code, output, errors = self.call_main("acquire", "heavy", "--run", "run-b", "--task", "worker",
                                                       "--capacity", "2", "--wait", "60", "--json")
                 self.assertEqual((code, errors), (2, ""))
                 self.assertEqual(json.loads(output)["result"], "error")
                 self.assertEqual(json.loads(output)["existing_capacity"], 2)
                 self.assertIn("denied", json.loads(output)["reason"])
-                sleep.assert_not_called()
+                clock.sleep.assert_not_called()
                 self.assertEqual((root / "heavy" / "slot-0" / "holder.json").read_bytes(), before)
                 self.assertEqual(len(lock.holders(root / "heavy")), 1)
                 self.assertEqual(list(root.glob(".tmp-*")), [])
@@ -244,13 +245,13 @@ class ResourceLockTests(unittest.TestCase):
         self.assertEqual(self.acquire("db", "run-a", "worker").returncode, 0)
         root = lock.locks_root(self.repo)
         before = (root / "db" / "slot-0" / "holder.json").read_bytes()
-        with mock.patch.object(lock.time, "monotonic", side_effect=[0, 0, 1]), \
-                mock.patch.object(lock.time, "sleep") as sleep:
+        with mock.patch.object(lock, "time", wraps=time, sleep=mock.Mock(),
+                               monotonic=mock.Mock(side_effect=[0, 0, 1])) as clock:
             code, output, errors = self.call_main("acquire", "db", "--run", "run-b", "--task", "worker",
                                                   "--wait", "1", "--json")
         self.assertEqual((code, json.loads(output)["result"], errors), (1, "busy", ""))
-        sleep.assert_called_once_with(lock.POLL_SECONDS)
-        with mock.patch.object(lock.time, "sleep", side_effect=KeyboardInterrupt):
+        clock.sleep.assert_called_once_with(lock.POLL_SECONDS)
+        with mock.patch.object(lock, "time", wraps=time, sleep=mock.Mock(side_effect=KeyboardInterrupt)):
             with self.assertRaises(KeyboardInterrupt):
                 lock.acquire(root, "db", 1, "run-b", "worker", 1, None, 60)
         self.assertEqual((root / "db" / "slot-0" / "holder.json").read_bytes(), before)
