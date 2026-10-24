@@ -14,6 +14,8 @@ Statuses: `started`, `finished`, `failed`, `suspended`, `resumed`, `wait-start`,
 
 ### Files in a run directory
 
+Before `start`, dispatch, or recovery, read [Rule retention and recovery](rule-retention.md) in full, including usable Python.
+
 Read [Capability reuse](capabilities.md) in full for optional run-scoped `capabilities.json`. Only the orchestrator aggregates adapter observations; pass its path to stages.
 
 `run.json` holds the run ID and cycle limit, `events.jsonl` the append-only stage events, and one attempt-scoped evidence directory for each dispatched task. Attempt 1 uses `<task-id>/`, later attempts `<task-id>-r<attempt>/`; attempts are whole numbers 1–9999, default 1. `--task` remains the stage-and-item identifier such as `review-pr-45`; schema-2 events and summaries also retain the numbered attempt. Never overwrite an earlier attempt's `result.md`; read the earlier attempt directories before writing the next result. `handoff.json` is the short orchestration handoff that `report` validates, `cleanup.md` is the cleanup stage's per-resource audit, and `workspaces.json` is this run's workspace ownership record.
@@ -32,13 +34,9 @@ Stages own only `wait-start`/`wait-end`. A wait pair uses the same attempt, type
 
 Readers deduplicate identical event IDs and flag conflicts, malformed/unmatched transitions, open waits, and ambiguous legacy lifecycles. `attempts`, `accounting_complete`, and `diagnostics` explain incomplete totals; valid completed intervals may still contribute partial totals. Legacy schema/attempt-free records remain readable: infer only one unambiguous start/end pair; repeated boundaries are ambiguous. Mixed legacy/numbered events cannot assign old events to an attempt. Never rewrite raw events or earlier evidence directories. Older readers can miscount schema-2 events; rollback uses a matching reader and retained originals. See [Final report](report.md) for timing labels and manual fallback.
 
-### Find usable Python
-
-Try `python3 --version`, `py -3 --version`, then `python --version`; use the first working Python 3.9+ command, avoiding Windows stubs that only open the store. Substitute it for `python3` throughout these rules. Check before `start`. If none works, record it in the handoff, continue delivery, and use [Final report](report.md)'s manual fallback.
-
 ### Orchestrator responsibilities
 
-1. After the startup check, run `start` for a run identifier/directory. It retains its latest 20 script-created directories; other files stay untouched.
+1. Before the first stage dispatch, run `start` for a run identifier/directory. It retains its latest 20 script-created directories; other files stay untouched.
 2. Only the orchestrator records lifecycle events: `started` before dispatch, `finished` or `failed` after confirmed completion, and `suspended`/`resumed` around a confirmed user/capacity suspension. Subagents must not duplicate these events. Close stage-owned waits before suspension or completion; ordinary CI/lock waits remain stage occupancy, not suspension. Stages are `check-workflow`, `prepare`, `implement`, `review`, `fix`, `merge`, `cleanup`. Task identifiers match [Resource locks](verification.md).
 3. Give subagents the run ID and attempt's `task-dir`. Require `event` records for `wait-start`/`wait-end` during CI, lock, approval, and other external waits. Each subagent's evidence/handoff files belong in its own directory.
 4. Save [Cycles, handoffs, and stopping](cycles.md)'s short orchestration handoff as run-directory `handoff.json`, populating [Final report](report.md)'s required fields. Read it first after compaction/interruption.
