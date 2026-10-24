@@ -1,6 +1,6 @@
 ## Move completed items forward
 
-Avoid making completed items wait for the whole batch. Workload, stage standards, merge conditions, and review-round limits remain unchanged; only dispatch timing changes.
+Move completed items ahead without waiting for the batch. Keep workload, stage standards, merge conditions, and review-round limits unchanged.
 
 ### Enable or fall back
 
@@ -18,7 +18,7 @@ A checkout runs one work-cycle at a time. Before the first stage dispatch, acqui
 
 ### Scheduling table
 
-For every Issue/Change Request, the orchestrator records current step (Awaiting start, Implementing, Handed off, Reviewing, Awaiting repair, Repairing, Merged, Waiting externally, Paused), owner subagent, workspace, batch relationships, and locks held. After a subagent ends, verify results/remote state, update the table, release its leftover locks, then dispatch under limits/order.
+Record current step (Awaiting start, Implementing, Handed off, Reviewing, Awaiting repair, Repairing, Merged, Waiting externally, Paused), owner, workspace, batch relationships, and locks per Issue/Change Request. Persist [Normal waits](subagent-lifecycle.md#normal-waits)' compact state here; unchanged waits cause no history reread. On completion verify remote state, update the table, release leftover locks, and dispatch under limits/order promptly.
 
 ### Concurrent implementation by Issue
 
@@ -59,4 +59,4 @@ With concurrent stages, only the orchestrator writes shared progress such as the
 
 ### Report
 
-Record enabled concurrency, chosen limit, serial-fallback reasons, and CI queuing among simultaneous requests in handoff `concurrency` under [Final report](report.md). Queue delays are not time savings.
+Record concurrency, its limit, serial-fallback reasons, and CI queues in handoff `concurrency` under [Final report](report.md). Queue delays are not time savings.

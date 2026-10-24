@@ -2,6 +2,14 @@
 
 Distinguish quota warnings, occupied threads, and actual call failures. Low/near-limit quota warnings or suggestions to reduce concurrency still require stage dispatch; do not infer lost creation capability, stop early, or fabricate prepare-work's `[]`. Dependent stages in one repository remain sequential; do not use purposeless probes to test quota.
 
+## Normal waits
+
+Use only actual adapter APIs; add no background scheduling. Prefer progress/completion events or cursor-based waits, bounded by the runtime limit and time left before the host's required user update. Use the largest permitted bound; completion must wake an event wait immediately. Resume from the returned cursor, including after an unchanged timeout. Without cursors/events, read compact snapshots: start at half that bound, double the interval after unchanged reads up to the bound, and use interruptible waits when available. A snapshot-only host may delay discovery by at most that bound; do not claim immediate completion detection there.
+
+Persist owner/task, cursor when available, last meaningful revision, state, interval/deadline, and evidence location in the existing scheduling handoff. Apply newer meaningful results once, verify them, then dispatch eligible work without waiting for the batch. Unchanged timeouts keep the original Agent and advance only cursor/backoff; fetch no full history or `result.md`. Warnings do not enter recovery or reset the interval; actual errors use recovery below. Restore this state after compaction; on explicit stop save it and stop dispatching. Give user updates from known state within the host's deadline, without extra status probes merely for commentary.
+
+Keep timeout wakeups, unchanged status queries, and completion-to-dispatch latency separate in task evidence. Report available cumulative input, cached input, uncached input, and child totals separately; unknown stays unknown. Do not add token collection or infer cost, unique text, or production speedup from simulations. Full traces stay outside the compact handoff.
+
 ## Completion and thread release
 
 Before releasing a completed thread through an actual runtime close/release API, save its Agent identifier, task scope, concise conclusion, evidence locations (Issue/Change Request links or records), and checked remote state. Full results remain in subagent output/persisted records for retrieval; do not retain all of them in orchestrator context. Completed does not mean released; recheck ambiguous API results. Never close active Agents, the orchestrator, or another conversation's Agents, or delete conversations/workspaces/persisted handoffs to free capacity.
