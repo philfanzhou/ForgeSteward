@@ -127,6 +127,24 @@ The cleanup stage runs only after no other stage remains active and before repor
 | Final report | Run ends | Include wall time, aggregate stage durations, and totals for every wait type in the report specification |
 | Script unavailable | Recording command errors | Explain in session handoff and continue delivery |
 
+## Attempt timing and suspension (#206)
+
+The schema-2 replay fixture `tests/fixtures/run_report/attempts.jsonl` uses the original October 23 Review and Cleanup intervals from Issue #206. Its derived summary reports Review **819 seconds**, Cleanup **455 seconds**, elapsed wall time **10,588 seconds**, and active interval union **1,274 seconds**. The report rounds completed stage occupancy to Review 14 minutes and Cleanup 8 minutes; it labels elapsed wall time separately. The earlier task-only calculation reported 10,343 and 10,133 seconds. This corrects accounting; it measures neither CPU usage nor a runtime speedup.
+
+| Scenario | Input and state | Observed result/assertion |
+| --- | --- | --- |
+| Original replay | Two completed numbered attempts for each stage, separated by user-message gaps | Sum each stage's completed intervals; preserve all eight event identities and attempt numbers; gaps appear only in elapsed wall time |
+| Retry after uncertain append | Same event ID, timestamp and content, including simultaneous writers | One persisted line and one contribution; conflicting reuse fails without changing earlier lines |
+| Suspension and cancellation | Start at 0, suspend at 10, resume at 100, fail at 120 seconds | 30 seconds stage occupancy, 90 seconds suspension, failed terminal result |
+| Latest attempt remains open | Attempt 1 finishes; attempt 2 starts or suspends | Task result comes from attempt 2; no completed duration for that attempt or exact active-wall total; earlier evidence stays intact |
+| Concurrent stages | Active intervals 0–10 and 5–15 seconds | Accumulated stages 20 seconds, wall/active union 15 seconds |
+| Simultaneous waits | Two CI wait IDs cover 1–7 and 2–8 seconds | Accumulated CI waits 12 seconds, wait union 7 seconds, overlap labeled; stage occupancy remains 10 seconds |
+| Legacy pair | One unversioned start and terminal event | Read exact interval, preserve old report format and raw bytes |
+| Ambiguous or malformed input | Repeated legacy lifecycle, orphan terminal/resume, missing wait match, invalid event shape or conflicting ID | Diagnostics and incomplete accounting; never infer a precise complete total or echo sensitive detail fields |
+| Recovery and rollback | Existing attempt directories and raw files | Reader/rendering do not rewrite evidence or events; use retained originals and a matching reader |
+
+`tests/test_run_record.py` checks the transitions, concurrent append identity, summaries, and byte preservation. `tests/test_run_report.py` compares the new replay report and all existing legacy reports byte for byte, and checks overlap, suspension, ongoing attempts, and ambiguity labels. `tests/test_work_cycle_cleanup.py` checks the updated timing output through the CLI. These are executable fixture walkthroughs, not evidence that every Agent always records lifecycle events correctly; the orchestrator is their sole owner and stages record only waits.
+
 ## Retry unrelated CI failures once (#86)
 
 | Scenario | Input and state | Expected behavior |
