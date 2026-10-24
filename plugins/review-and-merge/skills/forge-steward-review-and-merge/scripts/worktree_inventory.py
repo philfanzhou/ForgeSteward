@@ -13,6 +13,7 @@ Exit codes: 0 when the inventory completed, even if nothing is removable, and
 """
 
 import argparse
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -109,6 +110,8 @@ def read_ownership(path):
             raise InventoryError(where + " needs a branch string or null")
         if "detached" in entry and not isinstance(entry["detached"], bool):
             raise InventoryError(where + " detached must be a boolean")
+        if "disposable" in entry and not isinstance(entry["disposable"], bool):
+            raise InventoryError(where + " disposable must be a boolean")
         if "head" in entry and (not isinstance(entry["head"], str)
                                 or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}",
                                                 entry["head"]) is None):
@@ -132,7 +135,7 @@ def read_ownership(path):
 
 
 def identity_reasons(owner, record):
-    """Ownership identity is evidence only; even a matching detached HEAD is retained."""
+    """Ownership identity alone never authorizes detached disposal."""
     reasons = []
     branch = owner["branch"]
     detached = owner.get("detached")
@@ -153,6 +156,106 @@ def identity_reasons(owner, record):
     return reasons
 
 
+def read_disposal(path):
+    """Read cleanup's explicit facts; this file never grants ownership by itself."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise InventoryError("Cannot read disposal checks %s: %s" % (path, exc)) from None
+    if not isinstance(data, list):
+        raise InventoryError("Disposal checks must be a JSON list")
+    entries = {}
+    for entry in data:
+        if (not isinstance(entry, dict) or not isinstance(entry.get("workspace"), str)
+                or not Path(entry["workspace"]).is_absolute()):
+            raise InventoryError("Each disposal check needs an absolute workspace path")
+        key = canonical(entry["workspace"])
+        if key in entries:
+            raise InventoryError("Disposal checks repeat workspace " + entry["workspace"])
+        entries[key] = entry
+    return entries
+
+
+def saved_file(value, run_dir, workspace):
+    """Evidence must survive disposal in this run's metadata, not via a symlink into it."""
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        return False
+    path = canonical(value)
+    if (not path.startswith(canonical(run_dir) + os.sep)
+            or path == workspace or path.startswith(workspace + os.sep)):
+        return False
+    try:
+        with open(value, "rb") as stream:
+            return bool(stream.read(1))
+    except OSError:
+        return False
+
+
+def detached_checks(record, owner, checks, run_dir, ignored, mainline):
+    """Combine recorded ownership, live Git facts, and explicit caller host checks."""
+    reasons, method, recovery = [], None, None
+    if owner is None or owner.get("disposable") is not True:
+        reasons.append("detached HEAD: not explicitly recorded as disposable by this run")
+    if owner is None or owner["status"] != "finished":
+        reasons.append("detached HEAD: the owning stage is not confirmed finished")
+    if checks is None:
+        return reasons + ["detached HEAD: disposal checks were not supplied"], method, recovery
+    if (owner is None or checks.get("task") != owner["task"]
+            or checks.get("owner_updated_at") != owner["updated_at"]
+            or checks.get("head") != record["head"]):
+        reasons.append("disposal checks do not match the current owner and head")
+    try:
+        checked_at = datetime.fromisoformat(str(checks.get("checked_at", "")).replace("Z", "+00:00"))
+        valid_time = checked_at.utcoffset() is not None and checked_at.utcoffset().total_seconds() == 0
+    except ValueError:
+        valid_time = False
+    if not valid_time:
+        reasons.append("disposal checks need a UTC checked_at time")
+    if checks.get("inactive") is not True:
+        reasons.append("no confirmation that all stages and conversations have stopped using it")
+    if checks.get("requests_clear") is not True:
+        reasons.append("no confirmation that no open Change Request uses the workspace or head")
+    evidence = checks.get("evidence")
+    workspace = canonical(record["path"])
+    if (checks.get("evidence_complete") is not True
+            or not saved_file(checks.get("handoff"), run_dir, workspace)
+            or not isinstance(evidence, list) or not evidence
+            or not all(saved_file(path, run_dir, workspace) for path in evidence)):
+        reasons.append("complete handoff and evidence are not saved outside the workspace in this run")
+    if (not isinstance(checks.get("ignored_paths"), list)
+            or checks["ignored_paths"] != ignored):
+        reasons.append("ignored files have not all been reviewed and confirmed dispensable")
+    lifecycle = checks.get("lifecycle", {})
+    if isinstance(lifecycle, dict) and lifecycle.get("kind") == "git":
+        method = "git worktree remove"
+    elif (isinstance(lifecycle, dict) and lifecycle.get("kind") == "host"
+          and isinstance(lifecycle.get("artifact"), str) and lifecycle["artifact"].strip()
+          and lifecycle.get("archive_supported") is True):
+        method = "host archive"
+    else:
+        reasons.append("ordinary Git or supported host archive lifecycle is not confirmed")
+    proof = checks.get("recovery", {})
+    if isinstance(proof, dict) and proof.get("kind") == "mainline":
+        reference = proof.get("ref")
+        if (isinstance(reference, str) and reference == mainline
+                and reference.startswith("refs/remotes/")):
+            try:
+                tip = git(record["path"], "show-ref", "--verify", "--hash", reference).strip()
+                unique = git(record["path"], "rev-list", record["head"], "--not", reference)
+                if tip == proof.get("tip") and not unique.strip():
+                    recovery = {"kind": "mainline", "ref": reference, "tip": tip}
+            except InventoryError:
+                pass
+    elif (isinstance(proof, dict) and proof.get("kind") == "request"
+          and proof.get("state") in ("merged", "closed") and proof.get("restorable") is True
+          and proof.get("head") == record["head"] and isinstance(proof.get("url"), str)
+          and re.match(r"https?://[^/]+/.+", proof["url"])):
+        recovery = dict(proof)
+    if recovery is None:
+        reasons.append("head has no verified durable mainline or restorable closed-request recovery")
+    return reasons, method, recovery
+
+
 def current_workspaces(records, requested):
     """Explicit --current paths plus the worktree containing the current directory."""
     where = {item["path"]: canonical(item["path"]) for item in records}
@@ -171,11 +274,13 @@ def current_workspaces(records, requested):
 def inspect(path):
     """Read working-tree state without writing; unreadable state is never removable."""
     if not Path(path).is_dir():
-        return False, False, None
+        return False, False, [], None
     try:
         output = git(path, "--no-optional-locks", "status", "--porcelain")
+        ignored = sorted(filter(None, git(path, "ls-files", "--others", "--ignored",
+                                          "--exclude-standard", "-z").split("\0")))
     except InventoryError as exc:
-        return False, False, str(exc)
+        return False, False, [], str(exc)
     dirty = False
     untracked = False
     for line in output.splitlines():
@@ -183,14 +288,14 @@ def inspect(path):
             untracked = True
         elif line.strip():
             dirty = True
-    return dirty, untracked, None
+    return dirty, untracked, ignored, None
 
 
 def evaluate(record, primary, conventional_root, ownership, currents, active, deletable,
-             open_requests):
+             open_requests, disposal, run_dir, mainline):
     path = canonical(record["path"])
     owner = ownership.get(path) if ownership is not None else None
-    dirty, untracked, status_error = inspect(record["path"])
+    dirty, untracked, ignored, status_error = inspect(record["path"])
     inside_conventional = path == conventional_root or path.startswith(conventional_root + os.sep)
     branch = record["branch"]
     owner_reasons = identity_reasons(owner, record) if owner is not None else []
@@ -210,8 +315,12 @@ def evaluate(record, primary, conventional_root, ownership, currents, active, de
                            "was supplied")
         elif owner is None:
             reasons.append("outside the conventional workspace directory and not recorded by this run")
+    method, recovery = None, None
+    checks = disposal.get(path)
     if record["detached"]:
-        reasons.append("detached HEAD")
+        detached_reasons, method, recovery = detached_checks(
+            record, owner, checks, run_dir, ignored, mainline)
+        reasons.extend(detached_reasons)
     elif not branch:
         reasons.append("no local branch is checked out")
     if record["locked"] is not None:
@@ -241,6 +350,7 @@ def evaluate(record, primary, conventional_root, ownership, currents, active, de
         "missing": not Path(record["path"]).is_dir(),
         "dirty": dirty,
         "untracked": untracked,
+        "ignored_paths": ignored,
         "status_error": status_error,
         "current": path in currents,
         "active": path in active,
@@ -248,17 +358,26 @@ def evaluate(record, primary, conventional_root, ownership, currents, active, de
         "ownership": owner,
         "ownership_identity_verified": not owner_reasons if owner is not None else False,
         "ownership_identity_reasons": owner_reasons,
+        "disposal_checks": checks,
+        "reclamation_method": method,
+        "recovery": recovery,
         "removal_allowed": not reasons,
         "retain_reasons": reasons,
     }
 
 
-def inventory(repo, ownership_path, current, active, deletable, open_requests):
+def inventory(repo, ownership_path, current, active, deletable, open_requests,
+              disposal_path=None, mainline=None):
     repo = Path(repo).resolve()
     if not repo.is_dir():
         raise InventoryError("Target repository directory does not exist: " + str(repo))
     records = read_worktrees(repo)
     ownership = read_ownership(ownership_path) if ownership_path is not None else None
+    disposal = read_disposal(disposal_path) if disposal_path is not None else {}
+    run_dir = ownership_path.resolve().parent if ownership_path is not None else repo
+    if disposal_path is not None and (ownership_path is None
+                                     or disposal_path.resolve().parent != run_dir):
+        raise InventoryError("Disposal checks must be beside this run's ownership record")
     primary = canonical(records[0]["path"])
     primary_path = Path(records[0]["path"]).resolve()
     conventional_root = canonical(primary_path.parent / (primary_path.name + CONVENTIONAL_SUFFIX))
@@ -268,18 +387,21 @@ def inventory(repo, ownership_path, current, active, deletable, open_requests):
     active = {canonical(path) for path in active}
 
     worktrees = [evaluate(record, primary, conventional_root, ownership, currents, active,
-                          deletable, open_requests) for record in records]
+                          deletable, open_requests, disposal, run_dir, mainline) for record in records]
     removable = [item["path"] for item in worktrees if item["removal_allowed"]]
     return {
         "repository": str(repo),
         "conventional_root": str(conventional_root),
         "ownership_record": str(ownership_path) if ownership_path is not None else None,
         "ownership_entries": len(ownership) if ownership is not None else 0,
+        "disposal_record": str(disposal_path) if disposal_path is not None else None,
         "current_workspaces": sorted(currents),
         "deletable_branches": sorted(deletable),
         "open_request_branches": sorted(open_requests),
         "worktrees": worktrees,
         "removable": removable,
+        "counts": {"inventoried": len(worktrees), "eligible": len(removable),
+                   "retained": len(worktrees) - len(removable)},
         "retained": [{"path": item["path"], "reasons": item["retain_reasons"]}
                      for item in worktrees if not item["removal_allowed"]],
     }
@@ -291,6 +413,8 @@ def parse(arguments):
                     "It never removes a worktree; removal stays a reviewed cleanup action.")
     parser.add_argument("--repo", required=True, help="local repository to inspect")
     parser.add_argument("--ownership", help="this run's workspaces.json in its run directory")
+    parser.add_argument("--disposal", help="cleanup's detached disposal checks beside workspaces.json")
+    parser.add_argument("--mainline", help="confirmed remote-tracking mainline ref, e.g. refs/remotes/origin/main")
     parser.add_argument("--current", action="append", default=[],
                         help="workspace path running the cleanup; repeatable")
     parser.add_argument("--active", action="append", default=[],
@@ -305,9 +429,11 @@ def parse(arguments):
 def main(arguments=None):
     arguments = parse(sys.argv[1:] if arguments is None else arguments)
     ownership = Path(arguments.ownership) if arguments.ownership else None
+    disposal = Path(arguments.disposal) if arguments.disposal else None
     try:
         report = inventory(arguments.repo, ownership, arguments.current, arguments.active,
-                           arguments.deletable_branch, arguments.open_request)
+                           arguments.deletable_branch, arguments.open_request, disposal,
+                           arguments.mainline)
     except InventoryError as exc:
         print(str(exc), file=sys.stderr)
         return 2
