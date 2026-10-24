@@ -1,6 +1,8 @@
 ## Subagent lifecycle and recovery
 
-Distinguish quota warnings, occupied threads, and actual call failures. Low/near-limit quota warnings or suggestions to reduce concurrency still require stage dispatch; do not infer lost creation capability, stop early, or fabricate prepare-work's `[]`. Dependent stages in one repository remain sequential; do not use purposeless probes to test quota.
+Before dispatch or capability reuse, read [Capability reuse](capabilities.md) in full; pass its record path and return sanitized observations in task evidence.
+
+Distinguish quota warnings, occupied threads, and call failures. Low/near-limit quota warnings or suggestions to reduce concurrency still require stage dispatch; do not infer lost creation capability, stop early, or fabricate prepare-work's `[]`. Dependent stages in one repository remain sequential; do not use purposeless probes to test quota.
 
 ## Normal waits
 
@@ -12,7 +14,7 @@ Keep timeout wakeups, unchanged status queries, and completion-to-dispatch laten
 
 ## Completion and thread release
 
-Before releasing a completed thread through an actual runtime close/release API, save its Agent identifier, task scope, concise conclusion, evidence locations (Issue/Change Request links or records), and checked remote state. Full results remain in subagent output/persisted records for retrieval; do not retain all of them in orchestrator context. Completed does not mean released; recheck ambiguous API results. Never close active Agents, the orchestrator, or another conversation's Agents, or delete conversations/workspaces/persisted handoffs to free capacity.
+Before releasing a completed thread through an actual runtime close/release API, save its Agent identifier, task scope, concise conclusion, evidence locations (Issue/Change Request links or records), and checked remote state. Full results remain in subagent output/persisted records for retrieval; do not retain all of them in orchestrator context. Recheck ambiguous release results; completion alone is not release. Never close active Agents, the orchestrator, or another conversation's Agents, or delete conversations/workspaces/persisted handoffs to free capacity.
 
 If no close API exists, record that limit and continue with available create/wait capabilities. Do not invent a tool or assume interruption releases a thread. Capacity savings do not permit the orchestrator to perform stages or reuse old review Agents instead of required new reviewers.
 
@@ -20,7 +22,7 @@ If no close API exists, record that limit and continue with available create/wai
 
 ## Return format
 
-Require only these fixed fields per Issue/Change Request: result, link, one-sentence reason, one-sentence next step, and evidence location. The evidence location is `result.md` in that task's attempt directory from `run_record.py task-dir`; write the stage skill's full report, process, and verification details there instead of returning them. A separate dispatch of the same task uses the next attempt directory (`review-pr-45`, then `review-pr-45-r2`), and earlier attempts remain readable, so a later stage reads them before writing its own result. Put content the orchestrator must add to shared records in the same directory and identify it in the return.
+Require only these fixed fields per Issue/Change Request: result, link, one-sentence reason, one-sentence next step, and evidence location. Evidence is `result.md` in the attempt directory from `run_record.py task-dir`; put the stage skill's full report, process, verification, and proposed shared-record updates there. Identify those updates in the return. Each new dispatch uses the next attempt directory (`review-pr-45`, then `review-pr-45-r2`); retain and read earlier attempts before writing the next result.
 
 - Use [Final report](report.md)'s result vocabulary. If none applies while work is in progress, such as implementation handed to review or review requiring repair/sync, use an existing [Scheduling table](concurrency.md#scheduling-table) step, such as “Handed off” or “Awaiting repair”; invent no new term.
 - prepare-work returns only its required single-line Issue list or `[]`. Batch relationships and queued-resource details are in the stage's `result.md`, which the orchestrator reads and records; do not require them in the reply. check-workflow uses [Startup](startup.md)'s `clean`/`pr-open` for its run record, and its release-audit details are read from `result.md` for the optional `release_audit` field. Leftover cleanup returns retained branches/workspaces.
