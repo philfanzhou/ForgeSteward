@@ -43,9 +43,10 @@ The repository and all plugins share one version: when `VERSION` is `X.Y.Z`, all
 
 ## Current release input
 
-The current source target is `0.2.26`; see its [mapping table and notes](releases/v0.2.26.md). Publication is determined by the matching remote Tag and non-draft Release. Change versions only on explicit user request; see [unified version rules](../AGENTS.md#unified-version).
+The current source target is `0.2.27`; see its [mapping table and notes](releases/v0.2.27.md). Publication is determined by the matching remote Tag and non-draft Release. Change versions only on explicit user request; see [unified version rules](../AGENTS.md#unified-version).
 
 ## Release records
+- [v0.2.26 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.26); [mapping table and notes](releases/v0.2.26.md)
 - [v0.2.25 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.25); [mapping table and notes](releases/v0.2.25.md)
 - [v0.2.24 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.24); [mapping table and notes](releases/v0.2.24.md)
 - [v0.2.23 GitHub Release](https://github.com/philfanzhou/ForgeSteward/releases/tag/v0.2.23); [mapping table and notes](releases/v0.2.23.md)
