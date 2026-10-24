@@ -26,7 +26,7 @@ Require only these fixed fields per Issue/Change Request: result, link, one-sent
 
 - Use [Final report](report.md)'s result vocabulary. If none applies while work is in progress, such as implementation handed to review or review requiring repair/sync, use an existing [Scheduling table](concurrency.md#scheduling-table) step, such as “Handed off” or “Awaiting repair”; invent no new term.
 - prepare-work returns only its required single-line Issue list or `[]`. Batch relationships and queued-resource details are in the stage's `result.md`, which the orchestrator reads and records; do not require them in the reply. check-workflow uses [Startup](startup.md)'s `clean`/`pr-open` for its run record, and its release-audit details are read from `result.md` for the optional `release_audit` field. Leftover cleanup returns retained branches/workspaces.
-- Save only these fields in the scheduling table and `handoff.json`, even if more are returned. Read `result.md` only for missing fields, remote-state disagreement, recovery after interruption/compaction, the startup release-audit record, the final report's “Errors and recovery,” or user-requested details. Remote state takes precedence over conflicting returns.
+- Save only these fields in the scheduling table and `handoff.json`, even if more are returned. Read `result.md` only for capability observations, missing fields, remote-state disagreement, recovery after interruption/compaction, the startup release-audit record, the final report's “Errors and recovery,” or user-requested details. Remote state takes precedence over conflicting returns.
 
 ## Recover actual call failures
 

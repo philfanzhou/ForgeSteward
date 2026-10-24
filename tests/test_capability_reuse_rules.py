@@ -302,6 +302,8 @@ class CapabilityRuleGuards(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn("](capabilities.md)", text)
                 self.assertIn("in full", text)
+        self.assertIn("Read `result.md` only for capability observations",
+                      (RULES / "subagent-lifecycle.md").read_text(encoding="utf-8"))
         rules = (RULES / "capabilities.md").read_text(encoding="utf-8")
         for phrase in ("Only the orchestrator writes/aggregates", "same current run",
                        "before every reuse", "unsupported flag/command", "uncovered",

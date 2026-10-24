@@ -4,7 +4,7 @@ Before discovery, dispatch, or reuse, read this file in full. A capability fact 
 
 ### One optional record
 
-Keep `capabilities.json` in this run's Git-metadata directory beside `handoff.json`, outside tracked files and workspaces. Adapters own tool-specific identities, invocation choices, cheap checks, and sanitization; core rules prescribe no platform command. Only the orchestrator writes/aggregates the shared record. Pass its absolute path and run ID in each dispatch; stages read it and return sanitized new observations in their own attempt evidence. The orchestrator validates those observations before aggregation, preserving unaffected entries. A missing record is normal discovery, not a stage failure.
+Keep `capabilities.json` in this run's Git-metadata directory beside `handoff.json`, outside tracked files and workspaces. Adapters own tool-specific identities, invocation choices, cheap checks, and sanitization; core rules prescribe no platform command. Only the orchestrator writes/aggregates the shared record. Pass its absolute path and run ID in each dispatch; stages read it and return sanitized new observations in their own attempt evidence. Identify proposed observations in an existing reason/evidence return field when present, adding no fields. Preparation keeps its exact list-only return and saves observations in `result.md`; the orchestrator reads that evidence. It validates them before aggregation, preserving unaffected entries. A missing record is normal discovery, not a stage failure.
 
 Use one JSON object with `schema: 1`, `run`, and an `entries` list. Each entry has:
 
