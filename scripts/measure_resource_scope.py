@@ -69,6 +69,18 @@ def child_environment():
     return result
 
 
+def close_finished_handle(process):
+    # CPython retains the Windows native process handle while Popen is retained.
+    # OpenProcess can then still find that terminated process. Close only after
+    # communicate/wait confirmed exit; Handle.Close is idempotent in CPython.
+    if os.name == "nt":
+        if process.returncode is None:
+            raise ExperimentError("refusing to close a running child's handle")
+        process._handle.Close()
+        return True
+    return False
+
+
 def wait_for(path, deadline):
     while not path.exists():
         if time.monotonic() >= deadline:
@@ -185,6 +197,7 @@ class Experiment:
             raise ExperimentError(record["label"] + " subprocess deadline") from error
         record.update(exit=process.returncode, stdout=stdout, stderr=stderr,
                       finished=time.monotonic())
+        record["native_handle_closed"] = close_finished_handle(process)
         record["elapsed_seconds"] = record["finished"] - record["started"]
         return record
 
@@ -320,6 +333,7 @@ class Experiment:
             except subprocess.TimeoutExpired:
                 process.kill()
                 stdout, stderr = process.communicate(timeout=2)
+            record["native_handle_closed"] = close_finished_handle(process)
             if "exit" not in record:
                 record.update(exit=process.returncode, stdout=stdout, stderr=stderr,
                               finished=time.monotonic(), interrupted=True)

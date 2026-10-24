@@ -288,6 +288,16 @@ class ResourceScopeExperimentTests(unittest.TestCase):
                 with mock.patch.object(sys, "platform", system):
                     self.assertEqual(scope.peak_memory()["value"], expected)
 
+    def test_windows_native_handle_closes_only_after_confirmed_exit(self):
+        process = mock.Mock(returncode=None)
+        with mock.patch.object(scope.os, "name", "nt"):
+            with self.assertRaises(scope.ExperimentError):
+                scope.close_finished_handle(process)
+            process._handle.Close.assert_not_called()
+            process.returncode = 0
+            self.assertTrue(scope.close_finished_handle(process))
+            process._handle.Close.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()
