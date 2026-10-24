@@ -23,6 +23,7 @@ WORK_CYCLE = REPO / "plugins/work-cycle/skills/forge-steward-work-cycle"
 REVIEW = REPO / "plugins/review-and-merge/skills/forge-steward-review-and-merge"
 CONCURRENCY = WORK_CYCLE / "references/concurrency.md"
 RUN_RECORD = WORK_CYCLE / "references/run-record.md"
+OWNERSHIP = WORK_CYCLE / "references/workspace-ownership.md"
 BRANCH_CLEANUP = REVIEW / "references/branch-cleanup.md"
 POST_MERGE = REVIEW / "references/post-merge.md"
 INVENTORY = REVIEW / "scripts/worktree_inventory.py"
@@ -85,7 +86,9 @@ class InventoryFixture(unittest.TestCase):
         return path
 
     def entry(self, workspace, status="finished", **overrides):
-        entry = {"task": "implement-42", "branch": "issue-42", "workspace": str(workspace),
+        branch = subprocess.run(["git", "branch", "--show-current"], cwd=str(workspace),
+                                check=True, capture_output=True, text=True).stdout.strip()
+        entry = {"task": "implement-42", "branch": branch, "workspace": str(workspace),
                  "stage": "implement", "status": status, "updated_at": "2026-10-17T13:00:00Z"}
         entry.update(overrides)
         return entry
@@ -150,6 +153,103 @@ class WorktreeInventoryTests(InventoryFixture):
         self.assertIsNone(item["ownership"])
         self.assertTrue(item["removal_allowed"])
         self.assertEqual(item["retain_reasons"], [])
+
+    def test_explicit_detached_identity_is_verified_but_never_removable(self):
+        detached = self.worktree(None, detach=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(detached),
+                              check=True, capture_output=True, text=True).stdout.strip()
+        record = self.ownership([self.entry(detached, branch=None, detached=True, head=head.upper())])
+        report = self.report("--ownership", str(record), "--deletable-branch", "issue-42")
+        item = self.item(report, detached)
+        self.assertIsNone(item["ownership"]["branch"])
+        self.assertTrue(item["ownership"]["detached"])
+        self.assertEqual(item["ownership"]["head"], head)
+        self.assertTrue(item["ownership_identity_verified"])
+        self.assertEqual(item["ownership_identity_reasons"], [])
+        self.assertEqual(item["retain_reasons"], ["detached HEAD"])
+        self.assertFalse(item["removal_allowed"])
+        self.assertEqual(report["removable"], [])
+
+    def test_attached_records_remain_compatible_with_optional_identity_fields(self):
+        attached = self.worktree("issue-42")
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(attached),
+                              check=True, capture_output=True, text=True).stdout.strip()
+        for fields in ({}, {"detached": False}, {"detached": False, "head": head}):
+            with self.subTest(fields=fields):
+                record = self.ownership([self.entry(attached, **fields)])
+                item = self.item(self.report("--ownership", str(record),
+                                             "--deletable-branch", "issue-42"), attached)
+                self.assertTrue(item["ownership_identity_verified"])
+                self.assertTrue(item["removal_allowed"])
+
+    def test_legacy_and_incomplete_detached_identity_is_readable_and_retained(self):
+        detached = self.worktree(None, parent=self.conventional, detach=True)
+        for fields in ({"branch": ""}, {"branch": None}, {"branch": "  "},
+                       {"branch": None, "detached": True},
+                       {"branch": None, "detached": False}):
+            with self.subTest(fields=fields):
+                record = self.ownership([self.entry(detached, **fields)])
+                item = self.item(self.report("--ownership", str(record)), detached)
+                self.assertFalse(item["ownership_identity_verified"])
+                self.assertTrue(any("unverified ownership" in reason
+                                    for reason in item["retain_reasons"]))
+                self.assertFalse(item["removal_allowed"])
+
+        attached = self.worktree("issue-42", parent=self.conventional)
+        record = self.ownership([self.entry(attached, branch=None)])
+        item = self.item(self.report("--ownership", str(record),
+                                     "--deletable-branch", "issue-42"), attached)
+        self.assertFalse(item["ownership_identity_verified"])
+        self.assertFalse(item["removal_allowed"])
+        self.assertTrue(any("unverified ownership" in reason for reason in item["retain_reasons"]))
+
+    def test_changed_or_contradictory_identity_is_retained(self):
+        attached = self.worktree("issue-42", parent=self.conventional)
+        detached = self.worktree(None, detach=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(detached),
+                              check=True, capture_output=True, text=True).stdout.strip()
+        cases = [(attached, {"branch": None, "detached": True, "head": head}, "attached worktree"),
+                 (attached, {"branch": "issue-42", "detached": True}, "flag disagree"),
+                 (attached, {"branch": "other"}, "branch does not match"),
+                 (detached, {"branch": None, "detached": True, "head": "0" * len(head)},
+                  "head does not match")]
+        for path, fields, reason in cases:
+            with self.subTest(fields=fields):
+                record = self.ownership([self.entry(path, **fields)])
+                item = self.item(self.report("--ownership", str(record),
+                                             "--deletable-branch", "issue-42"), path)
+                self.assertFalse(item["ownership_identity_verified"])
+                self.assertFalse(item["removal_allowed"])
+                self.assertTrue(any(reason in text for text in item["retain_reasons"]))
+
+        record = self.ownership([self.entry(detached, branch=None, detached=True, head=head)])
+        (detached / "tracked.txt").write_text("new commit\n", encoding="utf-8")
+        git("commit", "-qam", "advance detached head", cwd=detached)
+        item = self.item(self.report("--ownership", str(record)), detached)
+        self.assertIn("recorded head does not match the worktree head", item["retain_reasons"])
+
+        record = self.ownership([self.entry(detached, branch=None, detached=True, head="a" * 64)])
+        item = self.item(self.report("--ownership", str(record)), detached)
+        self.assertEqual(item["ownership"]["head"], "a" * 64)
+        self.assertFalse(item["removal_allowed"])
+
+    def test_explicit_detached_identity_preserves_all_workspace_exclusions(self):
+        detached = self.worktree(None, detach=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(detached),
+                              check=True, capture_output=True, text=True).stdout.strip()
+        (detached / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        (detached / "new.txt").write_text("new\n", encoding="utf-8")
+        git("worktree", "lock", str(detached), cwd=self.repo)
+        record = self.ownership([self.entry(detached, status="active", branch=None,
+                                            detached=True, head=head)])
+        item = self.item(self.report("--ownership", str(record), "--current", str(detached),
+                                     "--active", str(detached)), detached)
+        self.assertTrue(item["ownership_identity_verified"])
+        self.assertFalse(item["removal_allowed"])
+        for reason in ("detached HEAD", "the owning stage is still active", "locked worktree",
+                       "the workspace running this skill", "listed as active by the caller",
+                       "uncommitted changes", "untracked files"):
+            self.assertIn(reason, item["retain_reasons"])
 
     def test_removable_verdict_allows_a_real_outside_removal_without_force(self):
         outside = self.worktree("issue-42", parent=self.root / "outside")
@@ -254,6 +354,15 @@ class WorktreeInventoryTests(InventoryFixture):
             "relative path": json.dumps([relative]),
             "unknown status": json.dumps([unknown]),
             "duplicate workspace": json.dumps([valid, dict(valid, task="implement-43")]),
+            "duplicate canonical path": json.dumps([
+                valid, dict(valid, workspace=str(outside) + os.sep + ".." + os.sep + outside.name)]),
+            "branch type": json.dumps([dict(valid, branch=17)]),
+            "detached type": json.dumps([dict(valid, detached="true")]),
+            "abbreviated head": json.dumps([dict(valid, branch=None, detached=True, head="a" * 39)]),
+            "partial sha256 head": json.dumps([dict(valid, head="a" * 41)]),
+            "nonhex head": json.dumps([dict(valid, head="z" * 40)]),
+            "null head": json.dumps([dict(valid, head=None)]),
+            "missing owner": json.dumps([dict(valid, task="")]),
         }
         for label, text in cases.items():
             with self.subTest(label=label):
@@ -279,7 +388,13 @@ class WorktreeInventoryTests(InventoryFixture):
         dirty = self.worktree("issue-44", parent=self.root / "outside")
         (dirty / "tracked.txt").write_text("changed\n", encoding="utf-8")
         (outside / "new.txt").write_text("new\n", encoding="utf-8")
-        record = self.ownership([self.entry(path) for path in (inside, outside, dirty)])
+        detached = self.worktree(None, detach=True)
+        legacy = self.worktree(None, detach=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(detached),
+                              check=True, capture_output=True, text=True).stdout.strip()
+        record = self.ownership([self.entry(path) for path in (inside, outside, dirty)]
+                                + [self.entry(detached, branch=None, detached=True, head=head),
+                                   self.entry(legacy, branch=None)])
 
         def snapshot():
             return {
@@ -292,6 +407,8 @@ class WorktreeInventoryTests(InventoryFixture):
                                          check=True, capture_output=True, text=True).stdout,
                 "outside": (outside / "new.txt").read_text(encoding="utf-8"),
                 "dirty": (dirty / "tracked.txt").read_text(encoding="utf-8"),
+                "bytes": {str(path.relative_to(self.root)): path.read_bytes()
+                          for path in self.root.rglob("*") if path.is_file()},
             }
 
         before = snapshot()
@@ -308,6 +425,19 @@ class WorktreeInventoryTests(InventoryFixture):
 
 
 class OwnershipRuleTests(unittest.TestCase):
+    def test_writer_and_reader_share_the_complete_detached_identity_contract(self):
+        for path in (RUN_RECORD, CONCURRENCY):
+            with self.subTest(path=path):
+                self.assertIn("read [workspace ownership](workspace-ownership.md) in full",
+                              normalized(path))
+        text = normalized(OWNERSHIP)
+        for phrase in ("`branch: null`", "`detached: true`", "`head`", "40- or 64-digit",
+                       "before dispatch", "after confirmed completion", "reread its identity",
+                       "legacy empty/null", "unverified", "old readers", "retain the worktree",
+                       "does not authorize removal", "only the orchestrator writes it"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
     def test_concurrency_requires_the_run_scoped_ownership_record(self):
         text = normalized(CONCURRENCY)
         for phrase in ("workspaces.json", "run directory", "one entry per dispatched workspace",

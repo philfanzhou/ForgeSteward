@@ -115,6 +115,24 @@ The original #83 revision used everyday Chinese as the default while prioritizin
 
 The cleanup stage runs only after no other stage remains active and before report generation; `cleanup.md` is the run's per-resource record, with one outcome for every branch and worktree checked, and the stage changes no tracked files. A worktree outside the conventional workspace directory is removable only when this run's ownership record names it and every safety condition holds; each unsafe case is retained with the failed condition, and ownership is never inferred from a path. These are rule walkthroughs; the wording tests and the read-only inventory fixtures check rule text and inventory decisions, not whether an Agent follows them.
 
+## Detached workspace ownership (#209)
+
+The [ownership format](../plugins/work-cycle/skills/forge-steward-work-cycle/references/workspace-ownership.md) supports attached branch records and explicit detached identity. The orchestrator records the actual branch/head before dispatch and rereads them after confirmed completion, since review can leave a workspace detached. Inventory reads a snapshot; concurrent identity changes require a fresh read before any separately authorized cleanup. It never certifies an absent owner or infers ownership from a path.
+
+| Scenario | Input and state | Observed result/assertion |
+| --- | --- | --- |
+| Existing attached record | Finished record with the actual branch; optional detached false and full head | Parses and keeps existing attached removal conditions |
+| Explicit detached record | Null branch, detached true, full matching head; uppercase hex accepted | Reports verified ownership identity and normalized lowercase head, but retains detached HEAD with `removal_allowed: false` |
+| Legacy record | Empty, whitespace, or null branch without complete detached identity | Inventory completes and reports unverified ownership; retains even a conventional-directory workspace |
+| Incomplete or contradictory identity | Missing head, branch/detached disagreement, wrong branch, or recorded detached identity for an attached workspace | Clear unverified/mismatch reasons; no removal |
+| Head changes during a stage | Recorded detached head followed by a new commit | Actual head differs; inventory retains it with the head-mismatch reason |
+| Invalid record | Missing owner/branch, malformed head/flag, unknown status, relative path, duplicate canonical workspace, unreadable file or invalid JSON | Exit 2 with the record error; caller retains affected worktrees |
+| Active or unsafe detached workspace | Matching identity plus owner-active, caller-active, current, locked, dirty, or untracked state | Identity may be verified; every safety reason remains and removal is false |
+| Read-only and cancellation | Inventory attached, explicit detached, and legacy workspaces; no cleanup action follows | Repository, worktrees, ownership record, and Git-metadata file paths/bytes stay unchanged; interruption grants no removal authority |
+| Rollback | An older reader rejects null branches | Keep originals and use a compatible reader or retain the worktree; never fabricate a branch/head or rewrite evidence |
+
+`tests/test_worktree_ownership.py` runs temporary Git-repository fixtures for the parser, identity comparisons, each retained safety condition, and byte preservation. These are executable inventory scenarios and instruction walkthroughs, not proof that an Agent follows cleanup instructions. Parsing does not change detached deletion policy; Issue #210 owns that separate policy. No runtime speedup is claimed.
+
 ## Run records and timing (#85)
 
 | Scenario | Input and state | Expected behavior |
