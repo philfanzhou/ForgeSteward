@@ -1,6 +1,6 @@
 ## Subagent lifecycle and recovery
 
-Before dispatch or capability reuse, read [Capability reuse](capabilities.md) in full; pass its record path and return sanitized observations in task evidence.
+Before dispatch or capability reuse, read [Rule loading](rule-loading.md) and [Capability reuse](capabilities.md) in full; pass its record path and return sanitized observations in task evidence.
 
 Distinguish quota warnings, occupied threads, and call failures. Low/near-limit quota warnings or suggestions to reduce concurrency still require stage dispatch; do not infer lost creation capability, stop early, or fabricate prepare-work's `[]`. Dependent stages in one repository remain sequential; do not use purposeless probes to test quota.
 
