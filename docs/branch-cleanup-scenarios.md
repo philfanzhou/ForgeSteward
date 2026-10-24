@@ -1,6 +1,6 @@
 # Leftover branch cleanup scenarios
 
-This document covers review-and-merge's [leftover branch cleanup](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) rules (Issues #81 and #165). These are limited walkthroughs of the written rules, not runs against real repositories or evaluations of actual Agent behavior.
+This document covers review-and-merge's [leftover branch cleanup](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/branch-cleanup.md) rules (Issues #81, #165, and #210). These are limited walkthroughs of the written rules, not runs against real repositories or evaluations of actual Agent behavior.
 
 ## Background
 
@@ -46,12 +46,30 @@ Unless specified otherwise, the user explicitly invokes review-and-merge and all
 | B30 | B28's worktree has one untracked file | Retain the worktree and its branch and report the untracked file | Worktree rule 2 |
 | B31 | B28's worktree is locked | Retain it and report the lock; `git worktree prune` also skips it | Worktree rules 1–2 |
 | B32 | B28's worktree is the one running cleanup | Do not remove it; if its branch is the merged request's, switch to mainline first, then remove only if every condition still holds | Worktree rule 2; post-merge step 4 |
-| B33 | B28's worktree has a detached HEAD | Retain it and report the detached HEAD | Worktree rule 2 |
+| B33 | B28's worktree has a detached HEAD without the additional disposable/finished/recovery checks | Retain it and report the missing proof; matching detached identity alone is insufficient | Detached workspace rule |
 | B34 | A clean outside worktree checks out a merged-PR branch, but this run's `workspaces.json` does not name it (another run or a user created it) | Retain it and report that this run does not own it; never infer ownership from a path | Worktree rule 5 |
 | B35 | B28's worktree is named by the record, but another active stage or a caller list marks it active | Retain it and report the active owner | Worktree rule 2 |
 | B36 | B28's worktree's branch has unique commits, is unmerged, or is used by an open PR | Retain the worktree and its branch; report the failed branch condition | Worktree rule 2; classification table |
 | B37 | `workspaces.json` is missing, unreadable, or malformed when cleanup runs | Treat every outside-directory worktree as unowned, retain it, and report the unusable record | Worktree rule 2 |
 | B38 | The record names a worktree whose directory no longer exists | Prune the stale record with `git worktree prune`; report it as absent, not deleted | Worktree rule 1 |
+
+## Disposable detached stage workspaces (#210)
+
+The [detached cleanup rule](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/detached-workspaces.md) changes blanket retention only for this run's explicitly disposable, finished stage environment. All ordinary safety exclusions remain. `disposal.json` is cleanup's final-check record, separate from orchestrator-owned `workspaces.json`.
+
+| ID | Input and state | Expected result | Basis |
+| --- | --- | --- | --- |
+| B39 | Explicit disposable/finished detached owner, matching full head, saved complete handoff/evidence, confirmed inactive and requests clear, reviewed ignored files, ordinary Git lifecycle, and refreshed durable mainline contains head | No-force removal; read back absence, preserve evidence, record commit/ref and per-resource outcome; isolated fixture recreates the worktree from saved commit | Detached success |
+| B40 | B39 with any dirty, untracked, locked, current, active, other-conversation, failed/paused, unknown/legacy owner, or mismatched identity condition | Retain with exact reason, including inside the conventional directory | Detached exclusions |
+| B41 | B39 has needed ignored output or a changed ignored listing | Retain until needed output is preserved in run metadata and every remaining ignored file is freshly inspected as dispensable | Ignored-file review |
+| B42 | Detached commit exists only in local reflog/branch or differs from recorded request head; request is open or host cannot restore | Retain unrecoverable/unknown work; accept a matching restorable closed/merged request head even after squash/rebase | Durable recovery |
+| B43 | B39 becomes active, changes owner/head, or gets an open associated request before action | Refresh facts and inventory; retain changed resources | Final checks |
+| B44 | Host-managed disposable workspace has supported archive API and artifact identity | Call only host adapter archive, verify archived metadata, preserve recovery/evidence; fake adapter fixture confirms this flow | Host lifecycle |
+| B45 | Host API unavailable/denied or result ambiguous | Retain unsupported/denied resource; resolve ambiguity by readback before retry and never substitute raw Git/filesystem removal | Host failure |
+| B46 | Stop after inventory or no-force removal fails because new untracked data arrived | Stop further detached reclamation; preserve data/evidence and record completed/remaining outcomes | Stop/failure |
+| B47 | Saved handoff/evidence missing, still inside workspace, incomplete, or facts malformed/stale | Retain or report unusable checks; never claim removal or invent facts | Evidence and compatibility |
+
+The isolated Git fixture tests execute B39–B43 and B46–B47 conditions; a fake host adapter exercises supported archive and response-loss readback for B44–B45. Rule walkthroughs cover denied API calls and per-resource audit reporting. They do not certify a real host or Agent. Report inventoried, reclaimed, and retained counts from actual outcomes; never claim unmeasured disk savings.
 
 ## Recovery and rollback
 

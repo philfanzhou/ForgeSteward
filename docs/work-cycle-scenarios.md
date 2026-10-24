@@ -108,7 +108,7 @@ The original #83 revision used everyday Chinese as the default while prioritizin
 | Failed audit write or query | Run directory not writable, or a branch/worktree query fails | Report the failure and unqueried scope honestly, retain unconfirmed resources, and never claim an unperformed check |
 | Recorded outside-directory worktree | A clean, unlocked, non-current, attached worktree outside `<repository-parent>/<repository-name>-forge-steward/`; this run's `workspaces.json` names it as a finished task, and its branch is a merged Change Request with matching head and no open request | Remove the worktree with `git worktree remove` (never force), delete the branch, and record the outside path, deleted commit, and recovery in `cleanup.md` |
 | Unrecorded outside-directory worktree | The same clean worktree and merged branch, but this run's `workspaces.json` does not name it | Retain it and report that this run does not own it; never infer ownership from a path |
-| Worktree safety exclusions | A recorded outside worktree is dirty, has untracked files, is locked, is current, is detached, or another active stage or run lists it as active | Retain it and report the exact failed condition; remove only when every condition holds |
+| Worktree safety exclusions | A recorded outside worktree is dirty, has untracked files, is locked, is current, lacks detached disposal proof, or another active stage or run lists it as active | Retain it and report the exact failed condition; remove only when every condition holds |
 | Branch safety exclusions | A recorded outside worktree's branch has unique commits, is unmerged, or is used by an open Change Request | Retain the worktree and its branch; report which branch condition failed |
 | Ownership record updates | The orchestrator dispatches and completes implementation, review, and repair stages | `workspaces.json` in the run directory lists task, branch, absolute workspace path, owning stage, status, and update time; dispatch sets `active` and completion sets `finished`, `failed`, or `paused`; no tracked files change and `handoff.json` keeps its schema |
 | Standalone review-and-merge | User directly invokes review Skill | Unchanged: one leftover pass after processing its list; without a work-cycle run directory it reports the audit in its result |
@@ -122,7 +122,7 @@ The [ownership format](../plugins/work-cycle/skills/forge-steward-work-cycle/ref
 | Scenario | Input and state | Observed result/assertion |
 | --- | --- | --- |
 | Existing attached record | Finished record with the actual branch; optional detached false and full head | Parses and keeps existing attached removal conditions |
-| Explicit detached record | Null branch, detached true, full matching head; uppercase hex accepted | Reports verified ownership identity and normalized lowercase head, but retains detached HEAD with `removal_allowed: false` |
+| Explicit detached record | Null branch, detached true, full matching head; uppercase hex accepted | Reports verified ownership identity and normalized lowercase head; without the separate #210 disposal proof, retains detached HEAD with `removal_allowed: false` |
 | Legacy record | Empty, whitespace, or null branch without complete detached identity | Inventory completes and reports unverified ownership; retains even a conventional-directory workspace |
 | Incomplete or contradictory identity | Missing head, branch/detached disagreement, wrong branch, or recorded detached identity for an attached workspace | Clear unverified/mismatch reasons; no removal |
 | Head changes during a stage | Recorded detached head followed by a new commit | Actual head differs; inventory retains it with the head-mismatch reason |
@@ -131,7 +131,25 @@ The [ownership format](../plugins/work-cycle/skills/forge-steward-work-cycle/ref
 | Read-only and cancellation | Inventory attached, explicit detached, and legacy workspaces; no cleanup action follows | Repository, worktrees, ownership record, and Git-metadata file paths/bytes stay unchanged; interruption grants no removal authority |
 | Rollback | An older reader rejects null branches | Keep originals and use a compatible reader or retain the worktree; never fabricate a branch/head or rewrite evidence |
 
-`tests/test_worktree_ownership.py` runs temporary Git-repository fixtures for the parser, identity comparisons, each retained safety condition, and byte preservation. These are executable inventory scenarios and instruction walkthroughs, not proof that an Agent follows cleanup instructions. Parsing does not change detached deletion policy; Issue #210 owns that separate policy. No runtime speedup is claimed.
+`tests/test_worktree_ownership.py` runs temporary Git-repository fixtures for the parser, identity comparisons, each retained safety condition, and byte preservation. These are executable inventory scenarios and instruction walkthroughs, not proof that an Agent follows cleanup instructions. Parsing alone does not change eligibility; the separate #210 disposal rule below is required. No runtime speedup is claimed.
+
+## Disposable detached cleanup (#210)
+
+Read the [detached cleanup contract](../plugins/review-and-merge/skills/forge-steward-review-and-merge/references/detached-workspaces.md) in full before considering reclamation. The orchestrator alone may mark an explicitly disposable environment; completion alone never implies this marker. Cleanup records current facts separately in run-directory `disposal.json` and preserves ownership, handoffs, evidence, and `cleanup.md` outside the workspace.
+
+| Scenario | Input and state | Result/assertion |
+| --- | --- | --- |
+| Ordinary Git success and recovery | Finished disposable detached record, exact task/head/update time, complete external saved records, no ignored files, inactive, requests clear, refreshed remote mainline contains the head | Inventory reports one eligible workspace and the Git removal method; fixture removes it without force, confirms registration/path absent, retains evidence bytes, and recreates a detached worktree from its saved commit |
+| Each retention condition | Dirty, untracked, locked, current, caller-active, owner-active, other-conversation, unknown owner, missing disposable marker, failed/paused status, legacy identity, or head mismatch | Each fixture stays present and inventory reports the failed condition, even under the conventional directory |
+| Needed ignored output | Clean Git status with ignored `needed.log` and no completed review | Retain; fixture moves needed output into run metadata, refreshes the empty ignored list, removes only then, and confirms the output survives |
+| Durable recovery | Local reflog, local-only ref, stale remote tip, unmatched request head, open request, missing host restoration, or unique detached commit | Retain; fixtures accept only exact current mainline ancestry or matching restorable merged/closed request proof supplied by the caller |
+| State changes before action | Initial eligibility followed by new head, changed owner, active caller list, or open associated request | Fresh inventory rejects each change; no stale decision authorizes removal |
+| Host archive | Supported fake adapter with exact artifact identity and saved head/evidence | Inventory selects host archive; fake adapter updates archive metadata and removes only its fixture; an ambiguous response is resolved by readback with one call and no fallback |
+| Unsupported host or incomplete evidence | No archive support, denied/unknown lifecycle, evidence inside workspace, absent saved files, malformed facts, or facts outside the run directory | Retain or exit 2; no raw deletion and no success claim |
+| Stop or command failure | Stop after inventory, or an untracked file appears before no-force removal | Stop leaves both fixture workspaces; refused removal preserves the new file and the remaining workspace; record completed/remaining outcomes |
+| Compatibility and rollback | Existing attached records and legacy detached records; revert the exception | Attached behavior stays unchanged, unproven detached entries retain, and records are not rewritten; rollback restores blanket retention |
+
+`tests/test_worktree_ownership.py` executes these isolated Git fixtures and a fake host adapter; a real host archive API and Agent behavior remain outside that test's coverage. Caller-supplied inactivity, request/restoration, evidence completeness, ignored-file semantics, and lifecycle assertions require fresh authorized inspection. Inventory does not query hosts or prove those assertions itself. Per-resource audit and retained counts are required; no disk savings or speedup is claimed.
 
 ## Run records and timing (#85)
 

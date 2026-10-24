@@ -1,10 +1,9 @@
 """Verify run workspace ownership rules and the read-only worktree inventory.
 
-The fixture tests create temporary Git repositories with linked worktrees and
-check the inventory and every removal exclusion it can observe. The static
-tests check that the rules and documents require the ownership record, the
-outside-directory exception, and every exclusion. They do not prove that a
-cleanup Agent follows the rules or actually removes a real worktree.
+The fixtures create isolated temporary Git repositories, check retention,
+remove/recover a disposable detached worktree, and exercise a fake host adapter.
+They never reclaim a user/stage resource. Instruction checks do not prove that
+an Agent follows the rules or that a real host implements the fake adapter.
 """
 
 import json
@@ -26,6 +25,7 @@ RUN_RECORD = WORK_CYCLE / "references/run-record.md"
 OWNERSHIP = WORK_CYCLE / "references/workspace-ownership.md"
 BRANCH_CLEANUP = REVIEW / "references/branch-cleanup.md"
 POST_MERGE = REVIEW / "references/post-merge.md"
+DETACHED = REVIEW / "references/detached-workspaces.md"
 INVENTORY = REVIEW / "scripts/worktree_inventory.py"
 README = REPO / "README.md"
 SCENARIOS = REPO / "docs/work-cycle-scenarios.md"
@@ -50,7 +50,7 @@ class InventoryFixture(unittest.TestCase):
     """Temporary repository with worktrees in and outside the conventional directory."""
 
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = tempfile.TemporaryDirectory(prefix="forge-steward-worktree-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.repo = self.root / "repo"
@@ -92,6 +92,39 @@ class InventoryFixture(unittest.TestCase):
                  "stage": "implement", "status": status, "updated_at": "2026-10-17T13:00:00Z"}
         entry.update(overrides)
         return entry
+
+    def detached_entry(self, workspace, **overrides):
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace,
+                                       text=True).strip()
+        entry = self.entry(workspace, branch=None, detached=True, head=head, disposable=True)
+        entry.update(overrides)
+        return entry
+
+    def disposal(self, entry, **overrides):
+        head = entry["head"]
+        git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=self.repo)
+        tip = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo,
+                                      text=True).strip()
+        handoff = self.run_dir / "handoff.json"
+        evidence = self.run_dir / "result.md"
+        handoff.write_text('{"status": "finished"}\n', encoding="utf-8")
+        evidence.write_text("Completed acceptance evidence\n", encoding="utf-8")
+        checks = {"workspace": entry["workspace"], "task": entry["task"], "head": head,
+                  "owner_updated_at": entry["updated_at"], "checked_at": "2026-10-24T12:00:00Z",
+                  "inactive": True, "requests_clear": True, "evidence_complete": True,
+                  "handoff": str(handoff), "evidence": [str(evidence)], "ignored_paths": [],
+                  "lifecycle": {"kind": "git"},
+                  "recovery": {"kind": "mainline", "ref": "refs/remotes/origin/main", "tip": tip}}
+        checks.update(overrides)
+        path = self.run_dir / "disposal.json"
+        path.write_text(json.dumps([checks]), encoding="utf-8")
+        return path
+
+    def detached_report(self, entry, **checks):
+        record = self.ownership([entry])
+        disposal = self.disposal(entry, **checks)
+        return self.report("--ownership", str(record), "--disposal", str(disposal),
+                           "--mainline", "refs/remotes/origin/main")
 
     def run_inventory(self, *arguments, cwd=None):
         return subprocess.run(
@@ -154,7 +187,7 @@ class WorktreeInventoryTests(InventoryFixture):
         self.assertTrue(item["removal_allowed"])
         self.assertEqual(item["retain_reasons"], [])
 
-    def test_explicit_detached_identity_is_verified_but_never_removable(self):
+    def test_explicit_detached_identity_alone_never_authorizes_removal(self):
         detached = self.worktree(None, detach=True)
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(detached),
                               check=True, capture_output=True, text=True).stdout.strip()
@@ -166,7 +199,7 @@ class WorktreeInventoryTests(InventoryFixture):
         self.assertEqual(item["ownership"]["head"], head)
         self.assertTrue(item["ownership_identity_verified"])
         self.assertEqual(item["ownership_identity_reasons"], [])
-        self.assertEqual(item["retain_reasons"], ["detached HEAD"])
+        self.assertIn("detached HEAD: disposal checks were not supplied", item["retain_reasons"])
         self.assertFalse(item["removal_allowed"])
         self.assertEqual(report["removable"], [])
 
@@ -246,7 +279,8 @@ class WorktreeInventoryTests(InventoryFixture):
                                      "--active", str(detached)), detached)
         self.assertTrue(item["ownership_identity_verified"])
         self.assertFalse(item["removal_allowed"])
-        for reason in ("detached HEAD", "the owning stage is still active", "locked worktree",
+        for reason in ("detached HEAD: disposal checks were not supplied",
+                       "the owning stage is still active", "locked worktree",
                        "the workspace running this skill", "listed as active by the caller",
                        "uncommitted changes", "untracked files"):
             self.assertIn(reason, item["retain_reasons"])
@@ -358,6 +392,7 @@ class WorktreeInventoryTests(InventoryFixture):
                 valid, dict(valid, workspace=str(outside) + os.sep + ".." + os.sep + outside.name)]),
             "branch type": json.dumps([dict(valid, branch=17)]),
             "detached type": json.dumps([dict(valid, detached="true")]),
+            "disposable type": json.dumps([dict(valid, disposable="true")]),
             "abbreviated head": json.dumps([dict(valid, branch=None, detached=True, head="a" * 39)]),
             "partial sha256 head": json.dumps([dict(valid, head="a" * 41)]),
             "nonhex head": json.dumps([dict(valid, head="z" * 40)]),
@@ -424,6 +459,283 @@ class WorktreeInventoryTests(InventoryFixture):
         self.assertIn('"worktree", "list"', source)
 
 
+class DetachedDisposalTests(InventoryFixture):
+    def test_finished_disposable_detached_workspace_is_removed_and_recoverable(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        report = self.detached_report(entry)
+        item = self.item(report, detached)
+        self.assertTrue(item["removal_allowed"], item["retain_reasons"])
+        self.assertEqual(item["reclamation_method"], "git worktree remove")
+        self.assertEqual(item["recovery"]["kind"], "mainline")
+        self.assertEqual(report["counts"], {"inventoried": 2, "eligible": 1, "retained": 1})
+        saved = {path.name: path.read_bytes() for path in self.run_dir.iterdir()}
+
+        # Only this fixture repository is mutated, using the documented no-force method.
+        git("worktree", "remove", str(detached), cwd=self.repo)
+        self.assertFalse(detached.exists())
+        self.assertEqual(len(json.loads(self.run_inventory().stdout)["worktrees"]), 1)
+        self.assertEqual(saved, {path.name: path.read_bytes() for path in self.run_dir.iterdir()})
+        restored = self.root / "restored"
+        git("worktree", "add", "--detach", str(restored), entry["head"], cwd=self.repo)
+        self.assertEqual((restored / "tracked.txt").read_text(encoding="utf-8"), "base\n")
+
+    def test_ownership_and_completion_are_required_even_in_conventional_directory(self):
+        detached = self.worktree(None, parent=self.conventional, detach=True)
+        for overrides in ({"disposable": False}, {"status": "active"}, {"status": "failed"},
+                          {"status": "paused"}, {"detached": False}, {"head": "0" * 40}):
+            with self.subTest(overrides=overrides):
+                entry = self.detached_entry(detached, **overrides)
+                item = self.item(self.detached_report(entry), detached)
+                self.assertFalse(item["removal_allowed"], item)
+                self.assertTrue(detached.exists())
+        entry = self.detached_entry(detached)
+        disposal = self.disposal(entry)
+        record = self.ownership([])
+        item = self.item(self.report("--ownership", str(record), "--disposal", str(disposal),
+                                     "--mainline", "refs/remotes/origin/main"), detached)
+        self.assertFalse(item["removal_allowed"])
+        self.assertFalse(item["ownership_identity_verified"])
+
+    def test_each_live_workspace_safety_exclusion_is_preserved(self):
+        for condition in ("dirty", "untracked", "locked", "current", "active", "other conversation"):
+            with self.subTest(condition=condition):
+                detached = self.worktree(None, detach=True)
+                entry = self.detached_entry(detached)
+                extra = []
+                checks = {}
+                if condition == "dirty":
+                    (detached / "tracked.txt").write_text("changed\n", encoding="utf-8")
+                    expected = "uncommitted changes"
+                elif condition == "untracked":
+                    (detached / "new.txt").write_text("keep\n", encoding="utf-8")
+                    expected = "untracked files"
+                elif condition == "locked":
+                    git("worktree", "lock", str(detached), cwd=self.repo)
+                    expected = "locked worktree"
+                elif condition in ("current", "active"):
+                    extra = ["--" + condition, str(detached)]
+                    expected = ("the workspace running this skill" if condition == "current"
+                                else "listed as active by the caller")
+                else:
+                    checks["inactive"] = False
+                    expected = "no confirmation that all stages and conversations have stopped using it"
+                record = self.ownership([entry])
+                disposal = self.disposal(entry, **checks)
+                item = self.item(self.report("--ownership", str(record), "--disposal", str(disposal),
+                                             "--mainline", "refs/remotes/origin/main", *extra), detached)
+                self.assertIn(expected, item["retain_reasons"])
+                self.assertFalse(item["removal_allowed"])
+                self.assertTrue(detached.exists())
+
+    def test_missing_changed_or_unproven_external_checks_retain(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        for overrides, expected in (
+                ({"task": "other-task"}, "do not match"),
+                ({"head": "0" * 40}, "do not match"),
+                ({"owner_updated_at": "later"}, "do not match"),
+                ({"checked_at": "invalid"}, "UTC checked_at"),
+                ({"inactive": False}, "conversations"),
+                ({"requests_clear": False}, "open Change Request"),
+                ({"evidence_complete": False}, "complete handoff"),
+                ({"handoff": str(detached / "tracked.txt")}, "complete handoff"),
+                ({"evidence": [str(self.run_dir / "absent")]}, "complete handoff"),
+                ({"ignored_paths": None}, "ignored files"),
+                ({"lifecycle": {}}, "lifecycle is not confirmed"),
+                ({"lifecycle": {"kind": "host", "artifact": "host-1",
+                                "archive_supported": False}}, "lifecycle is not confirmed"),
+                ({"recovery": {}}, "durable mainline")):
+            with self.subTest(overrides=overrides):
+                item = self.item(self.detached_report(entry, **overrides), detached)
+                self.assertFalse(item["removal_allowed"])
+                self.assertTrue(any(expected in reason for reason in item["retain_reasons"]), item)
+                self.assertTrue(detached.exists())
+
+    def test_ignored_files_need_exact_review_and_needed_data_is_preserved(self):
+        detached = self.worktree(None, detach=True)
+        (self.repo / ".git" / "info" / "exclude").write_text("needed.log\n", encoding="utf-8")
+        needed = detached / "needed.log"
+        needed.write_text("needed build output\n", encoding="utf-8")
+        entry = self.detached_entry(detached)
+        item = self.item(self.detached_report(entry), detached)
+        self.assertFalse(item["removal_allowed"])
+        self.assertEqual(item["ignored_paths"], ["needed.log"])
+        self.assertIn("ignored files have not all been reviewed and confirmed dispensable",
+                      item["retain_reasons"])
+        saved = self.run_dir / "needed.log"
+        shutil.move(str(needed), str(saved))
+        item = self.item(self.detached_report(entry), detached)
+        self.assertTrue(item["removal_allowed"], item)
+        git("worktree", "remove", str(detached), cwd=self.repo)
+        self.assertEqual(saved.read_text(encoding="utf-8"), "needed build output\n")
+
+    def test_stale_mainline_local_refs_and_unique_detached_commits_are_not_recovery(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        for proof in ({"kind": "mainline", "ref": "refs/remotes/origin/main", "tip": "0" * 40},
+                      {"kind": "mainline", "ref": "HEAD", "tip": entry["head"]},
+                      {"kind": "mainline", "ref": "refs/remotes/other/main", "tip": entry["head"]}):
+            with self.subTest(proof=proof):
+                item = self.item(self.detached_report(entry, recovery=proof), detached)
+                self.assertIsNone(item["recovery"])
+                self.assertFalse(item["removal_allowed"])
+        (detached / "tracked.txt").write_text("unique\n", encoding="utf-8")
+        git("commit", "-qam", "unique detached work", cwd=detached)
+        entry = self.detached_entry(detached)
+        item = self.item(self.detached_report(entry), detached)
+        self.assertIsNone(item["recovery"])
+        self.assertFalse(item["removal_allowed"])
+        self.assertTrue(detached.exists())
+
+    def test_only_matching_restorable_closed_or_merged_request_is_recovery(self):
+        detached = self.worktree(None, detach=True)
+        (detached / "tracked.txt").write_text("squashed source\n", encoding="utf-8")
+        git("commit", "-qam", "source commit", cwd=detached)
+        entry = self.detached_entry(detached)
+        proof = {"kind": "request", "url": "https://example.test/repo/changes/42",
+                 "state": "merged", "head": entry["head"], "restorable": True}
+        for state in ("merged", "closed"):
+            item = self.item(self.detached_report(entry, recovery=dict(proof, state=state)), detached)
+            self.assertTrue(item["removal_allowed"], item)
+            self.assertEqual(item["recovery"]["head"], entry["head"])
+        for overrides in ({"state": "open"}, {"head": "0" * 40}, {"restorable": False}, {"url": ""}):
+            item = self.item(self.detached_report(entry, recovery=dict(proof, **overrides)), detached)
+            self.assertIsNone(item["recovery"])
+            self.assertFalse(item["removal_allowed"])
+
+    def test_final_reread_catches_head_owner_use_and_request_changes(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        self.assertTrue(self.item(self.detached_report(entry), detached)["removal_allowed"])
+        record = self.run_dir / "workspaces.json"
+        disposal = self.run_dir / "disposal.json"
+        args = ["--ownership", str(record), "--disposal", str(disposal),
+                "--mainline", "refs/remotes/origin/main"]
+        self.assertFalse(self.item(self.report(*args, "--active", str(detached)), detached)["removal_allowed"])
+        checks = json.loads(disposal.read_text(encoding="utf-8"))
+        checks[0]["requests_clear"] = False
+        disposal.write_text(json.dumps(checks), encoding="utf-8")
+        self.assertFalse(self.item(self.report(*args), detached)["removal_allowed"])
+        checks[0]["requests_clear"] = True
+        disposal.write_text(json.dumps(checks), encoding="utf-8")
+        record.write_text(json.dumps([dict(entry, task="new-owner")]), encoding="utf-8")
+        self.assertFalse(self.item(self.report(*args), detached)["removal_allowed"])
+        self.ownership([entry])
+        (detached / "tracked.txt").write_text("changed\n", encoding="utf-8")
+        git("commit", "-qam", "changed after checks", cwd=detached)
+        self.assertFalse(self.item(self.report(*args), detached)["removal_allowed"])
+        self.assertTrue(detached.exists())
+
+    def test_fake_host_archive_uses_artifact_and_preserves_metadata(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        item = self.item(self.detached_report(entry, lifecycle={"kind": "host", "artifact": "host-42",
+                                                               "archive_supported": True}), detached)
+        self.assertTrue(item["removal_allowed"], item)
+        self.assertEqual(item["reclamation_method"], "host archive")
+        metadata = {"artifact": "host-42", "path": str(detached), "archived": False,
+                    "recovery_head": entry["head"]}
+        calls = []
+
+        def archive(artifact):
+            calls.append(artifact)
+            self.assertEqual(artifact, metadata["artifact"])
+            # This fake host owns only a disposable fixture, never a real app attachment.
+            git("worktree", "remove", str(detached), cwd=self.repo)
+            metadata["archived"] = True
+            raise TimeoutError("response lost after archive")
+
+        try:
+            archive(item["disposal_checks"]["lifecycle"]["artifact"])
+        except TimeoutError:
+            # Readback resolves ambiguity; do not retry or bypass the host API.
+            self.assertTrue(metadata["archived"])
+        self.assertEqual(calls, ["host-42"])
+        self.assertFalse(detached.exists())
+        self.assertEqual(metadata["recovery_head"], entry["head"])
+        self.assertTrue((self.run_dir / "handoff.json").exists())
+        self.assertTrue((self.run_dir / "result.md").exists())
+
+    def test_stop_and_failed_removal_preserve_remaining_workspaces(self):
+        first = self.worktree(None, detach=True)
+        second = self.worktree(None, detach=True)
+        entry = self.detached_entry(first)
+        self.assertTrue(self.item(self.detached_report(entry), first)["removal_allowed"])
+        # A stop after inventory performs no action and leaves both registered.
+        self.assertTrue(first.exists())
+        self.assertTrue(second.exists())
+        (first / "new.txt").write_text("arrived after checks\n", encoding="utf-8")
+        result = subprocess.run(["git", "worktree", "remove", str(first)], cwd=self.repo,
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((first / "new.txt").read_text(encoding="utf-8"), "arrived after checks\n")
+        self.assertTrue(second.exists())
+
+    def test_disposal_file_errors_retain_and_never_mutate(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        record = self.ownership([entry])
+        checks = self.disposal(entry)
+        original = checks.read_bytes()
+        for content in ("{", "{}", '[{"workspace": "relative"}]',
+                        json.dumps([{"workspace": str(detached)}, {"workspace": str(detached)}])):
+            checks.write_text(content, encoding="utf-8")
+            result = self.run_inventory("--ownership", str(record), "--disposal", str(checks))
+            self.assertEqual(result.returncode, 2, result.stdout)
+            self.assertTrue(detached.exists())
+            self.assertEqual(checks.read_text(encoding="utf-8"), content)
+        checks.write_bytes(original)
+        outside_checks = self.root / "elsewhere.json"
+        outside_checks.write_bytes(original)
+        result = self.run_inventory("--ownership", str(record), "--disposal", str(outside_checks))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("beside this run", result.stderr)
+
+    def test_eligible_detached_inventory_is_read_only_and_checks_evidence_links(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        record = self.ownership([entry])
+        checks = self.disposal(entry)
+        args = ["--ownership", str(record), "--disposal", str(checks),
+                "--mainline", "refs/remotes/origin/main"]
+
+        def snapshot():
+            return {str(path.relative_to(self.root)): path.read_bytes()
+                    for path in self.root.rglob("*") if path.is_file()}
+
+        before = snapshot()
+        self.assertTrue(self.item(self.report(*args), detached)["removal_allowed"])
+        self.assertEqual(snapshot(), before)
+        link = self.run_dir / "linked-result.md"
+        try:
+            link.symlink_to(detached / "tracked.txt")
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest("Symlink evidence subcase unavailable: %s" % exc)
+        facts = json.loads(checks.read_text(encoding="utf-8"))
+        facts[0]["evidence"] = [str(link)]
+        checks.write_text(json.dumps(facts), encoding="utf-8")
+        item = self.item(self.report(*args), detached)
+        self.assertFalse(item["removal_allowed"])
+        self.assertTrue(any("outside the workspace" in reason for reason in item["retain_reasons"]))
+
+    def test_unreadable_git_state_retains_detached_workspace(self):
+        detached = self.worktree(None, detach=True)
+        entry = self.detached_entry(detached)
+        self.detached_report(entry)
+        # Git for Windows hides this file; update it in place instead of CREATE_ALWAYS.
+        with (detached / ".git").open("r+", encoding="utf-8") as pointer:
+            pointer.write("gitdir: %s\n" % (self.root / "missing-git-dir").as_posix())
+            pointer.truncate()
+        report = self.report("--ownership", str(self.run_dir / "workspaces.json"),
+                             "--disposal", str(self.run_dir / "disposal.json"),
+                             "--mainline", "refs/remotes/origin/main")
+        item = self.item(report, detached)
+        self.assertFalse(item["removal_allowed"])
+        self.assertIsNotNone(item["status_error"])
+        self.assertTrue(detached.exists())
+
+
 class OwnershipRuleTests(unittest.TestCase):
     def test_writer_and_reader_share_the_complete_detached_identity_contract(self):
         for path in (RUN_RECORD, CONCURRENCY):
@@ -463,9 +775,23 @@ class OwnershipRuleTests(unittest.TestCase):
         text = normalized(BRANCH_CLEANUP)
         for phrase in ("this run's ownership record", "names this exact worktree path",
                        "never infer ownership from a path alone", "no uncommitted or untracked files",
-                       "unlocked", "not current", "not detached", "not caller-listed active",
+                       "unlocked", "not current", "not caller-listed active",
                        "no other active stage or run owns it", "no open change request uses it",
                        "matching head", "scripts/worktree_inventory.py", "never deletes or prunes"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+    def test_both_cleanup_paths_load_the_detached_exception_in_full(self):
+        for path in (BRANCH_CLEANUP, POST_MERGE):
+            with self.subTest(path=path):
+                self.assertIn("read [disposable detached workspaces](detached-workspaces.md) in full",
+                              normalized(path))
+        text = normalized(DETACHED)
+        for phrase in ("`disposable: true`", "`status: finished`", "`disposal.json`",
+                       "ignored files", "conversation", "mainline", "restorable",
+                       "without force", "host-managed", "never substitute raw git removal",
+                       "stop further detached reclamations", "cleanup.md", "retained counts",
+                       "unmeasured disk savings", "rollback"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
 
