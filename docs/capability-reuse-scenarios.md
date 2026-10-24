@@ -9,7 +9,7 @@ python3 -m unittest discover -s tests -p 'test_capability_reuse_rules.py' -v
 python3 tests/test_capability_reuse_rules.py --report
 ```
 
-The [fixture](../tests/test_capability_reuse_rules.py) uses a fake adapter, fixed UTC observation time, and two stages one minute apart. A fixture entry expires after one hour; real adapters must choose and record their own justified freshness deadline and release conditions. No Agent, service, tool executable, real clock, credential, installation, or global configuration is called. The fixture's baseline repeats discovery at both stages; it does not reconstruct every historical caller.
+The [fixture](../tests/test_capability_reuse_rules.py) uses a fake adapter and fixed UTC observation time. It compares stages one minute apart and repeats the reuse walkthrough with the second stage two hours later, after the entry's one-hour deadline. Real adapters must choose and record their own justified freshness deadline and release conditions. No Agent, service, tool executable, real clock, credential, installation, or global configuration is called. The fixture's baseline repeats discovery at both stages; it does not reconstruct every historical caller.
 
 ## Reuse walkthrough and counts
 
@@ -25,6 +25,8 @@ A discovery probe tries a fake candidate invocation. An unsuccessful candidate i
 
 Each reuse trace is `discover`, then `reuse`. The first stage records the safe choice or gap; the second checks the same complete identity and freshness, then uses that choice or preserves that gap. The timeout fixture selects the already available bounded process method; it installs nothing and does not alter the CI deadline. The pagination fixture does not retry the unsupported flag. The authenticated-method fixture's history contains one unauthenticated failure and one authenticated discovery; its second current read returns revision 2 using the authenticated method. No mutable revision is stored in the capability record.
 
+The report's `expired_reuse` traces are `discover`, then `revalidate`, with the same reuse counts in every column above. Expiry blocks direct reuse. The second stage checks the current complete safe identity and release conditions, renews the matching observation in its own proposal, and preserves the working choice or uncovered gap without another discovery probe. For the unsupported optional flag, probes and failed invocations both remain 1, with two cheap identity checks and zero current reads. Boundary regressions also run exactly at the deadline, reject unknown/missing/duplicate identity, and change each identity component after expiry to permit one fresh bounded discovery. Only the orchestrator aggregates a renewed proposal; the original evidence remains unchanged.
+
 ## Acceptance and result-model walkthroughs
 
 The following outcomes are checked by the executable fixture, with rule/link guards reported separately. The fixture is an implementation of this documented model for reproducibility, not an independent source of acceptance requirements.
@@ -34,7 +36,8 @@ The following outcomes are checked by the executable fixture, with rule/link gua
 | Same complete identity, valid freshness, cheap validation passes | All five count scenarios above reuse once; no known failed candidate is retried. Working methods still read current state. |
 | Tool upgrade, runtime/host/repository change, safe configuration or authentication mechanism change | Each of the nine identity components is changed independently. Every affected capability discovers again; the prior record is unchanged. Unrelated entries remain reusable after aggregation. |
 | Missing/old-run/unsupported-schema/malformed record, missing fields, duplicate matching entries, unknown identity | Fresh bounded discovery; unknown identity produces no reusable proposal. Existing evidence remains intact. |
-| Stale, future, invalid or timezone-free observation/deadline | No blind reuse. Expired entries discover within authorization; orchestrator replaces only revalidated affected entries, keeping prior task evidence. The next unchanged stage reuses the refreshed choice. |
+| Expired observation/deadline | No direct stale reuse. A complete current cheap identity and release-condition match renews the observation without retrying known failed candidates; otherwise follow bounded discovery or unknown/uncovered handling. Only revalidated affected entries are replaced, keeping prior task evidence. The next unchanged stage reuses the refreshed choice. |
+| Future, invalid, reversed or timezone-free observation/deadline | Unusable; no renewal from malformed evidence. Fresh bounded discovery remains subject to authorization. |
 | Previous permission denial | Preserves `denied` and `uncovered:fixture-source`, makes zero current reads and does not turn denial into an empty successful scan. A changed safe permission indicator triggers rediscovery. Expiry still yields denial when the source remains unavailable. |
 | Unsupported capability with no alternative | Preserves `unsupported` and uncovered scope without retrying the same flag. Arbitrary stored command text fails the adapter allowlist and is never invoked. |
 | Current request/check/approval/protection evidence needed | Choice selects the read method only. The two working-stage reads return current revisions 1 and 2; no mutable business state is persisted. The fixture models a read, not actual hosting permissions or branch rules. |

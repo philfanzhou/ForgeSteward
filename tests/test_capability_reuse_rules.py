@@ -79,7 +79,7 @@ class FakeAdapter:
         return {"revision": self.mutable_reads, "method": choice}
 
 
-def usable(record, run, identity, capability, now, permission_revision):
+def usable(record, run, identity, capability, now, permission_revision, revalidate_expired=False):
     if not identity or set(identity) != set(IDENTITY) or not all(identity.values()):
         return None
     if not isinstance(record, dict) or record.get("schema") != 1 or record.get("run") != run:
@@ -96,7 +96,9 @@ def usable(record, run, identity, capability, now, permission_revision):
     try:
         observed = datetime.fromisoformat(entry["observed_at"].replace("Z", "+00:00"))
         deadline = datetime.fromisoformat(entry["revalidate_by"].replace("Z", "+00:00"))
-        if observed.tzinfo != timezone.utc or deadline.tzinfo != timezone.utc or not observed <= now < deadline:
+        if (observed.tzinfo != timezone.utc or deadline.tzinfo != timezone.utc
+                or not observed < deadline or observed > now
+                or (now >= deadline and not revalidate_expired)):
             return None
     except (TypeError, ValueError, AttributeError):
         return None
@@ -113,14 +115,21 @@ def stage(adapter, capability, record=None, run="fixture-run", now=NOW, stop=Fal
     if stop:
         return {"decision": "stopped", "proposal": None, "remote": None}
     identity = adapter.cheap_identity()
-    entry = usable(record, run, identity, capability, now, adapter.permission_revision)
+    # Only this current safe check permits revalidation of an expired observation.
+    entry = usable(record, run, identity, capability, now, adapter.permission_revision,
+                   revalidate_expired=True)
     decision = "reuse" if entry else "discover"
+    proposal = None
+    if entry and now >= datetime.fromisoformat(entry["revalidate_by"].replace("Z", "+00:00")):
+        decision = "revalidate"
+        entry["observed_at"] = stamp(now)
+        entry["revalidate_by"] = stamp(now + timedelta(hours=1))
+        proposal = entry
     if entry and adapter.fail_reuse:
         adapter.fail_reuse = False
         adapter.failed_invocations += 1
         entry = None
         decision = "rediscover-after-failure"
-    proposal = None
     if entry is None:
         entry = adapter.discover(capability, now)
         # Unknown identity must not become an apparently reusable observation.
@@ -143,20 +152,21 @@ def aggregate(record, observations, run="fixture-run", revalidated=False):
     return result
 
 
-def walkthrough(capability, reuse=True):
+def walkthrough(capability, reuse=True, at_minutes=(0, 1)):
     adapter, record = FakeAdapter(), None
     decisions = []
-    for minute in (0, 1):
+    for minute in at_minutes:
         result = stage(adapter, capability, record if reuse else None, now=NOW + timedelta(minutes=minute))
         decisions.append(result["decision"])
-        record = aggregate(record, [result["proposal"]])
+        record = aggregate(record, [result["proposal"]], revalidated=result["decision"] == "revalidate")
     return {"probes": adapter.probes, "failed_invocations": adapter.failed_invocations,
             "identity_checks": adapter.identity_checks, "current_reads": adapter.mutable_reads,
             "decisions": decisions}
 
 
 def scenarios():
-    return {capability: {"baseline": walkthrough(capability, False), "reuse": walkthrough(capability)}
+    return {capability: {"baseline": walkthrough(capability, False), "reuse": walkthrough(capability),
+                         "expired_reuse": walkthrough(capability, at_minutes=(0, 120))}
             for capability in FakeAdapter.CANDIDATES}
 
 
@@ -201,7 +211,9 @@ class CapabilityScenarioTests(unittest.TestCase):
         cases = [None, {}, {**original, "run": "other-run"}, {**original, "schema": 2},
                  {**original, "entries": "malformed"}, {**original, "entries": [None]}]
         for field, value in (("observed_at", stamp(NOW + timedelta(seconds=1))),
-                             ("revalidate_by", stamp(NOW)), ("revalidate_by", "unknown"),
+                             ("revalidate_by", stamp(NOW)),
+                             ("revalidate_by", stamp(NOW - timedelta(seconds=1))),
+                             ("revalidate_by", "unknown"),
                              ("revalidate_by", "2026-10-25T00:00:00"), ("choice", "")):
             changed = copy.deepcopy(original)
             changed["entries"][0][field] = value
@@ -229,6 +241,59 @@ class CapabilityScenarioTests(unittest.TestCase):
         self.assertEqual(stage(adapter, "repository-read", refreshed,
                                now=NOW + timedelta(hours=2, minutes=1))["decision"], "reuse")
         self.assertEqual(record, saved)
+
+    def test_expiry_revalidates_unchanged_identity_without_repeating_failed_candidates(self):
+        for capability in FakeAdapter.CANDIDATES:
+            for elapsed in (timedelta(hours=1), timedelta(hours=2)):
+                with self.subTest(capability=capability, elapsed=elapsed):
+                    adapter, record = self.saved(capability)
+                    saved = copy.deepcopy(record)
+                    self.assertIsNone(usable(record, "fixture-run", adapter.identity, capability,
+                                             NOW + elapsed, adapter.permission_revision))
+                    counts = adapter.probes, adapter.failed_invocations
+                    history = list(adapter.history)
+                    result = stage(adapter, capability, record, now=NOW + elapsed)
+                    self.assertEqual(result["decision"], "revalidate")
+                    self.assertEqual((adapter.probes, adapter.failed_invocations), counts)
+                    self.assertEqual(adapter.history, history)
+                    self.assertEqual(adapter.identity_checks, 2)
+                    self.assertEqual(result["result"], saved["entries"][0]["result"])
+                    self.assertEqual(result["coverage"], saved["entries"][0]["coverage"])
+                    if result["result"] == "working":
+                        self.assertEqual(result["remote"]["revision"], 2)
+                    else:
+                        self.assertIsNone(result["remote"])
+                    self.assertEqual(result["proposal"]["observed_at"], stamp(NOW + elapsed))
+                    refreshed = aggregate(record, [result["proposal"]], revalidated=True)
+                    self.assertEqual(len(refreshed["entries"]), 1)
+                    self.assertEqual(stage(adapter, capability, refreshed,
+                                           now=NOW + elapsed + timedelta(minutes=1))["decision"], "reuse")
+                    self.assertEqual((adapter.probes, adapter.failed_invocations), counts)
+                    self.assertEqual(record, saved)
+
+    def test_expired_unsupported_gap_requires_current_unambiguous_identity(self):
+        for key in IDENTITY:
+            with self.subTest(changed_identity=key):
+                adapter, record = self.saved("optional-flag")
+                adapter.identity[key] += "-changed"
+                result = stage(adapter, "optional-flag", record, now=NOW + timedelta(hours=2))
+                self.assertEqual(result["decision"], "discover")
+                self.assertEqual((adapter.probes, adapter.failed_invocations), (2, 2))
+        for invalid in ("unknown", "missing", "duplicate"):
+            with self.subTest(invalid=invalid):
+                adapter, record = self.saved("optional-flag")
+                if invalid == "unknown":
+                    adapter.identity_known = False
+                elif invalid == "missing":
+                    del record["entries"][0]["identity"]["config_fingerprint"]
+                elif invalid == "duplicate":
+                    record["entries"].append(copy.deepcopy(record["entries"][0]))
+                result = stage(adapter, "optional-flag", record, now=NOW + timedelta(hours=2))
+                self.assertEqual(result["decision"], "discover")
+                self.assertEqual(result["result"], "unsupported")
+                self.assertEqual(result["coverage"], "uncovered:fixture-source")
+                if invalid == "unknown":
+                    self.assertIsNone(result["proposal"])
 
     def test_permission_denial_remains_uncovered_and_is_not_reprobed_unchanged(self):
         adapter, record = self.saved("alert-read")
