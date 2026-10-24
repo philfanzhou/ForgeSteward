@@ -66,3 +66,7 @@ Use these platform-neutral terms throughout the core design:
 - Project-maintained content throughout the repository must be English. Keep technical Unicode test inputs and known legacy status aliases narrowly identified as data; do not hide untranslated prose in escapes. `tests/test_skill_wording.py` enforces the content policy and the existing prohibition on `triage` in file or directory names under `plugins/`.
 - Prefer familiar descriptions such as “build output” when they make an artifact's purpose clearer.
 - The same wording requirements apply to this repository's Issue and Change Request bodies and Comments.
+
+## English working environment
+
+Write in English: project-maintained documentation (README and docs), Issue and Change Request titles and bodies, Comments, Discussions, Review Threads, and future commit messages, unless a maintainer explicitly requests another language. Preserve historical Issues, Change Requests, and comments. Do not translate code, commands, paths, identifiers, logs, technical data, or quoted external text. Preserve other project conventions.
