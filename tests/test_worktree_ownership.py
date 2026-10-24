@@ -723,8 +723,10 @@ class DetachedDisposalTests(InventoryFixture):
         detached = self.worktree(None, detach=True)
         entry = self.detached_entry(detached)
         self.detached_report(entry)
-        (detached / ".git").write_text("gitdir: %s\n" % (self.root / "missing-git-dir").as_posix(),
-                                      encoding="utf-8")
+        # Git for Windows hides this file; update it in place instead of CREATE_ALWAYS.
+        with (detached / ".git").open("r+", encoding="utf-8") as pointer:
+            pointer.write("gitdir: %s\n" % (self.root / "missing-git-dir").as_posix())
+            pointer.truncate()
         report = self.report("--ownership", str(self.run_dir / "workspaces.json"),
                              "--disposal", str(self.run_dir / "disposal.json"),
                              "--mainline", "refs/remotes/origin/main")
