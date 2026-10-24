@@ -161,6 +161,35 @@ class ResourceScopeExperimentTests(unittest.TestCase):
                     scope.workload(config)
                 self.assertFalse((self.parent / "ready-0").exists())
 
+    def test_interrupted_acquire_before_json_releases_its_exact_fixture_owner(self):
+        helper = self.parent / "delayed_helper.py"
+        helper.write_text("import contextlib,io,runpy,sys,time\n"
+                          "module=runpy.run_path(%r)\n" % str(scope.HELPER) +
+                          "if 'acquire' in sys.argv:\n"
+                          " with contextlib.redirect_stdout(io.StringIO()):\n"
+                          "  module['main'](sys.argv[1:])\n"
+                          " time.sleep(30)\n"
+                          "else:\n"
+                          " raise SystemExit(module['main'](sys.argv[1:]))\n", encoding="utf-8")
+        class Interrupted(scope.Experiment):
+            def finish(self, child, timeout=10):
+                if child[1]["label"].startswith("acquire-"):
+                    deadline = time.monotonic() + 10
+                    while not list(self.output.glob("repo-a/.git/forge-steward/locks/heavy/slot-*/holder.json")):
+                        if child[0].poll() is not None or time.monotonic() >= deadline:
+                            raise AssertionError("delayed helper did not create its fixture slot")
+                        time.sleep(0.005)
+                    raise scope.ExperimentError("injected acquire interruption before JSON")
+                return super().finish(child, timeout)
+        with mock.patch.object(scope, "HELPER", helper):
+            report = self.experiment(Interrupted).run()
+        self.assertEqual(report["status"], "error")
+        self.assertIn("before JSON", report["error"])
+        self.assert_drained(report)
+        self.assertEqual(report["cleanup_errors"], [])
+        self.assertEqual(len(report["cleanup_releases"]), 1)
+        self.assertFalse(list(self.output.glob("repo-*/.git/forge-steward/locks/heavy/slot-*")))
+
     def test_partial_start_failure_drains_child_and_releases_fixtures(self):
         class Partial(scope.Experiment):
             def start(self, arguments, label):

@@ -325,13 +325,26 @@ class Experiment:
                               finished=time.monotonic(), interrupted=True)
             record["drained"] = True
             if record.get("fixture_owner") and not record.get("accounted"):
+                repo, owner = record["fixture_owner"]
+                acquired = False
                 try:
                     result = json.loads(record["stdout"])
-                    if record["exit"] == 0 and isinstance(result, dict) and result.get("result") in ("acquired", "held"):
-                        repo, owner = record["fixture_owner"]
-                        self.held.append((Path(repo), owner))
+                    acquired = record["exit"] == 0 and isinstance(result, dict) and result.get("result") in ("acquired", "held")
                 except ValueError:
                     pass
+                # A killed helper may have created its slot before writing stdout.
+                # Inspect only our fixed new fixture roots and exact attempted owner;
+                # release still performs the production helper's liveness checks.
+                if Path(repo) in (self.output / "repo-a", self.output / "repo-b"):
+                    for holder in Path(repo).glob(".git/forge-steward/locks/heavy/slot-*/holder.json"):
+                        try:
+                            entry = json.loads(holder.read_text(encoding="utf-8"))
+                            if isinstance(entry, dict) and entry.get("owner") == "scope-experiment/" + owner + "/1":
+                                acquired = True
+                        except (OSError, ValueError):
+                            pass
+                if acquired:
+                    self.held.append((Path(repo), owner))
         # Only these new fixture repositories and exact acquired owners are used.
         for repo, owner in list(self.held):
             try:

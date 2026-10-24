@@ -27,7 +27,7 @@ python3 -B -m unittest discover -s tests -p 'test_resource_scope_experiment.py' 
 ```
 
 The actual measured command on 2026-10-24 used the same flags and output
-`/Users/phil/code/ForgeSteward/.git/forge-steward/runs/20261024T102544Z-eee3/implement-215/measurement-2`.
+`/Users/phil/code/ForgeSteward/.git/forge-steward/runs/20261024T102544Z-eee3/implement-215/measurement-3`.
 The run acquired `heavy` capacity 2 as owner
 `20261024T102544Z-eee3/implement-215/1`, then released its own slot. This scheduling
 lock protects the measurement, separately from the two disposable fixture locks.
@@ -35,7 +35,10 @@ lock protects the measurement, separately from the two disposable fixture locks.
 The new output contains `results.json`, complete command arguments, stdout,
 stderr, exits, PIDs, acquire responses and elapsed times, plus both initialized
 repositories, worker configurations and synchronization files. Partial failures
-also retain results and diagnostics. No fixture tree is automatically removed;
+also retain results and diagnostics. An interrupted acquire can create its slot
+before emitting JSON: after draining children, cleanup checks only the new fixture
+roots and exact attempted owner, then uses the unchanged helper's liveness-checked
+release. It never searches real user lock roots. No fixture tree is automatically removed;
 after checking completion and stopped children, a caller may delete only its own
 output. The report reproduces every trial's measurements below, so its findings
 do not depend on private workstation access. Full raw output remains in the
@@ -89,16 +92,16 @@ polling, rather than pretending to isolate time asleep in the queue.
 
 ## Measurement baseline and limits
 
-Measured 2026-10-24, 11:40:20.993198–11:40:31.393352 UTC, on
+Measured 2026-10-24, 11:44:49.831896–11:45:00.037342 UTC, on
 macOS 27.0.1 arm64, Python 3.9.6, ten logical CPUs. Source baseline was
 `61e47b96d3b53384a25fe2f35de5cb76554dd200`, target version 0.2.26; the new
 experiment was uncommitted during measurement. Its SHA-256 was
-`5d002ce00a68c50ce5465ef2dbfe960444f6f671bca9ddba5eedbcd5eddb3296`. The unchanged helper SHA-256 was
+`650a36d232310286ce7aaade3fa4dc0230a03cd896532a1afe10114528e52e6d`. The unchanged helper SHA-256 was
 `49912886389dac32b7bd1a99ccdfa4b5b5f77d42268d7831cd8f929ddcfdbe26`.
 
 Host load averages (1/5/15 minutes, runnable tasks) changed from
-`[4.818359375, 5.94482421875, 5.14501953125]` to
-`[5.1533203125, 5.97900390625, 5.16650390625]`. Background work was uncontrolled;
+`[2.685546875, 4.0166015625, 4.484375]` to
+`[2.80078125, 3.99853515625, 4.47265625]`. Background work was uncontrolled;
 load averages cannot attribute pressure to this experiment. Host memory pressure
 was unavailable: this implementation has no verified read-only macOS pressure
 probe. Configured allocation and child peak RSS are memory-use indicators, not
@@ -124,18 +127,18 @@ workers; `Overlap` measures their identity-use intervals, including barriers.
 
 | Trial | Condition | Total | Acquire elapsed 0/1 | Worker wall 0/1 | Worker CPU 0/1 | Peak RSS bytes 0/1 | Active | Overlap | Collisions |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | serial | 0.728959 | 0.039454 / 0.039600 | 0.250227 / 0.250248 | 0.250007 / 0.250003 | 19398656 / 19365888 | 1 | 0.000000 | 0 |
-| 1 | isolated | 0.449706 | 0.041464 / 0.040595 | 0.250541 / 0.250503 | 0.250007 / 0.250000 | 19398656 / 19431424 | 2 | 0.250693 | 0 |
-| 1 | shared-identity | 0.481978 | 0.048083 / 0.045574 | 0.260424 / 0.257916 | 0.250001 / 0.250003 | 19349504 / 19398656 | 2 | 0.267121 | 1 |
-| 1 | same-repository | 1.771272 | 0.042021 / 1.067484 | 0.250244 / 0.250572 | 0.250000 / 0.250002 | 19382272 / 19415040 | 1 | 0.000000 | 0 |
-| 2 | serial | 0.735986 | 0.041966 / 0.040260 | 0.250671 / 0.250340 | 0.250002 / 0.250002 | 19398656 / 19415040 | 1 | 0.000000 | 0 |
-| 2 | isolated | 0.448624 | 0.040665 / 0.041424 | 0.250814 / 0.250812 | 0.250000 / 0.250005 | 19382272 / 19333120 | 2 | 0.251152 | 0 |
-| 2 | shared-identity | 0.453695 | 0.040434 / 0.039860 | 0.250743 / 0.250906 | 0.250002 / 0.250003 | 19333120 / 19415040 | 2 | 0.257386 | 1 |
-| 2 | same-repository | 1.763070 | 0.040097 / 1.059773 | 0.250411 / 0.250424 | 0.250004 / 0.250002 | 19333120 / 19529728 | 1 | 0.000000 | 0 |
-| 3 | serial | 0.769575 | 0.039662 / 0.041266 | 0.250367 / 0.250512 | 0.250000 / 0.250007 | 19431424 / 19333120 | 1 | 0.000000 | 0 |
-| 3 | isolated | 0.463260 | 0.056680 / 0.041517 | 0.251013 / 0.250841 | 0.250006 / 0.250005 | 19496960 / 19349504 | 2 | 0.251350 | 0 |
-| 3 | shared-identity | 0.455777 | 0.040574 / 0.039224 | 0.250362 / 0.250451 | 0.250004 / 0.250004 | 19365888 / 19333120 | 2 | 0.256965 | 1 |
-| 3 | same-repository | 1.755999 | 0.039475 / 1.061398 | 0.250145 / 0.250193 | 0.250000 / 0.250004 | 19333120 / 19415040 | 1 | 0.000000 | 0 |
+| 1 | serial | 0.719147 | 0.036194 / 0.038559 | 0.250148 / 0.250198 | 0.250002 / 0.250002 | 19415040 / 19382272 | 1 | 0.000000 | 0 |
+| 1 | isolated | 0.438334 | 0.038071 / 0.039039 | 0.250599 / 0.250616 | 0.250005 / 0.250003 | 19447808 / 19431424 | 2 | 0.250882 | 0 |
+| 1 | shared-identity | 0.456719 | 0.039637 / 0.041355 | 0.251448 / 0.250307 | 0.250003 / 0.250003 | 19398656 / 19431424 | 2 | 0.257978 | 1 |
+| 1 | same-repository | 1.756658 | 0.043953 / 1.062831 | 0.250231 / 0.250272 | 0.250005 / 0.250008 | 19464192 / 19464192 | 1 | 0.000000 | 0 |
+| 2 | serial | 0.725886 | 0.041131 / 0.037969 | 0.250222 / 0.250331 | 0.250006 / 0.250006 | 19447808 / 19480576 | 1 | 0.000000 | 0 |
+| 2 | isolated | 0.435296 | 0.037810 / 0.037367 | 0.250308 / 0.250278 | 0.250000 / 0.250007 | 19464192 / 19382272 | 2 | 0.250515 | 0 |
+| 2 | shared-identity | 0.451802 | 0.037732 / 0.037479 | 0.250944 / 0.250815 | 0.250003 / 0.250003 | 19447808 / 19529728 | 2 | 0.263535 | 1 |
+| 2 | same-repository | 1.746148 | 0.040760 / 1.053418 | 0.250567 / 0.250201 | 0.250004 / 0.250003 | 19398656 / 19398656 | 1 | 0.000000 | 0 |
+| 3 | serial | 0.721939 | 0.037745 / 0.038105 | 0.250314 / 0.250133 | 0.250001 / 0.250007 | 19464192 / 19415040 | 1 | 0.000000 | 0 |
+| 3 | isolated | 0.448654 | 0.037597 / 0.043562 | 0.250297 / 0.250394 | 0.250003 / 0.250002 | 19398656 / 19415040 | 2 | 0.250628 | 0 |
+| 3 | shared-identity | 0.448538 | 0.037488 / 0.037924 | 0.250615 / 0.250464 | 0.250003 / 0.250006 | 19431424 / 19382272 | 2 | 0.257149 | 1 |
+| 3 | same-repository | 1.746138 | 0.037962 / 1.060161 | 0.250277 / 0.250131 | 0.250001 / 0.250003 | 19480576 / 19447808 | 1 | 0.000000 | 0 |
 
 The three shared-identity collisions support a scope/identity limitation. The
 serial and isolated results show that the collision depends on the shared
@@ -237,7 +240,7 @@ This mapping identifies evidence rather than introducing a second protocol.
 | Shared simulated identity | Both repository acquisitions exit 0; explicit entered/attempted/completed barriers and exclusive marker yield exactly one observed collision per trial |
 | Missing/noisy telemetry | Unavailable reasons and background-load limits above; `test_unavailable_telemetry_and_rss_units` checks missing resource and normalization |
 | Invalid bounds/output, helper/child failure/deadline | Tests reject NaN/infinite/excessive parent and worker bounds and existing directory/file/symlink, distinguish exit 2 without retry, reject malformed helper output, inject child failure and both work/subprocess deadlines; partial diagnostics retained |
-| Cancellation or partial startup | Injected cancellation/start failure plus actual POSIX SIGTERM test; every started child drained and own fixture slots released; Windows skips only the POSIX signal-specific test |
+| Cancellation or partial startup | Injected cancellation/start failure plus actual POSIX SIGTERM test; every started child drained and own fixture slots released, including interruption after slot creation before acquire JSON; Windows skips only the POSIX signal-specific test |
 | Foreign data/holders and ambient Git overrides | `test_inherited_git_overrides_cannot_redirect_fixture_locks` retains a foreign fixture holder byte-for-byte while contaminated environment variables cannot redirect child Git commands; all safety tests retain an outside sentinel |
 | Shared coordinator recommendation | Supported boundary decision, scope table, recovery/fairness/compatibility/fallback design and separate runtime scope above; no capability enabled |
 
