@@ -26,7 +26,9 @@ import time
 MARKER = "forge-steward-run-record"
 RUN_ID = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{4}")
 TASK = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
-STATUSES = ("started", "finished", "failed", "wait-start", "wait-end")
+STATUSES = ("started", "finished", "failed", "suspended", "resumed", "wait-start", "wait-end")
+EVENT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+EVENT_SCHEMA = 2
 WAITS = ("ci", "lock", "review", "external", "other")
 RELEASE_AUDIT_STATES = ("clean", "findings", "incomplete", "not-run")
 SECRET_TEXT = re.compile(
@@ -230,15 +232,26 @@ def task_dir(path, task, attempt=1):
     return target
 
 
-def add_event(path, task, stage, status, wait, detail, moment, attempt=1):
+def add_event(path, task, stage, status, wait, detail, moment, attempt=1, event_id=None, wait_id=None):
     if status not in STATUSES:
         raise ValueError("Invalid status: " + status)
     if status.startswith("wait-") and wait not in WAITS:
         raise ValueError("wait-start and wait-end need --wait " + "/".join(WAITS))
+    event_id = secrets.token_hex(16) if event_id is None else event_id
+    if not isinstance(event_id, str) or not EVENT_ID.fullmatch(event_id):
+        raise ValueError("Invalid event id")
+    if wait_id is not None and (not isinstance(wait_id, str) or not EVENT_ID.fullmatch(wait_id)
+                                or not status.startswith("wait-")):
+        raise ValueError("Invalid wait id; use it only with wait events")
+    if not isinstance(stage, str) or not stage.strip():
+        raise ValueError("stage must be nonempty text")
     task_dir(path, task, attempt)
-    record = {"at": stamp(moment), "task": task, "stage": stage, "status": status}
+    record = {"schema": EVENT_SCHEMA, "event_id": event_id, "attempt": attempt,
+              "at": stamp(moment), "task": task, "stage": stage, "status": status}
     if wait:
         record["wait"] = wait
+    if status.startswith("wait-"):
+        record["wait_id"] = wait_id or wait
     if detail:
         record["detail"] = detail.replace("\r", " ").replace("\n", " ")[:MAX_DETAIL]
     line = (json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8")
@@ -261,6 +274,12 @@ def add_event(path, task, stage, status, wait, detail, moment, attempt=1):
     try:
         owner = owner_metadata("run-record event append")
         (guard / GUARD_OWNER).write_text(json.dumps(owner, ensure_ascii=False) + "\n", encoding="utf-8")
+        # Check under the append guard so simultaneous retries cannot both append.
+        for existing in read_events(path):
+            if isinstance(existing, dict) and existing.get("event_id") == event_id:
+                if existing != record:
+                    raise ValueError("Conflicting event id: " + event_id)
+                return existing
         fd = os.open(str(path / "events.jsonl"), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
         try:
             os.write(fd, line)
@@ -289,40 +308,163 @@ def read_events(path):
     return events
 
 
+def interval_seconds(intervals):
+    return sum((end - begin).total_seconds() for begin, end in intervals)
+
+
+def union_seconds(intervals):
+    """Elapsed occupancy, counting simultaneous intervals only once."""
+    merged = []
+    for begin, end in sorted(intervals):
+        if merged and begin <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((begin, end))
+    return interval_seconds(merged)
+
+
+def summarize_attempt(task, attempt, events):
+    """Reduce one attempt conservatively; malformed transitions never yield exact totals."""
+    stage = events[0][1]["stage"]
+    state, boundary = "absent", None
+    active, suspended, waits, opened, problems = [], [], [], {}, []
+    lifecycle_ok = True
+    for moment, event in events:
+        status = event["status"]
+        if event["stage"] != stage:
+            problems.append("stage changed within attempt")
+            lifecycle_ok = False
+        if status.startswith("wait-"):
+            kind = event.get("wait")
+            identity = event.get("wait_id", kind)
+            if kind not in WAITS or not isinstance(identity, str) or not EVENT_ID.fullmatch(identity):
+                problems.append("invalid wait identity or type")
+                continue
+            if state != "running":
+                problems.append("wait event outside running interval")
+                continue
+            if status == "wait-start":
+                if identity in opened:
+                    problems.append("duplicate wait-start: " + identity)
+                else:
+                    opened[identity] = (kind, moment)
+            elif identity not in opened or opened[identity][0] != kind:
+                problems.append("unmatched wait-end: " + identity)
+            else:
+                wait_kind, begun = opened.pop(identity)
+                waits.append((wait_kind, begun, moment))
+            continue
+        valid = ((status == "started" and state == "absent")
+                 or (status == "resumed" and state == "suspended")
+                 or (status in ("suspended", "finished", "failed") and state == "running"))
+        if not valid:
+            problems.append("unmatched %s from %s%s" % (
+                status, state, " (ambiguous legacy lifecycle)" if attempt is None else ""))
+            lifecycle_ok = False
+            continue
+        if status in ("suspended", "finished", "failed"):
+            active.append((boundary, moment))
+            if opened:
+                problems.append("open waits at " + status)
+                opened.clear()
+        elif status == "resumed":
+            suspended.append((boundary, moment))
+        state = {"started": "running", "resumed": "running"}.get(status, status)
+        boundary = moment
+    terminal = state in ("finished", "failed")
+    if opened:
+        problems.append("unmatched wait-start: " + ", ".join(sorted(opened)))
+    if state == "absent":
+        problems.append("missing started event")
+        lifecycle_ok = False
+    seconds = interval_seconds(active) if lifecycle_ok and terminal else None
+    totals = {}
+    for kind, begin, end in waits:
+        totals[kind] = totals.get(kind, 0) + (end - begin).total_seconds()
+    return ({"task": task, "stage": stage, "attempt": attempt, "result": state,
+             "seconds": seconds, "waits": totals,
+             "suspension_seconds": interval_seconds(suspended),
+             "open_waits": sorted(opened), "complete": terminal and not problems,
+             "diagnostics": list(dict.fromkeys(problems))},
+            active if lifecycle_ok and terminal else [], waits, suspended)
+
+
 def summarize(path):
-    events = sorted(read_events(path), key=lambda e: e["at"])
-    tasks = {}
-    for event in events:
-        moment = parse(event["at"])
-        item = tasks.setdefault(event["task"], {"task": event["task"], "stage": event["stage"],
-                                                "started": None, "ended": None, "result": "running",
-                                                "waits": {}, "_open": {}})
-        if event["status"] == "started" and item["started"] is None:
-            item["started"] = moment
-        elif event["status"] in ("finished", "failed"):
-            item["ended"] = moment
-            item["result"] = event["status"]
-        elif event["status"] == "wait-start":
-            item["_open"][event["wait"]] = moment
-        elif event["status"] == "wait-end" and event["wait"] in item["_open"]:
-            begun = item["_open"].pop(event["wait"])
-            item["waits"][event["wait"]] = item["waits"].get(event["wait"], 0) + (moment - begun).total_seconds()
-    stages, waits = {}, {}
-    report = []
-    for item in tasks.values():
-        seconds = None
-        if item["started"] and item["ended"]:
-            seconds = (item["ended"] - item["started"]).total_seconds()
-            stages[item["stage"]] = stages.get(item["stage"], 0) + seconds
+    groups, seen, diagnostics, moments, invalid_groups = {}, {}, [], [], set()
+    versioned = False
+    for number, event in enumerate(read_events(path), 1):
+        try:
+            if not isinstance(event, dict):
+                raise ValueError("event must be an object")
+            moment = parse(event["at"])
+            moments.append(moment)
+            task, stage, status = event["task"], event["stage"], event["status"]
+            if (not isinstance(task, str) or not TASK.fullmatch(task)
+                    or not isinstance(stage, str) or not stage.strip() or status not in STATUSES):
+                raise ValueError("invalid task, stage or status")
+            attempt = None
+            if "schema" in event:
+                versioned = True
+                attempt = event.get("attempt")
+                identity = event.get("event_id")
+                if (event["schema"] != EVENT_SCHEMA or not is_int(attempt) or not 1 <= attempt <= 9999
+                        or not isinstance(identity, str) or not EVENT_ID.fullmatch(identity)):
+                    raise ValueError("invalid event schema, attempt or event id")
+                if identity in seen:
+                    previous = seen[identity]
+                    if previous != event:
+                        diagnostics.append("conflicting event id: " + identity)
+                        invalid_groups.update(((task, attempt), (previous["task"], previous["attempt"])))
+                    continue
+                seen[identity] = event
+            elif "attempt" in event or "event_id" in event:
+                raise ValueError("attempt identity needs a versioned event")
+            groups.setdefault((task, attempt), []).append((moment, event))
+        except (KeyError, TypeError, ValueError, AttributeError):
+            # Do not echo event/detail content, which can contain sensitive data.
+            diagnostics.append("invalid event on line %d" % number)
+    stages, wait_totals, tasks, attempts = {}, {}, {}, []
+    active_intervals, wait_intervals, suspension_intervals = [], [], []
+    for (task, attempt), events in groups.items():
+        item, active, waits, suspended = summarize_attempt(task, attempt, sorted(events, key=lambda e: e[0]))
+        if (task, attempt) in invalid_groups:
+            item["seconds"], item["complete"], active = None, False, []
+            item["diagnostics"].append("conflicting event identity")
+        attempts.append(item)
+        diagnostics.extend("%s/%s: %s" % (task, attempt if attempt is not None else "legacy", problem)
+                           for problem in item["diagnostics"])
+        if item["seconds"] is not None:
+            stages[item["stage"]] = stages.get(item["stage"], 0) + item["seconds"]
         for kind, value in item["waits"].items():
-            waits[kind] = waits.get(kind, 0) + value
-        report.append({"task": item["task"], "stage": item["stage"], "result": item["result"],
-                       "seconds": seconds, "waits": item["waits"]})
-    wall = None
-    if events:
-        wall = (parse(events[-1]["at"]) - parse(events[0]["at"])).total_seconds()
-    return {"run_id": path.name, "wall_seconds": wall, "stage_seconds": stages,
-            "wait_seconds": waits, "tasks": report}
+            wait_totals[kind] = wait_totals.get(kind, 0) + value
+        active_intervals.extend(active)
+        wait_intervals.extend((begin, end) for _, begin, end in waits)
+        suspension_intervals.extend(suspended)
+        tasks.setdefault(task, []).append(item)
+    report = []
+    for task, items in tasks.items():
+        latest = max(items, key=lambda item: item["attempt"] or 0)
+        if len(items) > 1 and any(item["attempt"] is None for item in items):
+            diagnostics.append(task + ": legacy events cannot be assigned to numbered attempts")
+        completed = [item["seconds"] for item in items if item["seconds"] is not None]
+        totals = {}
+        for item in items:
+            for kind, value in item["waits"].items():
+                totals[kind] = totals.get(kind, 0) + value
+        report.append({"task": task, "stage": latest["stage"], "result": latest["result"],
+                       "seconds": sum(completed) if completed else None, "waits": totals,
+                       "attempt": latest["attempt"]})
+    complete = not diagnostics and all(item["complete"] for item in attempts)
+    return {"run_id": path.name,
+            "wall_seconds": (max(moments) - min(moments)).total_seconds() if moments else None,
+            "stage_seconds": stages, "wait_seconds": wait_totals, "tasks": report,
+            "attempts": attempts, "event_schema": EVENT_SCHEMA if versioned else None,
+            "accounting_complete": complete, "diagnostics": diagnostics,
+            "active_wall_seconds": union_seconds(active_intervals) if complete else None,
+            "completed_active_wall_seconds": union_seconds(active_intervals),
+            "wait_wall_seconds": union_seconds(wait_intervals),
+            "waits_overlap": interval_seconds(wait_intervals) > union_seconds(wait_intervals),
+            "suspension_seconds": interval_seconds(suspension_intervals)}
 
 
 def load_report_spec(path=REPORT_RULES):
@@ -352,6 +494,9 @@ def load_report_spec(path=REPORT_RULES):
                  and isinstance(spec["title"], str)
                  and valid_agent_spec(spec["agents"])
                  and valid_release_audit(spec["release_audit_results"])
+                 and all(isinstance(spec["timing"][key], str) and spec["timing"][key]
+                         for key in ("wall", "stages", "active", "partial_active", "suspension",
+                                     "wait_basis", "overlap", "no_overlap", "ongoing", "diagnostics"))
                  and valid_aliases(spec["result_aliases"], results))
     except (KeyError, TypeError, AttributeError):
         valid = False
@@ -693,16 +838,42 @@ def render_report(data, summary, spec, agents=None):
     lines += ["", "### " + titles[4]]
     if summary["wall_seconds"] is None:
         lines.append("- No record")
+        if summary.get("diagnostics"):
+            lines.append("- " + spec["timing"]["diagnostics"].format(
+                diagnostics="; ".join(summary["diagnostics"])))
     else:
         stage_seconds = summary["stage_seconds"]
         order = [name for name in spec["stages"] if name in stage_seconds]
         order += sorted(name for name in stage_seconds if name not in spec["stages"])
         stages = ", ".join("%s %d" % (spec["stages"].get(name, name), minutes(stage_seconds[name]))
                           for name in order)
-        lines.append("- Total " + duration(summary["wall_seconds"]) + (": %s (minutes)" % stages if stages else ""))
+        enhanced = summary.get("event_schema") is not None or bool(summary.get("diagnostics"))
+        words = spec["timing"]
+        if enhanced:
+            lines.append("- " + words["wall"].format(duration=duration(summary["wall_seconds"])))
+            if stages:
+                lines.append("- " + words["stages"].format(stages=stages))
+            active = summary["active_wall_seconds"]
+            key = "active" if active is not None else "partial_active"
+            lines.append("- " + words[key].format(duration=duration(
+                active if active is not None else summary["completed_active_wall_seconds"])))
+            lines.append("- " + words["suspension"].format(duration=duration(summary["suspension_seconds"])))
+        else:
+            # Keep unambiguous legacy report fixtures and consumers compatible.
+            lines.append("- Total " + duration(summary["wall_seconds"])
+                         + (": %s (minutes)" % stages if stages else ""))
         waits = summary["wait_seconds"]
         lines.append("- Including " + ", ".join("%s %s" % (spec["waits"][kind], duration(waits.get(kind, 0)))
                                                 for kind in spec["waits"]))
+        if enhanced:
+            lines.append("- " + words["wait_basis"].format(overlap=words[
+                "overlap" if summary["waits_overlap"] else "no_overlap"]))
+            ongoing = ["%s/%s (%s)" % (item["task"], item["attempt"] or "legacy", item["result"])
+                       for item in summary["attempts"] if item["result"] not in ("finished", "failed")]
+            if ongoing:
+                lines.append("- " + words["ongoing"].format(attempts=", ".join(ongoing)))
+            if summary["diagnostics"]:
+                lines.append("- " + words["diagnostics"].format(diagnostics="; ".join(summary["diagnostics"])))
 
     lines += ["", "### " + titles[5]]
     lines.extend(["- %s. Recovery: %s" % (trim(item["what"]), trim(item["recovery"]))
@@ -782,6 +953,8 @@ def main(argv=None):
     note.add_argument("--detail")
     note.add_argument("--at", help="ISO timestamp with timezone; defaults to now")
     note.add_argument("--attempt", type=attempt_number, default=1)
+    note.add_argument("--event-id", help="stable identity for an exact event retry; fresh by default")
+    note.add_argument("--wait-id", help="match a wait pair; defaults to its wait type")
     where = commands.add_parser("task-dir")
     where.add_argument("--run", required=True)
     where.add_argument("--task", required=True)
@@ -805,7 +978,7 @@ def main(argv=None):
         elif args.command == "event":
             moment = parse(args.at) if args.at else now
             record = add_event(run_dir(root, args.run), args.task, args.stage, args.status,
-                               args.wait, args.detail, moment, args.attempt)
+                               args.wait, args.detail, moment, args.attempt, args.event_id, args.wait_id)
             print(json.dumps(record, ensure_ascii=False))
         elif args.command == "task-dir":
             print(task_dir(run_dir(root, args.run), args.task, args.attempt))

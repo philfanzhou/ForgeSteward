@@ -1,8 +1,8 @@
 # Final report
 
-Generate the final work-cycle report only from this file. It defines sections, order, and wording; other rules only say what to record.
+This file defines final report sections, order, and wording.
 
-Before recording results or generating a report, read [report input fields](report-data.md) in full. It defines input fields; the vocabulary and output format remain here.
+Before recording/reporting, read [report input fields](report-data.md) in full.
 
 ## Result vocabulary
 
@@ -16,17 +16,17 @@ Before recording results or generating a report, read [report input fields](repo
 - Closed without merge
 - Not started
 
-`Awaiting your approval` means all checks passed and repository policy requires maintainer approval. `Waiting for external approval` means another person or system must approve. `Paused` covers a failed third-repair final review, a real blocker, or unfinished work when the run stops; explain the reason. `Not started` means the Issue has no PR. If the user stops, still report and mark unfinished items `Paused` with reasons.
+`Awaiting your approval`: checks passed, policy requires maintainer approval. `Waiting for external approval`: another person/system must approve. `Paused`: failed third-repair final review, real blocker, or unfinished work at stop; give reasons. `Not started`: no PR. User stop still requires a report with unfinished items `Paused`.
 
 ## Generation and fallback
 
-1. At the end, run `report` in [run records](run-record.md) and paste its output unchanged. Append at most one additional-notes paragraph; it also saves `report.md` in the run directory.
-2. Exit `1` means invalid data. Correct the fields listed in `handoff.json` and retry, at most three times.
-3. If it still fails, exits `2`, Python is unavailable, or the script cannot run, write the template below manually. Start with `This report was written manually by the model because: ...`; keep the remaining format. Use `summary` timings or events; if neither exists, write `No record`.
+1. Run `report` per [run records](run-record.md); it saves run-directory `report.md`. Paste output unchanged with at most one additional-notes paragraph.
+2. Exit `1`: correct listed `handoff.json` fields and retry at most three times.
+3. After failure, exit `2`, missing Python/script, use the template manually. Start `This report was written manually by the model because: ...`. Keep its format; use `summary`/events timings, else `No record`.
 
 ## Specification
 
-The script reads sections, outcomes, and display names here. This is the only shared specification. `result_aliases` and `agents.aliases` hold exact legacy inputs as Unicode escapes for compatibility, not output prose. Readers map them in memory before validation, never rewrite inputs or translate free text, and reject unknown values. Targets must belong to the current vocabulary. Existing fields and the CLI are unchanged; `release_audit` is optional. Older readers may reject new English values: on rollback, retain original records and use old copies or the new reader; never reverse-write user data.
+Alias maps hold exact legacy inputs as Unicode escapes. Map in memory to current values before validation; reject unknown values, preserve records/free text. Handoff fields remain; `release_audit` is optional. Older readers may reject values or miscount events; rollback requires saved originals and a matching reader, never rewriting.
 
 ```json report-spec
 {
@@ -73,13 +73,14 @@ The script reads sections, outcomes, and display names here. This is the only sh
     },
     "session_old": "This session uses older version v{session}; latest is v{latest}",
     "ask_session": "You can upgrade to v{latest}. Upgrade now?"
-  }
+  },
+  "timing": {"wall": "Total wall time {duration} (includes gaps and suspension)", "stages": "Accumulated completed stage time: {stages} (minutes; stages can overlap)", "active": "Active wall time {duration} (completed interval union)", "partial_active": "Active wall time incomplete; completed intervals cover {duration}", "suspension": "Suspension {duration} (accumulated; may overlap)", "wait_basis": "Matched waits are accumulated; {overlap}; included in stages", "overlap": "overlap is present", "no_overlap": "no overlap in recorded intervals", "ongoing": "Unfinished attempts: {attempts}", "diagnostics": "Timing incomplete: {diagnostics}"}
 }
 ```
 
 ## Template
 
-The first six sections always appear in order; write `- None` for empty sections. Add section seven only for a confirmed installable/upgradable Agent or a session package behind the latest release. Omit the entire section when there is no action available; do not add a placeholder.
+The first six sections always appear in order; empty: `- None`. Section seven needs an installable/upgradable Agent or older session package. Omit the entire section when there is no action available; no placeholder.
 
 ```markdown
 ## work-cycle report
@@ -99,7 +100,7 @@ Conclusion: <merged PR count> PRs merged; <action count> items need your action.
 
 ### Run overview
 - Startup check: <startup_check>
-- Release audit: <summary>; Result: <release audit result>; Findings: <finding>; <finding>; Unknowns: <unknown>; Evidence: <evidence>
+- Release audit: <summary>; Result: <result>; Findings: <all findings>; Unknowns: <all unknowns>; Evidence: <path>
 - Existing PRs: <count>, <note>
 - Cycles: <completed_cycles> / <requested_cycles>; Stop reason: <stop_reason>
 - Concurrency: Enabled, up to <agent_limit>; <note>
@@ -121,10 +122,10 @@ Conclusion: <merged PR count> PRs merged; <action count> items need your action.
 Filling rules:
 
 - Use Markdown for `<PR link>`: label `#<number>`, target `url`.
-- Needs your action: first PRs with results in `needs_you`, then `Paused` Issues, then extra `needs_you` items. Keep data order within each group and number continuously; their total is the conclusion's count.
-- PR results: PRs first, then Issues without PRs (`None` in PR column). An empty Issue list is `None`.
-- Omit empty `reason`/`next` parts, including `Next:`. Flatten line breaks to spaces, strip extra ending punctuation, and escape table `|` as `\|`.
-- Release audit: include this bullet only when `release_audit` is present. Use its summary, display name, every listed finding and unknown, and evidence location; omit `Findings:`/`Unknowns:` parts when empty, and never drop a listed item. Older handoffs stay unchanged.
-- Concurrency disabled or returned to serial: `Concurrency: Disabled; Reason: <serial_reason>`. Omit the separator and suffix for empty notes, likewise for the existing-PR note.
+- Needs your action: PRs in `needs_you`, then `Paused` Issues, then extra `needs_you` items; preserve group order, number continuously, and use the total in the conclusion.
+- PR results: PRs, then Issues without PRs (`None` PR column); empty Issue list: `None`.
+- Omit empty `reason`/`next` including `Next:`; flatten line breaks, trim ending punctuation, escape table `|` as `\|`.
+- Release audit: only when present; include summary, display name, every finding/unknown, and evidence. Omit empty `Findings:`/`Unknowns:` parts; preserve older handoffs.
+- Disabled/serial concurrency: `Concurrency: Disabled; Reason: <serial_reason>`. Omit separators and suffixes for empty concurrency or existing-PR notes.
 - Last section: follow section-seven rules in [installation checks](agent-check.md).
-- Time spent: total is first-to-last event; below one hour use `Y min`, otherwise `X h Y min`. Show only stages with completed records, in specification order, then unknown stage names alphabetically as-is. With no stages, omit the colon and suffix. Round minutes to the nearest integer. Missing waits are `0 min`; with no events, the section is `- No record`.
+- Time spent: total is first-to-last event. Use `Y min` below one hour, else `X h Y min`; round to nearest minute. Show completed stages in specification order, then unknown names alphabetically. Missing waits are `0 min`; no events means `- No record`. Unambiguous legacy records retain the template line (omit its colon/suffix without stages). New/ambiguous records use `timing`: elapsed wall time, completed stage sums, active interval union (incomplete with open/ambiguous attempts), suspension, matched waits/overlap, unfinished attempts, and diagnostics. Waits remain in stage occupancy; never subtract overlapping waits twice or claim CPU time. Summary: seconds; never reconstruct ambiguous legacy events.

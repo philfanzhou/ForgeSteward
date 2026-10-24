@@ -114,6 +114,58 @@ class RunReportTests(unittest.TestCase):
             positions.append(line.index(name))
         self.assertEqual(positions, sorted(positions))
 
+    def test_attempt_timing_fixture_excludes_gaps_and_preserves_source(self):
+        text = self.assert_golden("empty.json", "attempts.jsonl", "attempts.md")
+        self.assertIn("Total wall time 2 h 56 min (includes gaps and suspension)", text)
+        self.assertIn("Review 14, Cleanup 8 (minutes; stages can overlap)", text)
+        self.assertIn("Active wall time 21 min (completed interval union)", text)
+        self.assertNotIn("Timing incomplete:", text)
+        path = self.make_run("empty.json", "attempts.jsonl")
+        before = (path / "events.jsonl").read_bytes()
+        self.assertEqual(self.report(path).returncode, 0)
+        self.assertEqual((path / "events.jsonl").read_bytes(), before)
+
+    def test_suspended_and_running_attempts_are_explicit_in_report(self):
+        path = self.make_run("empty.json")
+        for task, attempt, status, at in (
+                ("review", 1, "started", "00:00:00"), ("review", 1, "finished", "00:10:00"),
+                ("review", 2, "started", "01:00:00"), ("review", 2, "suspended", "01:10:00"),
+                ("cleanup", 1, "started", "01:00:00")):
+            record.add_event(path, task, task, status, None, None,
+                             record.parse("2026-10-23T" + at + "Z"), attempt)
+        outcome = self.report(path)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        text = outcome.stdout.decode("utf-8")
+        self.assertIn("Active wall time incomplete; completed intervals cover 10 min", text)
+        self.assertIn("Unfinished attempts: review/2 (suspended), cleanup/1 (running)", text)
+        self.assertIn("Accumulated completed stage time: Review 10", text)
+
+    def test_wait_overlap_and_legacy_ambiguity_are_labeled(self):
+        path = self.make_run("empty.json")
+        for status, at, kind in (("started", "00:00:00", None), ("wait-start", "00:01:00", "ci"),
+                                 ("wait-start", "00:02:00", "lock"), ("wait-end", "00:07:00", "ci"),
+                                 ("wait-end", "00:08:00", "lock"), ("finished", "00:10:00", None)):
+            record.add_event(path, "review", "review", status, kind, None,
+                             record.parse("2026-10-23T" + at + "Z"))
+        first = self.report(path)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertIn("Matched waits are accumulated; overlap is present; included in stages", first.stdout.decode())
+        with (path / "events.jsonl").open("a", encoding="utf-8") as stream:
+            for at, status in (("01:00:00", "started"), ("01:10:00", "finished"), ("02:00:00", "started")):
+                stream.write(json.dumps(dict(task="legacy", stage="review", status=status,
+                                             at="2026-10-23T" + at + "Z")) + "\n")
+        second = self.report(path)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertIn("Timing incomplete:", second.stdout.decode())
+        self.assertIn("ambiguous legacy lifecycle", second.stdout.decode())
+
+    def test_all_malformed_events_still_show_timing_diagnostics(self):
+        path = self.make_run("empty.json")
+        (path / "events.jsonl").write_text('{}\n', encoding="utf-8")
+        result = self.report(path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("- No record\n- Timing incomplete: invalid event on line 1", result.stdout.decode())
+
     def test_release_audit_finding_and_unknown_reach_run_overview(self):
         data = json.loads((FIXTURES / "empty.json").read_text(encoding="utf-8"))
         data["release_audit"] = {

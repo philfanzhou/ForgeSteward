@@ -459,7 +459,168 @@ class RunRecordTests(unittest.TestCase):
         self.assertTrue((path / "review-pr-45-r2").is_dir())
         events = record.read_events(path)
         self.assertEqual([event["task"] for event in events], ["review-pr-45", "review-pr-45"])
-        self.assertTrue(all("attempt" not in event for event in events))
+        self.assertEqual([event["attempt"] for event in events], [1, 2])
+        self.assertEqual([event["schema"] for event in events], [2, 2])
+        self.assertEqual(len({event["event_id"] for event in events}), 2)
+
+    def timing_run(self):
+        return record.run_dir(record.runs_root(self.repo), self.start()["run_id"])
+
+    def timed(self, path, status, seconds, task="review", stage="review", attempt=1,
+              wait=None, event_id=None, wait_id=None):
+        return record.add_event(path, task, stage, status, wait, None,
+                                datetime(2026, 10, 23, tzinfo=timezone.utc) + timedelta(seconds=seconds),
+                                attempt, event_id, wait_id)
+
+    def test_original_intervals_sum_by_attempt_without_user_message_gaps(self):
+        path = self.timing_run()
+        for task, stage, attempt, begin, end in (
+                ("review", "review", 1, "12:56:01", "13:03:36"),
+                ("cleanup", "cleanup", 1, "13:03:36", "13:07:06"),
+                ("review", "review", 2, "15:42:20", "15:48:24"),
+                ("cleanup", "cleanup", 2, "15:48:24", "15:52:29")):
+            for status, clock in (("started", begin), ("finished", end)):
+                record.add_event(path, task, stage, status, None, None,
+                                 record.parse("2026-10-23T" + clock + "Z"), attempt)
+        summary = record.summarize(path)
+        self.assertEqual(summary["stage_seconds"], {"review": 819, "cleanup": 455})
+        self.assertEqual(summary["wall_seconds"], 10588)
+        self.assertEqual(summary["active_wall_seconds"], 1274)
+        self.assertTrue(summary["accounting_complete"])
+        self.assertEqual(summary["diagnostics"], [])
+        self.assertEqual([item["attempt"] for item in summary["attempts"]], [1, 1, 2, 2])
+
+    def test_new_running_attempt_does_not_inherit_terminal_result_or_gap(self):
+        path = self.timing_run()
+        self.timed(path, "started", 0)
+        self.timed(path, "finished", 10)
+        evidence = path / "review/result.md"
+        evidence.write_bytes(b"earlier evidence\n")
+        self.timed(path, "started", 100, attempt=2)
+        summary = record.summarize(path)
+        self.assertEqual(summary["tasks"][0]["result"], "running")
+        self.assertEqual(summary["tasks"][0]["attempt"], 2)
+        self.assertEqual(summary["attempts"][1]["seconds"], None)
+        self.assertEqual(summary["stage_seconds"], {"review": 10})
+        self.assertIsNone(summary["active_wall_seconds"])
+        self.assertEqual(evidence.read_bytes(), b"earlier evidence\n")
+        self.assertTrue((path / "review-r2").is_dir())
+
+    def test_suspension_resume_and_cancellation_count_only_active_intervals(self):
+        path = self.timing_run()
+        for status, at in (("started", 0), ("suspended", 10), ("resumed", 100), ("failed", 120)):
+            self.timed(path, status, at)
+        summary = record.summarize(path)
+        self.assertEqual(summary["stage_seconds"], {"review": 30})
+        self.assertEqual(summary["active_wall_seconds"], 30)
+        self.assertEqual(summary["suspension_seconds"], 90)
+        self.assertEqual(summary["tasks"][0]["result"], "failed")
+        self.assertTrue(summary["accounting_complete"])
+
+    def test_suspended_attempt_is_explicit_and_not_completed(self):
+        path = self.timing_run()
+        self.timed(path, "started", 0)
+        self.timed(path, "suspended", 10)
+        summary = record.summarize(path)
+        self.assertEqual(summary["attempts"][0]["result"], "suspended")
+        self.assertIsNone(summary["attempts"][0]["seconds"])
+        self.assertFalse(summary["accounting_complete"])
+        self.assertIsNone(summary["active_wall_seconds"])
+
+    def test_overlapping_stages_and_distinct_waits_are_not_wall_time(self):
+        path = self.timing_run()
+        for status, at, identity in (("started", 0, None), ("wait-start", 1, "one"),
+                                     ("wait-start", 2, "two"), ("wait-end", 7, "one"),
+                                     ("wait-end", 8, "two"), ("finished", 10, None)):
+            self.timed(path, status, at, wait="ci" if identity else None, wait_id=identity)
+        self.timed(path, "started", 5, task="implement", stage="implement")
+        self.timed(path, "finished", 15, task="implement", stage="implement")
+        summary = record.summarize(path)
+        self.assertEqual(sum(summary["stage_seconds"].values()), 20)
+        self.assertEqual(summary["wall_seconds"], 15)
+        self.assertEqual(summary["active_wall_seconds"], 15)
+        self.assertEqual(summary["wait_seconds"], {"ci": 12})
+        self.assertEqual(summary["wait_wall_seconds"], 7)
+        self.assertTrue(summary["waits_overlap"])
+        self.assertEqual(summary["stage_seconds"]["review"], 10)  # Waits remain occupancy.
+
+    def test_exact_event_retry_and_conflict_preserve_append_only_file(self):
+        path = self.timing_run()
+        first = self.timed(path, "started", 0, event_id="stable-start")
+        before = (path / "events.jsonl").read_bytes()
+        self.assertEqual(self.timed(path, "started", 0, event_id="stable-start"), first)
+        self.assertEqual((path / "events.jsonl").read_bytes(), before)
+        with self.assertRaisesRegex(ValueError, "Conflicting event id"):
+            self.timed(path, "finished", 1, event_id="stable-start")
+        self.assertEqual((path / "events.jsonl").read_bytes(), before)
+        self.assertFalse((path / ".events.lock").exists())
+
+    def test_concurrent_identical_retries_append_once(self):
+        path = self.timing_run()
+        command = [sys.executable, "-B", str(SCRIPT), "--repo", str(self.repo), "event", "--run", path.name,
+                   "--task", "review", "--stage", "review", "--status", "started",
+                   "--event-id", "same-start", "--at", "2026-10-23T00:00:00Z"]
+        results = run_concurrent([command] * 8)
+        self.assertEqual([item.returncode for item in results], [0] * 8, repr(results))
+        self.assertEqual(len(record.read_events(path)), 1)
+
+    def test_reader_deduplicates_old_retries_but_flags_conflicting_identity(self):
+        path = self.timing_run()
+        first = self.timed(path, "started", 0, event_id="start")
+        self.timed(path, "finished", 10)
+        with (path / "events.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(first) + "\n")
+        self.assertEqual(record.summarize(path)["stage_seconds"], {"review": 10})
+        with (path / "events.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(dict(first, status="finished")) + "\n")
+        summary = record.summarize(path)
+        self.assertEqual(summary["stage_seconds"], {})
+        self.assertIn("conflicting event id: start", summary["diagnostics"])
+        self.assertIsNone(summary["active_wall_seconds"])
+
+    def test_unmatched_lifecycle_and_wait_transitions_are_incomplete(self):
+        for sequence in (("finished",), ("resumed",), ("started", "started", "finished"),
+                         ("started", "finished", "resumed"), ("started", "wait-end", "finished"),
+                         ("started", "wait-start", "finished"), ("started", "wait-start", "wait-start", "finished")):
+            with self.subTest(sequence=sequence):
+                path = self.timing_run()
+                for at, status in enumerate(sequence):
+                    self.timed(path, status, at, wait="ci" if status.startswith("wait-") else None)
+                summary = record.summarize(path)
+                self.assertFalse(summary["accounting_complete"])
+                self.assertTrue(summary["diagnostics"])
+                self.assertIsNone(summary["active_wall_seconds"])
+
+    def test_legacy_pairs_read_without_rewriting_and_ambiguous_repeats_are_flagged(self):
+        path = self.timing_run()
+        events = [{"task": "review", "stage": "review", "status": status,
+                   "at": "2026-10-23T00:00:%02dZ" % at}
+                  for at, status in ((0, "started"), (10, "finished"))]
+        source = path / "events.jsonl"
+        source.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+        before = source.read_bytes()
+        self.assertEqual(record.summarize(path)["stage_seconds"], {"review": 10})
+        self.assertEqual(source.read_bytes(), before)
+        with source.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(dict(events[0], at="2026-10-23T01:00:00Z")) + "\n")
+            stream.write(json.dumps(dict(events[1], at="2026-10-23T01:00:10Z")) + "\n")
+        before = source.read_bytes()
+        summary = record.summarize(path)
+        self.assertEqual(summary["stage_seconds"], {})
+        self.assertTrue(any("ambiguous legacy" in problem for problem in summary["diagnostics"]))
+        self.assertEqual(source.read_bytes(), before)
+
+    def test_malformed_records_are_diagnosed_without_echoing_sensitive_details(self):
+        path = self.timing_run()
+        for value in ([], {}, {"at": "bad", "detail": "private fixture payload"},
+                      {"schema": 99, "at": "2026-10-23T00:00:00Z", "task": "review",
+                       "stage": "review", "status": "started", "detail": "private fixture payload"}):
+            with (path / "events.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(value) + "\n")
+        summary = record.summarize(path)
+        self.assertEqual(len(summary["diagnostics"]), 4)
+        self.assertNotIn("private fixture payload", json.dumps(summary))
+        self.assertFalse(summary["accounting_complete"])
 
     def test_attempt_outside_range_is_rejected(self):
         run_id = self.start()["run_id"]

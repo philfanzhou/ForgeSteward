@@ -1,0 +1,8 @@
+{"schema": 2, "event_id": "review-1-started", "attempt": 1, "task": "review", "stage": "review", "status": "started", "at": "2026-10-23T12:56:01Z"}
+{"schema": 2, "event_id": "review-1-finished", "attempt": 1, "task": "review", "stage": "review", "status": "finished", "at": "2026-10-23T13:03:36Z"}
+{"schema": 2, "event_id": "cleanup-1-started", "attempt": 1, "task": "cleanup", "stage": "cleanup", "status": "started", "at": "2026-10-23T13:03:36Z"}
+{"schema": 2, "event_id": "cleanup-1-finished", "attempt": 1, "task": "cleanup", "stage": "cleanup", "status": "finished", "at": "2026-10-23T13:07:06Z"}
+{"schema": 2, "event_id": "review-2-started", "attempt": 2, "task": "review", "stage": "review", "status": "started", "at": "2026-10-23T15:42:20Z"}
+{"schema": 2, "event_id": "review-2-finished", "attempt": 2, "task": "review", "stage": "review", "status": "finished", "at": "2026-10-23T15:48:24Z"}
+{"schema": 2, "event_id": "cleanup-2-started", "attempt": 2, "task": "cleanup", "stage": "cleanup", "status": "started", "at": "2026-10-23T15:48:24Z"}
+{"schema": 2, "event_id": "cleanup-2-finished", "attempt": 2, "task": "cleanup", "stage": "cleanup", "status": "finished", "at": "2026-10-23T15:52:29Z"}
