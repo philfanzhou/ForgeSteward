@@ -18,6 +18,39 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def is_link(path):
+    """Include Windows junction/reparse paths, which may not report is_symlink()."""
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(info.st_mode) or bool(
+        getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def resources(package):
+    """Inventory the complete package, excluding regenerable Python bytecode only."""
+    package = Path(package).absolute()
+    if is_link(package):
+        raise ValueError(f"{package}: package must not be a symlink")
+    root = package.resolve()
+    pending, rows = [root], []
+    while pending:
+        for child in sorted(pending.pop().iterdir()):
+            if is_link(child):
+                raise ValueError(f"{child}: symlink package resource")
+            if child.name == "__pycache__" or child.suffix == ".pyc":
+                continue
+            relative = child.relative_to(root).as_posix()
+            if child.is_dir():
+                rows.append({"path": relative, "directory": True})
+                pending.append(child)
+            else:
+                name, raw = package_file(root, relative)
+                rows.append({"path": name, "bytes": len(raw), "sha256": digest(raw)})
+    return sorted(rows, key=lambda row: row["path"])
+
+
 def package_file(root, relative):
     """Reject escaping paths and every symlink component before reading a regular file."""
     if not relative or "\\" in relative or Path(relative).is_absolute():
@@ -26,7 +59,7 @@ def package_file(root, relative):
     try:
         for component in Path(relative).parts:
             path = path.parent if component == ".." else path / component
-            if path.is_symlink():
+            if is_link(path):
                 raise ValueError(f"{path}: symlink rule resource")
             if path != root and root not in path.parents:
                 raise ValueError(f"{path}: path escapes package")
@@ -41,19 +74,19 @@ def package_file(root, relative):
 def inventory(package):
     """Inventory rules and their checked local edges; do not infer conditional requirements."""
     package = Path(package).absolute()
-    if package.is_symlink():
+    if is_link(package):
         raise ValueError(f"{package}: package must not be a symlink")
     root = package.resolve()
     paths = ["SKILL.md"]
     references = root / "references"
-    if references.is_symlink():
+    if is_link(references):
         raise ValueError(f"{references}: symlink rule directory")
     if references.exists():
         pending = [references]
         while pending:
             directory = pending.pop()
             for child in sorted(directory.iterdir()):
-                if child.is_symlink():
+                if is_link(child):
                     raise ValueError(f"{child}: symlink rule resource")
                 if child.is_dir():
                     pending.append(child)

@@ -90,6 +90,19 @@ class VersionPreflightTests(unittest.TestCase):
             with self.subTest(args=args):
                 self.assertEqual(self.run_preflight(*args).returncode, 2)
 
+    def test_retained_identity_options_are_paired_and_missing_manifest_stops(self):
+        stage = self.stage("stage", "0.2.25")
+        args = self.command("0.2.25", [stage])
+        for extra in (("--rules-manifest", str(self.root / "rules/manifest.json")),
+                      ("--rules-identity", "0" * 64)):
+            self.assertEqual(self.run_preflight(*args, *extra).returncode, 2)
+        missing = self.root / "rules/manifest.json"
+        result = self.run_preflight(*args, "--rules-manifest", str(missing),
+                                    "--rules-identity", "0" * 64)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(str(missing), result.stderr)
+        self.assertIn("preserve run state", result.stderr)
+
 
 class StartupPreflightRuleTests(unittest.TestCase):
     def test_startup_requires_the_preflight_before_the_first_stage_write(self):

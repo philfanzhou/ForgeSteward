@@ -22,6 +22,9 @@ def parser():
                         help="expected unified version from the orchestrator's scripts/VERSION")
     result.add_argument("--skill-dir", action="append", required=True, default=[],
                         help="stage skill directory containing VERSION; repeat for each stage")
+    result.add_argument("--rules-manifest", type=Path,
+                        help="validate the complete retained set before checking stage markers")
+    result.add_argument("--rules-identity", help="original pinned rule-set identity from run evidence")
     return result
 
 
@@ -31,6 +34,23 @@ def main(argv=None):
     if not VERSION.fullmatch(expected):
         print("preflight: invalid --expected version: " + repr(args.expected), file=sys.stderr)
         return 2
+    if bool(args.rules_manifest) != bool(args.rules_identity):
+        print("preflight: --rules-manifest and --rules-identity must be supplied together", file=sys.stderr)
+        return 2
+    if args.rules_manifest:
+        try:
+            sys.dont_write_bytecode = True
+            from rule_snapshot import validate
+            retained = validate(args.rules_manifest, args.rules_identity, expected)
+            allowed = set(retained["packages"].values())
+            for value in args.skill_dir:
+                if str(Path(value).absolute()) not in allowed:
+                    raise ValueError(f"{value}: stage must use its verified retained directory")
+            print("preflight: retained rule-set identity " + retained["identity"])
+        except (ImportError, OSError, ValueError, KeyError, TypeError, UnicodeError) as error:
+            print("preflight: retained rules invalid: {}. Stop writes; preserve run state and "
+                  "original wait deadlines for explicit recovery.".format(error), file=sys.stderr)
+            return 1
     gaps = 0
     for value in args.skill_dir:
         marker = Path(value) / "VERSION"
