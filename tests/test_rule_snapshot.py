@@ -218,6 +218,23 @@ class RuleSnapshotTests(unittest.TestCase):
         self.assertEqual(checked, retained)
         self.unchanged_state()
 
+    def test_crlf_packages_keep_raw_identity_and_copy_bytes(self):
+        before = SNAPSHOT.resolve(self.packages, self.version)
+        for root in self.packages.values():
+            for path in root.rglob('*.md'):
+                path.write_bytes(path.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        source = SNAPSHOT.resolve(self.packages, self.version)
+        # LF checkout changes identity; an already-CRLF checkout still copies exactly.
+        if b'\r\n' not in (REPO / 'plugins/execute-work/skills/forge-steward-execute-work/SKILL.md').read_bytes():
+            self.assertNotEqual(before['identity'], source['identity'])
+        retained = self.create()
+        self.assertEqual(retained['identity'], source['identity'])
+        for name, root in self.packages.items():
+            original = (root / 'SKILL.md').read_bytes()
+            self.assertIn(b'\r\n', original)
+            self.assertEqual((Path(retained['packages'][name]) / 'SKILL.md').read_bytes(), original)
+        self.assertEqual(SNAPSHOT.validate(self.manifest, source['identity']), retained)
+
     def test_cancellation_or_source_change_leaves_no_partial_published_tree(self):
         describe = SNAPSHOT.describe
         def changed(name, package, expected):

@@ -31,7 +31,7 @@ def describe(name, package, expected):
     rules = inventory(package)
     root = Path(rules["package"])
     text = package_file(root, "SKILL.md")[1].decode("utf-8")
-    if re.findall(r"^name: (.+)$", text, re.MULTILINE) != ["forge-steward-" + name]:
+    if re.findall(r"^name: ([^\r\n]+)\r?$", text, re.MULTILINE) != ["forge-steward-" + name]:
         raise ValueError(f"{root / 'SKILL.md'}: package name does not match {name}")
     required = ["scripts/VERSION"] if name == "work-cycle" else ["VERSION"]
     if name == "work-cycle":
