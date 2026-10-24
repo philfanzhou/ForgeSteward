@@ -1,6 +1,9 @@
 """Verify the shared resource locks that queue concurrent work-cycle verification and merges."""
 
 import importlib.util
+from contextlib import redirect_stderr, redirect_stdout
+import errno
+import io
 import json
 import os
 from pathlib import Path
@@ -9,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 
 
@@ -127,6 +131,130 @@ class ResourceLockTests(unittest.TestCase):
         self.assertEqual(mismatch.returncode, 2)
         self.assertIn("capacity", mismatch.stderr)
         self.assertEqual(len(self.status("heavy")[0]["holders"]), 2)
+
+    def call_main(self, *arguments):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            code = lock.main(["--repo", str(self.repo), *arguments])
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_json_acquire_held_busy_and_omitted_capacity_error(self):
+        first = self.acquire("heavy", "run-a", "worker", 1, "--capacity", "2", "--json")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        report = json.loads(first.stdout)
+        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(report["result"], "acquired")
+        self.assertEqual((report["resource"], report["requested_capacity"], report["existing_capacity"]),
+                         ("heavy", 2, 2))
+        self.assertEqual((report["owner"], report["run"], report["task"], report["attempt"]),
+                         ("run-a/worker/1", "run-a", "worker", 1))
+        self.assertEqual(report["slot"], "slot-0")
+        root = lock.locks_root(self.repo)
+        before = (root / "heavy" / "slot-0" / "holder.json").read_bytes()
+        with mock.patch.object(lock.time, "sleep") as sleep, \
+                mock.patch.object(lock, "try_acquire", wraps=lock.try_acquire) as tried:
+            code, output, errors = self.call_main("acquire", "heavy", "--run", "run-b", "--task", "worker",
+                                                  "--wait", "60", "--json")
+        self.assertEqual((code, errors), (2, ""))
+        mismatch = json.loads(output)
+        self.assertEqual(mismatch["result"], "error")
+        self.assertEqual((mismatch["requested_capacity"], mismatch["existing_capacity"]), (1, 2))
+        self.assertIn("retry with --capacity 2", mismatch["reason"])
+        self.assertEqual(tried.call_count, 1)
+        sleep.assert_not_called()
+        self.assertEqual((root / "heavy" / "capacity").read_text().strip(), "2")
+        self.assertEqual((root / "heavy" / "slot-0" / "holder.json").read_bytes(), before)
+        held = self.acquire("heavy", "run-a", "worker", 1, "--capacity", "2", "--json")
+        self.assertEqual((held.returncode, json.loads(held.stdout)["result"]), (0, "held"))
+        self.assertEqual(len(self.status("heavy")[0]["holders"]), 1)
+        corrected = self.acquire("heavy", "run-b", "worker", 1, "--capacity", "2", "--json")
+        self.assertEqual((corrected.returncode, json.loads(corrected.stdout)["result"]), (0, "acquired"))
+        busy = self.acquire("heavy", "run-c", "worker", 1, "--capacity", "2", "--json")
+        report = json.loads(busy.stdout)
+        self.assertEqual((busy.returncode, report["result"]), (1, "busy"))
+        self.assertEqual(sorted(h["owner"] for h in report["holders"]), ["run-a/worker/1", "run-b/worker/1"])
+        self.assertEqual(len(self.status("heavy")[0]["holders"]), 2)
+
+    def test_invalid_json_arguments_never_enter_retry_or_create_lock_state(self):
+        cases = [("--wait", value) for value in ("nan", "inf", "-inf", "-1", "no-number")]
+        cases += [("--capacity", value) for value in ("0", "-1", "no-number")]
+        cases += [("--attempt", "0"), ("--run", "bad/run"), ("--task", "bad task")]
+        for option, value in cases:
+            with self.subTest(option=option, value=value), mock.patch.object(lock, "acquire") as acquire:
+                code, output, errors = self.call_main("acquire", "db", "--run", "run-a", "--task", "worker",
+                                                      option + "=" + value, "--json")
+                self.assertEqual((code, errors), (2, ""))
+                report = json.loads(output)
+                self.assertEqual((report["schema_version"], report["result"]), (1, "error"))
+                self.assertIn(option, report["reason"])
+                acquire.assert_not_called()
+                self.assertFalse(lock.locks_root(self.repo).exists())
+        for arguments in (("acquire", "db", "--json"),
+                          ("acquire", "../db", "--run", "run-a", "--task", "worker", "--json")):
+            with self.subTest(arguments=arguments):
+                result = self.run_cli(*arguments)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(json.loads(result.stdout)["result"], "error")
+                self.assertEqual(result.stderr, "")
+        legacy = self.acquire("db", "run-a", "worker", 1, "--wait", "nan")
+        self.assertEqual(legacy.returncode, 2)
+        self.assertIn("finite nonnegative", legacy.stderr)
+
+    def test_only_occupied_destination_errors_count_as_busy(self):
+        root = lock.locks_root(self.repo)
+        for code in (errno.EEXIST, errno.ENOTEMPTY):
+            with self.subTest(errno=code), mock.patch.object(lock.os, "rename", side_effect=OSError(code, "occupied")):
+                self.assertIsNone(lock.try_acquire(root, "db", 1, "run-a", "worker", 1, None))
+        self.assertEqual(list(root.glob(".tmp-*")), [])
+        for code in (errno.EACCES, errno.EIO, errno.ENOENT, errno.ENOSPC):
+            with self.subTest(errno=code), mock.patch.object(lock.os, "rename", side_effect=OSError(code, "failure")), \
+                    mock.patch.object(lock.time, "sleep") as sleep:
+                result, output, errors = self.call_main("acquire", "db", "--run", "run-a", "--task", "worker",
+                                                        "--wait", "60", "--json")
+                self.assertEqual((result, errors), (2, ""))
+                self.assertEqual(json.loads(output)["result"], "error")
+                self.assertIn("failure", json.loads(output)["reason"])
+                sleep.assert_not_called()
+                self.assertEqual(list(root.glob(".tmp-*")), [])
+                self.assertEqual(lock.holders(root / "db"), [])
+
+    def test_creation_write_and_rename_failures_preserve_existing_holders(self):
+        self.assertEqual(self.acquire("heavy", "run-a", "worker", 1, "--capacity", "2").returncode, 0)
+        root = lock.locks_root(self.repo)
+        before = (root / "heavy" / "slot-0" / "holder.json").read_bytes()
+        for target in ("mkdtemp", "write_text", "rename"):
+            module, attribute = {"mkdtemp": (lock.tempfile, "mkdtemp"),
+                                 "write_text": (lock.Path, "write_text"),
+                                 "rename": (lock.os, "rename")}[target]
+            with self.subTest(target=target), mock.patch.object(module, attribute,
+                                                               side_effect=PermissionError(errno.EACCES, "denied")), \
+                    mock.patch.object(lock.time, "sleep") as sleep:
+                code, output, errors = self.call_main("acquire", "heavy", "--run", "run-b", "--task", "worker",
+                                                      "--capacity", "2", "--wait", "60", "--json")
+                self.assertEqual((code, errors), (2, ""))
+                self.assertEqual(json.loads(output)["result"], "error")
+                self.assertEqual(json.loads(output)["existing_capacity"], 2)
+                self.assertIn("denied", json.loads(output)["reason"])
+                sleep.assert_not_called()
+                self.assertEqual((root / "heavy" / "slot-0" / "holder.json").read_bytes(), before)
+                self.assertEqual(len(lock.holders(root / "heavy")), 1)
+                self.assertEqual(list(root.glob(".tmp-*")), [])
+
+    def test_real_busy_wait_is_bounded_and_stop_preserves_holder(self):
+        self.assertEqual(self.acquire("db", "run-a", "worker").returncode, 0)
+        root = lock.locks_root(self.repo)
+        before = (root / "db" / "slot-0" / "holder.json").read_bytes()
+        with mock.patch.object(lock.time, "monotonic", side_effect=[0, 0, 1]), \
+                mock.patch.object(lock.time, "sleep") as sleep:
+            code, output, errors = self.call_main("acquire", "db", "--run", "run-b", "--task", "worker",
+                                                  "--wait", "1", "--json")
+        self.assertEqual((code, json.loads(output)["result"], errors), (1, "busy", ""))
+        sleep.assert_called_once_with(lock.POLL_SECONDS)
+        with mock.patch.object(lock.time, "sleep", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                lock.acquire(root, "db", 1, "run-b", "worker", 1, None, 60)
+        self.assertEqual((root / "db" / "slot-0" / "holder.json").read_bytes(), before)
+        self.assertEqual(len(lock.holders(root / "db")), 1)
 
     def test_only_the_owner_key_can_release(self):
         self.assertEqual(self.acquire("simulator", "run-a", "issue-1").returncode, 0)

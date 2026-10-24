@@ -10,7 +10,9 @@ State lives in the repository's Git common directory, never in project files.
 
 import argparse
 from datetime import datetime, timezone
+import errno
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -28,6 +30,25 @@ CAPACITY_FILE = "capacity"
 POLL_SECONDS = 1.0
 # The `run` resource serializes whole work-cycles in one checkout, so it is always exclusive.
 RESERVED_CAPACITY = {"run": 1}
+RESULT_VERSION = 1
+
+
+class CommandLineError(ValueError):
+    def __init__(self, parser, message):
+        super().__init__(message)
+        self.parser = parser
+
+
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # Let main emit one JSON result for malformed acquire invocations, too.
+        raise CommandLineError(self, message)
+
+
+class CapacityError(ValueError):
+    def __init__(self, message, existing_capacity):
+        super().__init__(message)
+        self.existing_capacity = existing_capacity
 
 
 def locks_root(repo):
@@ -207,8 +228,8 @@ def resource_dir(root, name, capacity):
     """Create the resource directory and fix its capacity on first use."""
     reserved = RESERVED_CAPACITY.get(name)
     if reserved is not None and capacity != reserved:
-        raise ValueError("Resource %s is reserved for run-level ownership and always uses capacity %d"
-                         % (name, reserved))
+        raise CapacityError("Resource %s is reserved for run-level ownership and always uses capacity %d; "
+                            "retry with --capacity %d" % (name, reserved, reserved), reserved)
     path = root / name
     path.mkdir(parents=True, exist_ok=True)
     marker = path / CAPACITY_FILE
@@ -221,7 +242,8 @@ def resource_dir(root, name, capacity):
     except FileExistsError:
         saved = int(marker.read_text(encoding="utf-8").strip())
         if saved != capacity:
-            raise ValueError("Resource %s already uses capacity %d, not %d" % (name, saved, capacity))
+            raise CapacityError("Resource %s already uses capacity %d, not %d; retry with --capacity %d "
+                                "without changing the existing capacity" % (name, saved, capacity, saved), saved)
     finally:
         os.unlink(staged)
     return path
@@ -277,10 +299,15 @@ def try_acquire(root, name, capacity, run, task, attempt, note):
         try:
             (staged / HOLDER_FILE).write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
             # Renaming a directory onto an occupied slot fails, so a slot has exactly one holder.
-            os.rename(str(staged), str(path / ("slot-%d" % index)))
-            return "ACQUIRED slot-%d" % index
-        except OSError:
-            continue
+            try:
+                os.rename(str(staged), str(path / ("slot-%d" % index)))
+            except OSError as error:
+                # POSIX uses EEXIST or ENOTEMPTY for an occupied directory;
+                # Windows reports an existing destination as EEXIST, too.
+                if error.errno not in (errno.EEXIST, errno.ENOTEMPTY):
+                    raise
+            else:
+                return "ACQUIRED slot-%d" % index
         finally:
             if staged.exists():
                 shutil.rmtree(str(staged), ignore_errors=True)
@@ -331,8 +358,34 @@ def status(root, name=None):
     return report
 
 
+def acquire_result(result, args=None, existing_capacity=None, entries=None, reason=None, slot=None):
+    """Versioned acquire response; unknown fields stay null on parse failures."""
+    run = getattr(args, "run", None)
+    task = getattr(args, "task", None)
+    attempt = getattr(args, "attempt", None)
+    return {"schema_version": RESULT_VERSION, "result": result,
+            "resource": getattr(args, "resource", None),
+            "requested_capacity": getattr(args, "capacity", None),
+            "existing_capacity": existing_capacity,
+            "owner": owner_key(run, task, attempt) if run and task and attempt else None,
+            "run": run, "task": task, "attempt": attempt, "slot": slot,
+            "holders": entries or [], "reason": reason}
+
+
+def known_capacity(root, name):
+    """Best-effort error context, without hiding the original acquisition failure."""
+    if root is not None and name is not None:
+        try:
+            return int((root / name / CAPACITY_FILE).read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            pass
+    return None
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    json_output = "--json" in arguments
+    parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--repo", type=Path, required=True)
     commands = parser.add_subparsers(dest="command", required=True)
     take = commands.add_parser("acquire")
@@ -343,6 +396,7 @@ def main(argv=None):
     take.add_argument("--note")
     take.add_argument("--capacity", type=int, default=1)
     take.add_argument("--wait", type=float, default=0, help="Seconds to keep retrying")
+    take.add_argument("--json", action="store_true", help="Emit a versioned acquire result object")
     give = commands.add_parser("release")
     give.add_argument("resource")
     give.add_argument("--run", required=True)
@@ -350,33 +404,56 @@ def main(argv=None):
     give.add_argument("--attempt", type=attempt_number, default=1)
     show = commands.add_parser("status")
     show.add_argument("resource", nargs="?")
-    args = parser.parse_args(argv)
+    args = None
+    root = None
     try:
+        args = parser.parse_args(arguments)
+        if args.resource is not None:
+            check_name(args.resource)
+        if args.command != "status":
+            check_component("--run", args.run)
+            check_component("--task", args.task)
+        if args.command == "acquire":
+            if args.capacity < 1:
+                raise ValueError("--capacity must be a positive whole number")
+            if not math.isfinite(args.wait) or args.wait < 0:
+                raise ValueError("--wait must be a finite nonnegative number of seconds")
         root = locks_root(args.repo)
         root.mkdir(parents=True, exist_ok=True)
         if args.command == "status":
-            if args.resource:
-                check_name(args.resource)
             print(json.dumps(status(root, args.resource), ensure_ascii=False, indent=2))
             return 0
-        check_name(args.resource)
-        check_component("--run", args.run)
-        check_component("--task", args.task)
         if args.command == "release":
             print("RELEASED " + release(root, args.resource, args.run, args.task, args.attempt))
             return 0
-        if args.capacity < 1 or args.wait < 0:
-            parser.error("--capacity must be positive and --wait must not be negative")
         outcome = acquire(root, args.resource, args.capacity, args.run, args.task, args.attempt,
                           args.note, args.wait)
         if outcome:
-            print(outcome)
+            if args.json:
+                held = outcome == "HELD"
+                print(json.dumps(acquire_result("held" if held else "acquired", args, args.capacity,
+                                                slot=None if held else outcome.split()[1]), ensure_ascii=False))
+            else:
+                print(outcome)
             return 0
-        print("BUSY " + json.dumps([describe(entry) for entry in holders(root / args.resource)],
-                                   ensure_ascii=False))
+        entries = [describe(entry) for entry in holders(root / args.resource)]
+        if args.json:
+            print(json.dumps(acquire_result("busy", args, args.capacity, entries), ensure_ascii=False))
+        else:
+            print("BUSY " + json.dumps(entries, ensure_ascii=False))
         return 1
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-        print("ERROR: " + str(error), file=sys.stderr)
+        if json_output:
+            capacity = getattr(error, "existing_capacity", None)
+            if capacity is None:
+                capacity = known_capacity(root, args.resource if args else None)
+            print(json.dumps(acquire_result("error", args, capacity,
+                                            reason=str(error)), ensure_ascii=False))
+        elif isinstance(error, CommandLineError):
+            error.parser.print_usage(sys.stderr)
+            print(error.parser.prog + ": error: " + str(error), file=sys.stderr)
+        else:
+            print("ERROR: " + str(error), file=sys.stderr)
         return 2
 
 
