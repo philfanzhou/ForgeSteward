@@ -442,7 +442,7 @@ Together, **ForgeSteward** means a trusted steward for the software forge: an ag
 
 ## Agent instructions
 
-Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex, OpenCode and ZCode load it directly; [`CLAUDE.md`](CLAUDE.md) imports the same file for Claude Code. Open this repository root as the ZCode workspace: ZCode does not recursively load nested `AGENTS.md` or expand `@import` / `@include`. Platform adapters must not duplicate shared guidance.
+Repository-wide agent guidance has a single source of truth in [`AGENTS.md`](AGENTS.md). Codex, OpenCode, ZCode and Claude Code v2.1.277+ load it directly. Open this repository root as the ZCode workspace: ZCode does not recursively load nested `AGENTS.md` or expand `@import` / `@include`. Platform adapters must not duplicate shared guidance.
 
 Project-maintained documentation, Issue and change-request titles, bodies, and comments are written in clear English. Skills default to everyday English while honoring explicit user and target-repository language requirements.
 
