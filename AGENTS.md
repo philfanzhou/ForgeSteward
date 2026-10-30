@@ -4,7 +4,7 @@
 
 - This file is the single source of truth for repository-level Agent instructions.
 - Codex, OpenCode, and ZCode read this file directly. ZCode uses the repository root as its workspace and does not depend on subdirectory scanning or `@import`.
-- Claude Code imports this file through `CLAUDE.md` at the repository root.
+- Claude Code v2.1.277+ reads this file directly; no root `CLAUDE.md` import is needed.
 - Do not duplicate these shared rules in platform adapter files. Maintain them only here to avoid drift.
 
 ## Delivery to the main branch
